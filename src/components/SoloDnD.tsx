@@ -1483,6 +1483,14 @@ export default function SoloDnD() {
         />
       )}
       {showDev && <DevPanel onJump={jumpToScene} onClose={() => setShowDev(false)} />}
+      {showDefeated && (
+        <DefeatedScreen
+          hasPotion={inventory.some(i => i.toLowerCase().includes("зелье"))}
+          onUsePotion={handleDefeatedUsePotion}
+          onRetry={handleDefeatedRetry}
+          onMenu={() => { setShowDefeated(false); exitToMenu(); }}
+        />
+      )}
 
       <div className="sticky top-0 z-20 border-b border-stone-800/60 backdrop-blur" style={{ background: "rgba(12,10,9,0.93)" }}>
         <div className="flex items-center justify-between px-4 py-2.5">
