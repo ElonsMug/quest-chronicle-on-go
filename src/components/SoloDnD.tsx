@@ -613,6 +613,130 @@ function SpellPanel({
   );
 }
 
+// ─────────────────────────────────────────────────────────────────
+// БОЕВЫЕ КНОПКИ ПО КЛАССАМ
+// ─────────────────────────────────────────────────────────────────
+function CombatBtn({
+  onClick, disabled, children, variant = "primary", subtitle,
+}: {
+  onClick?: () => void;
+  disabled?: boolean;
+  children: React.ReactNode;
+  variant?: "primary" | "secondary" | "danger" | "magic";
+  subtitle?: string;
+}) {
+  const styles: Record<string, React.CSSProperties> = {
+    primary: { background: "linear-gradient(135deg,#d97706,#92400e)", color: "#0c0a09" },
+    secondary: { background: "#1c1917", color: "#fde68a", border: "1px solid #44403c" },
+    danger: { background: "linear-gradient(135deg,#dc2626,#7f1d1d)", color: "#0c0a09" },
+    magic: { background: "linear-gradient(135deg,#3b82f6,#1e40af)", color: "#0c0a09" },
+  };
+  const disabledStyle: React.CSSProperties = { background: "#292524", color: "#57534e", border: "1px solid #292524" };
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-all active:scale-[0.98] disabled:cursor-not-allowed"
+      style={{ ...(disabled ? disabledStyle : styles[variant]), fontFamily: "serif" }}
+    >
+      <div>{children}</div>
+      {subtitle && <div className="text-xs font-normal opacity-70 mt-0.5">{subtitle}</div>}
+    </button>
+  );
+}
+
+function CombatButtonsWarrior({
+  berserkUsed, onAttack, onBerserk, onDefend, onFree,
+}: {
+  berserkUsed: boolean;
+  onAttack: () => void;
+  onBerserk: () => void;
+  onDefend: () => void;
+  onFree: () => void;
+}) {
+  return (
+    <>
+      <CombatBtn onClick={onAttack} variant="primary">⚔️ Атаковать (меч d8)</CombatBtn>
+      <CombatBtn onClick={berserkUsed ? undefined : onBerserk} disabled={berserkUsed} variant="danger" subtitle={berserkUsed ? "Использован в этом бою" : "+2 урон / -2 AC на 2 хода"}>
+        🔥 Берсерк
+      </CombatBtn>
+      <CombatBtn onClick={onDefend} variant="secondary" subtitle="+2 AC до следующего хода">
+        🛡 Занять оборону
+      </CombatBtn>
+      <CombatBtn onClick={onFree} variant="secondary">✍ Свой вариант…</CombatBtn>
+    </>
+  );
+}
+
+function CombatButtonsRogue({
+  canSneak, onAttack, onDodge, onFree,
+}: {
+  canSneak: boolean;
+  onAttack: () => void;
+  onDodge: () => void;
+  onFree: () => void;
+}) {
+  return (
+    <>
+      <CombatBtn onClick={onAttack} variant="primary">🗡 Атаковать (кинжал d6)</CombatBtn>
+      <CombatBtn onClick={canSneak ? onAttack : undefined} disabled={!canSneak} variant="danger" subtitle={canSneak ? "+d6 урона" : "Доступна после уклонения"}>
+        🎯 Скрытая атака
+      </CombatBtn>
+      <CombatBtn onClick={onDodge} variant="secondary" subtitle="Враг бьёт с помехой">
+        💨 Уклониться
+      </CombatBtn>
+      <CombatBtn onClick={onFree} variant="secondary">✍ Свой вариант…</CombatBtn>
+    </>
+  );
+}
+
+function CombatButtonsMage({
+  spellSlots, showMini, spells, onAttack, onToggleSpells, onCastSpell, onDodge, onFree,
+}: {
+  spellSlots: { current: number; max: number };
+  showMini: boolean;
+  spells: Spell[];
+  onAttack: () => void;
+  onToggleSpells: () => void;
+  onCastSpell: (s: Spell) => void;
+  onDodge: () => void;
+  onFree: () => void;
+}) {
+  const hasSlots = spellSlots.current > 0;
+  return (
+    <>
+      <CombatBtn onClick={onAttack} variant="primary">🪄 Атаковать (посох d6)</CombatBtn>
+      <CombatBtn
+        onClick={hasSlots ? onToggleSpells : undefined}
+        disabled={!hasSlots}
+        variant="magic"
+        subtitle={hasSlots ? `${spellSlots.current}/${spellSlots.max} слотов` : "Нет слотов"}
+      >
+        ✦ Заклинание {hasSlots ? (showMini ? "▾" : "→") : ""}
+      </CombatBtn>
+      {showMini && hasSlots && (
+        <div className="space-y-1.5 pl-3 border-l-2 border-blue-900/60">
+          {spells.map((s, i) => (
+            <button
+              key={i}
+              onClick={() => onCastSpell(s)}
+              className="w-full text-left px-3 py-2 rounded-lg bg-stone-900 border border-stone-700 hover:border-blue-700 transition-colors"
+              style={{ fontFamily: "serif" }}
+            >
+              <div className="text-amber-100 text-sm font-bold">{s.name}</div>
+              <div className="text-stone-500 text-xs">{s.description}</div>
+            </button>
+          ))}
+        </div>
+      )}
+      <CombatBtn onClick={onDodge} variant="secondary" subtitle="Враг бьёт с помехой">
+        💨 Уклониться
+      </CombatBtn>
+      <CombatBtn onClick={onFree} variant="secondary">✍ Свой вариант…</CombatBtn>
+    </>
+  );
+}
+
 function DevPanel({ onJump, onClose }: { onJump: (prompt: string) => void; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.75)" }} onClick={onClose}>
