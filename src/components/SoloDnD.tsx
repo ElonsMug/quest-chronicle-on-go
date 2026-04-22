@@ -5,8 +5,9 @@ import { initAnalytics, trackEvent } from "@/lib/analytics";
 // ДАННЫЕ
 // ─────────────────────────────────────────────────────────────────
 type Stat = "str" | "dex" | "int";
-type Cantrip = { name: string; dice: string; stat: Stat; description: string };
-type Spell = { name: string; cost: number; description: string };
+type SpellType = "attack" | "defense" | "control";
+type Spell = { name: string; cost: number; type: SpellType; dice?: string; stat?: Stat; description: string };
+type ClassAbility = { name: string; type: "berserk" | "sneak" };
 type Character = {
   id: string;
   name: string;
@@ -22,43 +23,41 @@ type Character = {
   backstory: string;
   startItems: string[];
   spellSlots?: { current: number; max: number };
-  cantrips?: Cantrip[];
   spells?: Spell[];
+  classAbility?: ClassAbility;
 };
 
 const CHARACTERS: Character[] = [
   {
     id: "warrior", name: "Воин", emoji: "⚔️", subtitle: "Закалённый боец",
     hp: 14, maxHp: 14, stats: { str: 3, dex: 1, int: -1 },
-    ability: "Второе дыхание", abilityDesc: "Раз в день: восстановить d6 HP",
+    ability: "Берсерк", abilityDesc: "Раз в бой: +2 урон / -2 AC на 2 хода",
     weapon: { name: "Меч", dice: "d8", stat: "str" }, color: "#C0392B",
     backstory: "Бывший наёмник из Серого Берега. Ты видел войны и предательства, но меч не бросил.",
     startItems: ["Короткий меч", "Кожаный доспех", "Зелье лечения (d6+2 HP)"],
+    classAbility: { name: "Берсерк", type: "berserk" },
   },
   {
     id: "rogue", name: "Плут", emoji: "🗡️", subtitle: "Теневой клинок",
     hp: 10, maxHp: 10, stats: { str: 0, dex: 3, int: 1 },
-    ability: "Скрытая атака", abilityDesc: "+d6 урона из засады",
+    ability: "Скрытая атака", abilityDesc: "+d6 урона после уклонения",
     weapon: { name: "Кинжал", dice: "d6", stat: "dex" }, color: "#8E44AD",
     backstory: "Сирота с городских улиц. Ты вырос в переулках и знаешь каждую тень портового квартала.",
     startItems: ["Кинжал", "Отмычки", "Зелье лечения (d6+2 HP)"],
+    classAbility: { name: "Скрытая атака", type: "sneak" },
   },
   {
     id: "mage", name: "Маг", emoji: "🔮", subtitle: "Изгнанник Академии",
     hp: 8, maxHp: 8, stats: { str: -1, dex: 0, int: 4 },
     ability: "Заклинания", abilityDesc: "3 слота в день",
-    weapon: { name: "Магический заряд", dice: "d6", stat: "int" }, color: "#2980B9",
+    weapon: { name: "Посох", dice: "d6", stat: "int" }, color: "#2980B9",
     backstory: "Отчисленный студент Академии Серых Магов. Тебе запретили практиковать — ты практикуешь.",
     startItems: ["Посох", "Зелье лечения (d6+2 HP)", "Свиток Огненного Болта"],
     spellSlots: { current: 3, max: 3 },
-    cantrips: [
-      { name: "Огненный болт", dice: "d10", stat: "int", description: "Дальняя атака огнём" },
-      { name: "Луч холода", dice: "d8", stat: "int", description: "Замедляет врага на 1 раунд" },
-    ],
     spells: [
-      { name: "Магическая стрела", cost: 1, description: "3×d4+1 гарантированный урон, не требует броска" },
-      { name: "Усыпление", cost: 1, description: "Враг с HP ≤ 10 засыпает на 2 раунда" },
-      { name: "Щит", cost: 1, description: "+5 AC до начала следующего хода" },
+      { name: "Огненный болт", cost: 1, dice: "d10", stat: "int", type: "attack", description: "d10+INT урон" },
+      { name: "Щит", cost: 1, type: "defense", description: "+5 AC до следующего хода" },
+      { name: "Усыпление", cost: 1, type: "control", description: "Враг с HP ≤ 10 засыпает на 2 раунда" },
     ],
   },
 ];
@@ -85,12 +84,11 @@ function buildSystemPrompt(character: Character, hp: number, inventory: string[]
   const mageRules = character.id === "mage" ? `
 
 ЗАКЛИНАНИЯ МАГА:
-- Кантрипы (Огненный болт, Луч холода) — бесплатно, неограниченно
-- Заклинания (Магическая стрела, Усыпление, Щит) — стоят 1 слот
+- Заклинания (Огненный болт, Щит, Усыпление) — стоят 1 слот
 - Текущие слоты: ${spellSlots?.current ?? 0}/${spellSlots?.max ?? 0}
 - Когда игрок применяет заклинание через UI — система УЖЕ списала слот, не списывай повторно
 - DM описывает эффект заклинания в нарративе ярко и сочно
-- При Магической стреле урон гарантированный — DM пишет [ВРАГ_УРОН: Имя, сумма] (3×d4+1 без броска)
+- Огненный болт — система сама бросает d10+INT vs AC, DM описывает попадание/промах
 - При Усыплении: если HP врага ≤ 10 — добавь эффект [ЭФФЕКТ: Враг_засыпает, 2 раунда]
 - При Щите: добавь эффект игроку [ЭФФЕКТ: Щит, 1 раунд]
 ` : "";
@@ -177,6 +175,16 @@ ${spellsBlock}Инвентарь: ${inv} | Эффекты: ${eff}
 - При промахе — просто опиши промах, не используй [ВРАГ_УРОН]
 
 [ЭФФЕКТ: название, длительность] — добавить временный эффект (например, [ЭФФЕКТ: Враг_замедлен, 1 раунд], [ЭФФЕКТ: Щит, 1 раунд]).
+
+БОЕВЫЕ КНОПКИ КЛАССА:
+В бою игрок использует фиксированные кнопки класса, НЕ варианты от DM.
+DM в бою НЕ предлагает варианты 1-2-3 — только описывает результат действия игрока и ход врага.
+Исключение: после окончания боя [КОНЕЦ_БОЯ] — снова предлагай 3 варианта.
+
+Берсерк: когда получаешь [Активирован Берсерк] — следующие 2 атаки игрока наносят +2 урона, враги бьют игрока с +2 урона (AC снижен).
+Уклонение: когда получаешь [Уклонение] — опиши как персонаж уходит от удара, следующая атака врага делается с помехой.
+Скрытая атака: когда получаешь атаку после уклонения — добавь +d6 к урону в описании.
+Магическая стрела: когда получаешь [Магическая стрела: X урона] — напиши [ВРАГ_УРОН: Имя, X] для первого живого врага.
 
 СЮЖЕТ: тёмный фэнтезийный портовый город "Серый Берег". Краткость — мобильный, метро.${mageRules}`;
 }
@@ -556,11 +564,10 @@ function InventoryPanel({
 }
 
 function SpellPanel({
-  character, spellSlots, onCantrip, onSpell, onClose,
+  character, spellSlots, onSpell, onClose,
 }: {
   character: Character;
   spellSlots: { current: number; max: number };
-  onCantrip: (c: Cantrip) => void;
   onSpell: (s: Spell) => void;
   onClose: () => void;
 }) {
@@ -576,27 +583,6 @@ function SpellPanel({
           {slots.map((on, i) => (<span key={i}>{on ? "✦" : "◇"}</span>))}
           <span className="text-stone-500 text-sm ml-2 align-middle">{spellSlots.current}/{spellSlots.max}</span>
         </div>
-        {character.cantrips && character.cantrips.length > 0 && (
-          <div className="mb-4">
-            <div className="text-stone-500 text-xs uppercase tracking-widest mb-2">Кантрипы (бесплатно)</div>
-            <div className="space-y-2">
-              {character.cantrips.map((c, i) => (
-                <div key={i} className="bg-stone-800 rounded-xl px-4 py-3">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-amber-100 text-sm font-bold" style={{ fontFamily: "serif" }}>{c.name}</span>
-                    <button
-                      onClick={() => onCantrip(c)}
-                      className="text-xs px-3 py-1 rounded-lg font-bold text-stone-900 flex-shrink-0"
-                      style={{ background: "linear-gradient(135deg,#d97706,#92400e)" }}>
-                      Атаковать
-                    </button>
-                  </div>
-                  <div className="text-stone-400 text-xs">{c.description} · {c.dice}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
         {character.spells && character.spells.length > 0 && (
           <div>
             <div className="text-stone-500 text-xs uppercase tracking-widest mb-2">Заклинания (1 слот)</div>
@@ -624,6 +610,130 @@ function SpellPanel({
         )}
       </div>
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// БОЕВЫЕ КНОПКИ ПО КЛАССАМ
+// ─────────────────────────────────────────────────────────────────
+function CombatBtn({
+  onClick, disabled, children, variant = "primary", subtitle,
+}: {
+  onClick?: () => void;
+  disabled?: boolean;
+  children: React.ReactNode;
+  variant?: "primary" | "secondary" | "danger" | "magic";
+  subtitle?: string;
+}) {
+  const styles: Record<string, React.CSSProperties> = {
+    primary: { background: "linear-gradient(135deg,#d97706,#92400e)", color: "#0c0a09" },
+    secondary: { background: "#1c1917", color: "#fde68a", border: "1px solid #44403c" },
+    danger: { background: "linear-gradient(135deg,#dc2626,#7f1d1d)", color: "#0c0a09" },
+    magic: { background: "linear-gradient(135deg,#3b82f6,#1e40af)", color: "#0c0a09" },
+  };
+  const disabledStyle: React.CSSProperties = { background: "#292524", color: "#57534e", border: "1px solid #292524" };
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-all active:scale-[0.98] disabled:cursor-not-allowed"
+      style={{ ...(disabled ? disabledStyle : styles[variant]), fontFamily: "serif" }}
+    >
+      <div>{children}</div>
+      {subtitle && <div className="text-xs font-normal opacity-70 mt-0.5">{subtitle}</div>}
+    </button>
+  );
+}
+
+function CombatButtonsWarrior({
+  berserkUsed, onAttack, onBerserk, onDefend, onFree,
+}: {
+  berserkUsed: boolean;
+  onAttack: () => void;
+  onBerserk: () => void;
+  onDefend: () => void;
+  onFree: () => void;
+}) {
+  return (
+    <>
+      <CombatBtn onClick={onAttack} variant="primary">⚔️ Атаковать (меч d8)</CombatBtn>
+      <CombatBtn onClick={berserkUsed ? undefined : onBerserk} disabled={berserkUsed} variant="danger" subtitle={berserkUsed ? "Использован в этом бою" : "+2 урон / -2 AC на 2 хода"}>
+        🔥 Берсерк
+      </CombatBtn>
+      <CombatBtn onClick={onDefend} variant="secondary" subtitle="+2 AC до следующего хода">
+        🛡 Занять оборону
+      </CombatBtn>
+      <CombatBtn onClick={onFree} variant="secondary">✍ Свой вариант…</CombatBtn>
+    </>
+  );
+}
+
+function CombatButtonsRogue({
+  canSneak, onAttack, onDodge, onFree,
+}: {
+  canSneak: boolean;
+  onAttack: () => void;
+  onDodge: () => void;
+  onFree: () => void;
+}) {
+  return (
+    <>
+      <CombatBtn onClick={onAttack} variant="primary">🗡 Атаковать (кинжал d6)</CombatBtn>
+      <CombatBtn onClick={canSneak ? onAttack : undefined} disabled={!canSneak} variant="danger" subtitle={canSneak ? "+d6 урона" : "Доступна после уклонения"}>
+        🎯 Скрытая атака
+      </CombatBtn>
+      <CombatBtn onClick={onDodge} variant="secondary" subtitle="Враг бьёт с помехой">
+        💨 Уклониться
+      </CombatBtn>
+      <CombatBtn onClick={onFree} variant="secondary">✍ Свой вариант…</CombatBtn>
+    </>
+  );
+}
+
+function CombatButtonsMage({
+  spellSlots, showMini, spells, onAttack, onToggleSpells, onCastSpell, onDodge, onFree,
+}: {
+  spellSlots: { current: number; max: number };
+  showMini: boolean;
+  spells: Spell[];
+  onAttack: () => void;
+  onToggleSpells: () => void;
+  onCastSpell: (s: Spell) => void;
+  onDodge: () => void;
+  onFree: () => void;
+}) {
+  const hasSlots = spellSlots.current > 0;
+  return (
+    <>
+      <CombatBtn onClick={onAttack} variant="primary">🪄 Атаковать (посох d6)</CombatBtn>
+      <CombatBtn
+        onClick={hasSlots ? onToggleSpells : undefined}
+        disabled={!hasSlots}
+        variant="magic"
+        subtitle={hasSlots ? `${spellSlots.current}/${spellSlots.max} слотов` : "Нет слотов"}
+      >
+        ✦ Заклинание {hasSlots ? (showMini ? "▾" : "→") : ""}
+      </CombatBtn>
+      {showMini && hasSlots && (
+        <div className="space-y-1.5 pl-3 border-l-2 border-blue-900/60">
+          {spells.map((s, i) => (
+            <button
+              key={i}
+              onClick={() => onCastSpell(s)}
+              className="w-full text-left px-3 py-2 rounded-lg bg-stone-900 border border-stone-700 hover:border-blue-700 transition-colors"
+              style={{ fontFamily: "serif" }}
+            >
+              <div className="text-amber-100 text-sm font-bold">{s.name}</div>
+              <div className="text-stone-500 text-xs">{s.description}</div>
+            </button>
+          ))}
+        </div>
+      )}
+      <CombatBtn onClick={onDodge} variant="secondary" subtitle="Враг бьёт с помехой">
+        💨 Уклониться
+      </CombatBtn>
+      <CombatBtn onClick={onFree} variant="secondary">✍ Свой вариант…</CombatBtn>
+    </>
   );
 }
 
@@ -699,6 +809,11 @@ export default function SoloDnD() {
   const [showInventory, setShowInventory] = useState(false);
   const [showSpells, setShowSpells] = useState(false);
   const [spellSlots, setSpellSlots] = useState<{ current: number; max: number } | null>(null);
+  const [berserkChargesLeft, setBerserkChargesLeft] = useState(0);
+  const [berserkUsedThisCombat, setBerserkUsedThisCombat] = useState(false);
+  const [didDodgeLastTurn, setDidDodgeLastTurn] = useState(false);
+  const [defensiveStance, setDefensiveStance] = useState(false);
+  const [showSpellMini, setShowSpellMini] = useState(false);
   const [showDev, setShowDev] = useState(false);
   const devTaps = useRef(0);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -709,8 +824,12 @@ export default function SoloDnD() {
     effects: string[];
     enemies: Enemy[];
     messages: ChatMessage[];
-  }>({ character: null, hp: 0, inventory: [], effects: [], enemies: [], messages: [] });
-  stateRef.current = { character, hp, inventory, effects, enemies, messages };
+    spellSlots: { current: number; max: number } | null;
+    berserkChargesLeft: number;
+    didDodgeLastTurn: boolean;
+    defensiveStance: boolean;
+  }>({ character: null, hp: 0, inventory: [], effects: [], enemies: [], messages: [], spellSlots: null, berserkChargesLeft: 0, didDodgeLastTurn: false, defensiveStance: false });
+  stateRef.current = { character, hp, inventory, effects, enemies, messages, spellSlots, berserkChargesLeft, didDodgeLastTurn, defensiveStance };
 
   useEffect(() => { initAnalytics(); }, []);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, loading, pendingRoll, pendingInitiative]);
@@ -734,7 +853,7 @@ export default function SoloDnD() {
 
   // ── API: запрос к серверной функции /api/dm ───────────────────
   async function callAPI(char: Character, currentHp: number, currentInv: string[], currentEff: string[], history: ChatMessage[], userMessage: string) {
-    const slotsForPrompt = char.id === "mage" ? (spellSlots ?? { current: 0, max: 0 }) : null;
+    const slotsForPrompt = char.id === "mage" ? (stateRef.current.spellSlots ?? { current: 0, max: 0 }) : null;
     const res = await fetch("/api/dm", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -842,6 +961,11 @@ export default function SoloDnD() {
       const wasInCombat = currentEnemies.length > 0 || stateRef.current.enemies.length > 0;
       setInCombat(false);
       setEnemies([]);
+      // Сброс боевых состояний при окончании боя
+      setBerserkChargesLeft(0);
+      setBerserkUsedThisCombat(false);
+      setDidDodgeLastTurn(false);
+      setDefensiveStance(false);
       if (wasInCombat) {
         trackEvent("combat_ended", {
           characterId: stateRef.current.character?.id,
@@ -851,15 +975,29 @@ export default function SoloDnD() {
       }
     }
 
+    let finalEffects = newEff;
     if (parsed.newEffects?.length) {
       const labels = parsed.newEffects.map(e => e.duration ? `${e.name} (${e.duration})` : e.name);
-      const merged = [...newEff, ...labels];
-      newEff.length = 0;
-      newEff.push(...merged);
-      setEffects(merged);
+      finalEffects = [...newEff, ...labels];
+      setEffects(finalEffects);
     }
 
-    return { newHp, newInv, newEff, newEnemies };
+    // При окончании боя — убрать эффект Берсерка из списка
+    if (parsed.combatEnd || (newEnemies.length > 0 && newEnemies.every(e => e.hp <= 0))) {
+      const cleaned = finalEffects.filter(e => !/берсерк/i.test(e));
+      if (cleaned.length !== finalEffects.length) {
+        finalEffects = cleaned;
+        setEffects(cleaned);
+      }
+    }
+
+    // При начале нового боя — сбросить уклонение и оборону
+    if (parsed.initiativeTrigger) {
+      setDidDodgeLastTurn(false);
+      setDefensiveStance(false);
+    }
+
+    return { newHp, newInv, newEff: finalEffects, newEnemies };
   }
 
   async function processAndSetMessages(char: Character, currentHp: number, currentInv: string[], currentEff: string[], currentEnemies: Enemy[], reply: string, prevMessages: ChatMessage[]) {
@@ -907,6 +1045,11 @@ export default function SoloDnD() {
     setPendingRoll(null);
     setPendingInitiative(false);
     setSpellSlots(char.spellSlots ? { ...char.spellSlots } : null);
+    setBerserkChargesLeft(0);
+    setBerserkUsedThisCombat(false);
+    setDidDodgeLastTurn(false);
+    setDefensiveStance(false);
+    setShowSpellMini(false);
     setMessages([]);
     setScreen("game");
     setLoading(true);
@@ -1006,6 +1149,8 @@ export default function SoloDnD() {
     if (!c || inCombat) return;
     setHp(c.maxHp);
     if (c.spellSlots) setSpellSlots({ current: c.spellSlots.max, max: c.spellSlots.max });
+    setBerserkChargesLeft(0);
+    setBerserkUsedThisCombat(false);
     setShowInventory(false);
     setMessages(prev => [...prev, {
       role: "assistant",
@@ -1014,32 +1159,82 @@ export default function SoloDnD() {
     }]);
   }
 
-  async function handleCantrip(c: Cantrip) {
-    const { character: ch } = stateRef.current;
+  // ── Боевые действия ───────────────────────────────────────────
+  async function handleAttack() {
+    const { character: ch, enemies: en, berserkChargesLeft: bcl } = stateRef.current;
     if (!ch) return;
-    setShowSpells(false);
-    const mod = ch.stats[c.stat] || 0;
+    setDidDodgeLastTurn(false);
+    let mod = ch.stats[ch.weapon.stat] || 0;
+    let bonusNote = "";
+    if (bcl > 0) {
+      mod += 2;
+      setBerserkChargesLeft(prev => Math.max(0, prev - 1));
+      bonusNote = " [Берсерк +2 урон]";
+    }
+    if (stateRef.current.defensiveStance) {
+      setDefensiveStance(false);
+    }
+    const target = en.find(e => e.hp > 0);
+    const ac = target?.name ? 12 : 12;
     const modStr = (mod >= 0 ? "+" : "") + mod;
-    const slowEff = c.name === "Луч холода" ? " [ЭФФЕКТ: Враг_замедлен, 1 раунд]" : "";
-    const msg = `[АТАКА: ${c.name}, ${c.dice}, ${modStr}, AC врага]${slowEff}`;
-    await handleChoice(msg);
+    await handleChoice(`[АТАКА: ${ch.weapon.name}, ${ch.weapon.dice}, ${modStr}, AC${ac}]${bonusNote}`);
+  }
+
+  async function handleBerserk() {
+    setBerserkChargesLeft(2);
+    setBerserkUsedThisCombat(true);
+    setDefensiveStance(false);
+    setDidDodgeLastTurn(false);
+    setEffects(prev => [...prev, "Берсерк: +2 урон / -2 AC (2 хода)"]);
+    await handleChoice(`[Активирован Берсерк: +2 к урону и -2 AC на 2 хода]`);
+  }
+
+  async function handleDefend() {
+    setDefensiveStance(true);
+    setDidDodgeLastTurn(false);
+    await handleChoice(`[Занята оборона: +2 AC до следующего хода]`);
+  }
+
+  async function handleDodge() {
+    setDidDodgeLastTurn(true);
+    await handleChoice(`[Уклонение: враг атакует с помехой (два броска, меньший результат)]`);
   }
 
   async function handleSpell(s: Spell) {
-    if (!spellSlots || spellSlots.current <= 0) return;
+    const slots = stateRef.current.spellSlots;
+    if (!slots || slots.current <= 0) return;
+    const { character: ch, enemies: en } = stateRef.current;
+    if (!ch) return;
     setShowSpells(false);
-    setSpellSlots({ current: spellSlots.current - 1, max: spellSlots.max });
-    let msg: string;
-    if (s.name === "Магическая стрела") {
-      msg = `[Применено: Магическая стрела — 3×d4+1 гарантированный урон]`;
-    } else if (s.name === "Усыпление") {
-      msg = `[Применено: Усыпление]`;
-    } else if (s.name === "Щит") {
-      msg = `[Применено: Щит — +5 AC до следующего хода]`;
-    } else {
-      msg = `[Применено: ${s.name}]`;
+    setShowSpellMini(false);
+    setSpellSlots({ current: slots.current - 1, max: slots.max });
+    setDidDodgeLastTurn(false);
+
+    if (s.type === "attack") {
+      // Огненный болт — атака со слотом
+      const statKey: Stat = s.stat ?? "int";
+      const mod = ch.stats[statKey] || 0;
+      const target = en.find(e => e.hp > 0);
+      setPendingRoll({
+        type: "attack",
+        request: { weapon: s.name, dice: s.dice ?? "d10", mod, ac: target ? 12 : 12 },
+      });
+      return;
     }
-    await handleChoice(msg);
+    if (s.name === "Магическая стрела") {
+      const dmg = rollDice(4) + rollDice(4) + rollDice(4) + 3;
+      await handleChoice(`[Магическая стрела: ${dmg} гарантированного урона → напиши [ВРАГ_УРОН: Имя, ${dmg}]]`);
+      return;
+    }
+    if (s.type === "defense") {
+      await handleChoice(`[Применён Щит: +5 AC до следующего хода]`);
+      return;
+    }
+    if (s.type === "control") {
+      await handleChoice(`[Применено Усыпление — если HP врага ≤ 10 напиши [ЭФФЕКТ: Враг_засыпает, 2 раунда]]`);
+      return;
+    }
+    await handleChoice(`[Применено: ${s.name}]`);
   }
 
   function exitToMenu() {
@@ -1120,7 +1315,8 @@ export default function SoloDnD() {
   // ─────────────────────────────────────────────────────────────
   const lastMsg = messages[messages.length - 1];
   const parsed = lastMsg?.parsed;
-  const showChoices = !loading && !freeInput && !pendingRoll && !pendingInitiative && (parsed?.choices?.length ?? 0) > 0;
+  const showCombatButtons = !loading && !freeInput && !pendingRoll && !pendingInitiative && inCombat && !!character;
+  const showChoices = !loading && !freeInput && !pendingRoll && !pendingInitiative && !inCombat && (parsed?.choices?.length ?? 0) > 0;
   const showFreeArea = freeInput && !loading;
 
   return (
@@ -1141,7 +1337,6 @@ export default function SoloDnD() {
         <SpellPanel
           character={character}
           spellSlots={spellSlots}
-          onCantrip={handleCantrip}
           onSpell={handleSpell}
           onClose={() => setShowSpells(false)}
         />
@@ -1240,6 +1435,40 @@ export default function SoloDnD() {
 
       <div className="fixed bottom-0 left-0 right-0 z-10" style={{ background: "linear-gradient(0deg,#0c0a09 60%,transparent 100%)" }}>
         <div className="px-4 pb-6 pt-3 max-w-md mx-auto space-y-2">
+          {showCombatButtons && character && (
+            <>
+              {character.id === "warrior" && (
+                <CombatButtonsWarrior
+                  berserkUsed={berserkUsedThisCombat}
+                  onAttack={handleAttack}
+                  onBerserk={handleBerserk}
+                  onDefend={handleDefend}
+                  onFree={() => { trackEvent("free_input_used", { characterId: character.id, messageNumber: messages.length, inCombat: true }); setFreeInput(true); }}
+                />
+              )}
+              {character.id === "rogue" && (
+                <CombatButtonsRogue
+                  canSneak={didDodgeLastTurn}
+                  onAttack={handleAttack}
+                  onDodge={handleDodge}
+                  onFree={() => { trackEvent("free_input_used", { characterId: character.id, messageNumber: messages.length, inCombat: true }); setFreeInput(true); }}
+                />
+              )}
+              {character.id === "mage" && spellSlots && (
+                <CombatButtonsMage
+                  spellSlots={spellSlots}
+                  showMini={showSpellMini}
+                  spells={character.spells || []}
+                  onAttack={handleAttack}
+                  onToggleSpells={() => setShowSpellMini(v => !v)}
+                  onCastSpell={handleSpell}
+                  onDodge={handleDodge}
+                  onFree={() => { trackEvent("free_input_used", { characterId: character.id, messageNumber: messages.length, inCombat: true }); setFreeInput(true); }}
+                />
+              )}
+            </>
+          )}
+
           {showChoices && parsed && (
             <>
               {parsed.choices
