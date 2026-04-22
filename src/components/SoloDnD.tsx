@@ -75,17 +75,32 @@ const DEV_SCENES = [
 // ─────────────────────────────────────────────────────────────────
 // СИСТЕМНЫЙ ПРОМПТ
 // ─────────────────────────────────────────────────────────────────
-function buildSystemPrompt(character: Character, hp: number, inventory: string[], effects: string[]) {
+function buildSystemPrompt(character: Character, hp: number, inventory: string[], effects: string[], spellSlots: { current: number; max: number } | null) {
   const inv = inventory.length ? inventory.join(", ") : "пусто";
   const eff = effects.length ? effects.join(", ") : "нет";
   const s = (n: number) => (n >= 0 ? "+" : "") + n;
+  const spellsBlock = character.id === "mage" && spellSlots
+    ? `Слоты заклинаний: ${spellSlots.current}/${spellSlots.max}\n`
+    : "";
+  const mageRules = character.id === "mage" ? `
+
+ЗАКЛИНАНИЯ МАГА:
+- Кантрипы (Огненный болт, Луч холода) — бесплатно, неограниченно
+- Заклинания (Магическая стрела, Усыпление, Щит) — стоят 1 слот
+- Текущие слоты: ${spellSlots?.current ?? 0}/${spellSlots?.max ?? 0}
+- Когда игрок применяет заклинание через UI — система УЖЕ списала слот, не списывай повторно
+- DM описывает эффект заклинания в нарративе ярко и сочно
+- При Магической стреле урон гарантированный — DM пишет [ВРАГ_УРОН: Имя, сумма] (3×d4+1 без броска)
+- При Усыплении: если HP врага ≤ 10 — добавь эффект [ЭФФЕКТ: Враг_засыпает, 2 раунда]
+- При Щите: добавь эффект игроку [ЭФФЕКТ: Щит, 1 раунд]
+` : "";
   return `Ты — Мастер Подземелий в соло текстовой RPG (D&D 5e упрощённая). Один игрок.
 
 ПЕРСОНАЖ:
 Класс: ${character.name} | HP: ${hp}/${character.maxHp}
 Сила ${s(character.stats.str)} | Ловкость ${s(character.stats.dex)} | Интеллект ${s(character.stats.int)}
 Оружие: ${character.weapon.name} (${character.weapon.dice}+${s(character.stats[character.weapon.stat])})
-Инвентарь: ${inv} | Эффекты: ${eff}
+${spellsBlock}Инвентарь: ${inv} | Эффекты: ${eff}
 
 ФОРМАТ ОТВЕТА:
 - 3–5 предложений нарратива от второго лица
