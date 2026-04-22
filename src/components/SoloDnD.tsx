@@ -5,8 +5,9 @@ import { initAnalytics, trackEvent } from "@/lib/analytics";
 // ДАННЫЕ
 // ─────────────────────────────────────────────────────────────────
 type Stat = "str" | "dex" | "int";
-type Cantrip = { name: string; dice: string; stat: Stat; description: string };
-type Spell = { name: string; cost: number; description: string };
+type SpellType = "attack" | "defense" | "control";
+type Spell = { name: string; cost: number; type: SpellType; dice?: string; stat?: Stat; description: string };
+type ClassAbility = { name: string; type: "berserk" | "sneak" };
 type Character = {
   id: string;
   name: string;
@@ -22,43 +23,41 @@ type Character = {
   backstory: string;
   startItems: string[];
   spellSlots?: { current: number; max: number };
-  cantrips?: Cantrip[];
   spells?: Spell[];
+  classAbility?: ClassAbility;
 };
 
 const CHARACTERS: Character[] = [
   {
     id: "warrior", name: "Воин", emoji: "⚔️", subtitle: "Закалённый боец",
     hp: 14, maxHp: 14, stats: { str: 3, dex: 1, int: -1 },
-    ability: "Второе дыхание", abilityDesc: "Раз в день: восстановить d6 HP",
+    ability: "Берсерк", abilityDesc: "Раз в бой: +2 урон / -2 AC на 2 хода",
     weapon: { name: "Меч", dice: "d8", stat: "str" }, color: "#C0392B",
     backstory: "Бывший наёмник из Серого Берега. Ты видел войны и предательства, но меч не бросил.",
     startItems: ["Короткий меч", "Кожаный доспех", "Зелье лечения (d6+2 HP)"],
+    classAbility: { name: "Берсерк", type: "berserk" },
   },
   {
     id: "rogue", name: "Плут", emoji: "🗡️", subtitle: "Теневой клинок",
     hp: 10, maxHp: 10, stats: { str: 0, dex: 3, int: 1 },
-    ability: "Скрытая атака", abilityDesc: "+d6 урона из засады",
+    ability: "Скрытая атака", abilityDesc: "+d6 урона после уклонения",
     weapon: { name: "Кинжал", dice: "d6", stat: "dex" }, color: "#8E44AD",
     backstory: "Сирота с городских улиц. Ты вырос в переулках и знаешь каждую тень портового квартала.",
     startItems: ["Кинжал", "Отмычки", "Зелье лечения (d6+2 HP)"],
+    classAbility: { name: "Скрытая атака", type: "sneak" },
   },
   {
     id: "mage", name: "Маг", emoji: "🔮", subtitle: "Изгнанник Академии",
     hp: 8, maxHp: 8, stats: { str: -1, dex: 0, int: 4 },
     ability: "Заклинания", abilityDesc: "3 слота в день",
-    weapon: { name: "Магический заряд", dice: "d6", stat: "int" }, color: "#2980B9",
+    weapon: { name: "Посох", dice: "d6", stat: "int" }, color: "#2980B9",
     backstory: "Отчисленный студент Академии Серых Магов. Тебе запретили практиковать — ты практикуешь.",
     startItems: ["Посох", "Зелье лечения (d6+2 HP)", "Свиток Огненного Болта"],
     spellSlots: { current: 3, max: 3 },
-    cantrips: [
-      { name: "Огненный болт", dice: "d10", stat: "int", description: "Дальняя атака огнём" },
-      { name: "Луч холода", dice: "d8", stat: "int", description: "Замедляет врага на 1 раунд" },
-    ],
     spells: [
-      { name: "Магическая стрела", cost: 1, description: "3×d4+1 гарантированный урон, не требует броска" },
-      { name: "Усыпление", cost: 1, description: "Враг с HP ≤ 10 засыпает на 2 раунда" },
-      { name: "Щит", cost: 1, description: "+5 AC до начала следующего хода" },
+      { name: "Огненный болт", cost: 1, dice: "d10", stat: "int", type: "attack", description: "d10+INT урон" },
+      { name: "Щит", cost: 1, type: "defense", description: "+5 AC до следующего хода" },
+      { name: "Усыпление", cost: 1, type: "control", description: "Враг с HP ≤ 10 засыпает на 2 раунда" },
     ],
   },
 ];
