@@ -661,17 +661,17 @@ export default function SoloDnD() {
     setPendingRoll(null);
     let msg: string;
     if (r.type === "attack") {
-      if (rollRes.success) {
-        const sides = parseDiceSides(r.request.dice || "d6");
-        const dmgRoll = rollDice(sides);
-        const mod = r.request.mod || 0;
-        const total = dmgRoll + mod;
-        msg = `[Атака попала: ${r.request.weapon} — бросок ${rollRes.raw}${rollRes.mod !== 0 ? `+${rollRes.mod}` : ""}=${rollRes.total} vs DC${rollRes.dc} → Урон: ${dmgRoll}${mod !== 0 ? `${mod >= 0 ? "+" : ""}${mod}` : ""}=${total}]`;
+      if (rollRes.autoMiss) {
+        msg = `[Атака: ${r.request.weapon} — d20(1) АВТОПРОМАХ vs AC${rollRes.ac}]`;
+      } else if (rollRes.crit) {
+        msg = `[Атака: ${r.request.weapon} — d20(20) КРИТ vs AC${rollRes.ac} → Урон врагу: ${rollRes.damage}. Опиши удар и напиши [ВРАГ_УРОН: Имя, ${rollRes.damage}].]`;
+      } else if (rollRes.success) {
+        msg = `[Атака: ${r.request.weapon} — d20(${rollRes.hitRoll})+mod(${rollRes.mod})+prof(${rollRes.prof})=${rollRes.total} vs AC${rollRes.ac} ПОПАЛ → Урон врагу: ${rollRes.damage}. Опиши удар и напиши [ВРАГ_УРОН: Имя, ${rollRes.damage}].]`;
       } else {
-        msg = `[Атака мимо: ${r.request.weapon} — бросок ${rollRes.raw}${rollRes.mod !== 0 ? `+${rollRes.mod}` : ""}=${rollRes.total} vs DC${rollRes.dc}]`;
+        msg = `[Атака: ${r.request.weapon} — d20(${rollRes.hitRoll})+mod(${rollRes.mod})+prof(${rollRes.prof})=${rollRes.total} vs AC${rollRes.ac} МИМО]`;
       }
     } else {
-      msg = `[Проверка: ${r.request.stat} — ${rollRes.success ? "УСПЕХ" : "ПРОВАЛ"} (${rollRes.raw}${rollRes.mod !== 0 ? `+${rollRes.mod}` : ""}=${rollRes.total} vs DC${rollRes.dc})]`;
+      msg = `[Проверка: ${r.request.stat} — ${rollRes.success ? "УСПЕХ" : "ПРОВАЛ"} (${rollRes.hitRoll}${rollRes.mod !== 0 ? `${rollRes.mod >= 0 ? "+" : ""}${rollRes.mod}` : ""}=${rollRes.total} vs DC${rollRes.dc})]`;
     }
     await handleChoice(msg);
   }
