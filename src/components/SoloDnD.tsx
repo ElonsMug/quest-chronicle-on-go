@@ -774,6 +774,44 @@ function DevPanel({ onJump, onClose }: { onJump: (prompt: string) => void; onClo
   );
 }
 
+function DefeatedScreen({
+  hasPotion, onUsePotion, onRetry, onMenu,
+}: {
+  hasPotion: boolean;
+  onUsePotion: () => void;
+  onRetry: () => void;
+  onMenu: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.9)" }}>
+      <div className="max-w-sm w-full mx-4 text-center">
+        <div className="text-6xl mb-4">💀</div>
+        <div className="text-2xl font-bold text-red-400 mb-2" style={{ fontFamily: "serif" }}>Ты повержен</div>
+        <div className="text-stone-400 text-sm mb-6">Силы покидают тебя. Тьма смыкается...</div>
+        <div className="space-y-3">
+          {hasPotion && (
+            <button onClick={onUsePotion}
+              className="w-full py-3 rounded-xl font-bold text-stone-900"
+              style={{ background: "linear-gradient(135deg,#d97706,#92400e)", fontFamily: "serif" }}>
+              🧪 Выпить зелье лечения
+            </button>
+          )}
+          <button onClick={onRetry}
+            className="w-full py-3 rounded-xl border border-stone-600 bg-stone-800 text-amber-100 font-bold"
+            style={{ fontFamily: "serif" }}>
+            ⚔️ Начать бой заново
+          </button>
+          <button onClick={onMenu}
+            className="w-full py-3 rounded-xl border border-stone-700 bg-stone-900 text-stone-400 text-sm"
+            style={{ fontFamily: "serif" }}>
+            ← Вернуться в меню
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CharacterCard({ char, selected, onSelect }: { char: Character; selected: boolean; onSelect: (c: Character) => void }) {
   return (
     <button onClick={() => onSelect(char)}
