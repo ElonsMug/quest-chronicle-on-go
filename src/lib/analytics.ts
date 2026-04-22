@@ -16,6 +16,10 @@ export function initAnalytics() {
     api_host: POSTHOG_HOST,
     capture_pageview: true,
     person_profiles: "identified_only",
+    session_recording: {
+      recordCrossOriginIframes: false,
+    },
+    enable_recording_console_log: true,
   });
   initialized = true;
 }
