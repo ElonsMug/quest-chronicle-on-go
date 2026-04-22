@@ -5,6 +5,8 @@ import { initAnalytics, trackEvent } from "@/lib/analytics";
 // ДАННЫЕ
 // ─────────────────────────────────────────────────────────────────
 type Stat = "str" | "dex" | "int";
+type Cantrip = { name: string; dice: string; stat: Stat; description: string };
+type Spell = { name: string; cost: number; description: string };
 type Character = {
   id: string;
   name: string;
@@ -19,6 +21,9 @@ type Character = {
   color: string;
   backstory: string;
   startItems: string[];
+  spellSlots?: { current: number; max: number };
+  cantrips?: Cantrip[];
+  spells?: Spell[];
 };
 
 const CHARACTERS: Character[] = [
