@@ -144,12 +144,14 @@ function parseDMResponse(text: string) {
   let rollRequest: { stat: string; dc: number } | null = null;
   let damage: number | null = null;
   let newItem: string | null = null;
+  const newItems: string[] = [];
+  const upgrades: { from: string; to: string }[] = [];
   const newEnemies: { name: string; maxHp: number; hp: number }[] = [];
   const enemyDamages: { name: string; damage: number }[] = [];
   let initiativeTrigger = false;
   let combatEnd = false;
 
-  const TAG = /\[(АТАКА|БРОСОК|УРОН|ПРЕДМЕТ|ВРАГ|ВРАГ_УРОН|ИНИЦИАТИВА|КОНЕЦ_БОЯ)[^\]]*\]/gi;
+  const TAG = /\[(АТАКА|БРОСОК|УРОН|ПРЕДМЕТ|УЛУЧШЕНИЕ|ВРАГ|ВРАГ_УРОН|ИНИЦИАТИВА|КОНЕЦ_БОЯ)[^\]]*\]/gi;
 
   const atk = text.match(/\[АТАКА:\s*([^,\]]+),\s*([^,\]]+),\s*([^,\]]+),\s*AC(\d+)\]/i);
   if (atk) attackRequest = { weapon: atk[1].trim(), dice: atk[2].trim(), mod: parseInt(atk[3]) || 0, ac: parseInt(atk[4]) };
