@@ -801,6 +801,7 @@ export default function SoloDnD() {
     setInCombat(false);
     setPendingRoll(null);
     setPendingInitiative(false);
+    setSpellSlots(char.spellSlots ? { ...char.spellSlots } : null);
     setMessages([]);
     setScreen("game");
     setLoading(true);
