@@ -162,8 +162,21 @@ function parseDMResponse(text: string) {
   const dmg = text.match(/\[УРОН:\s*(\d+)\]/i);
   if (dmg) damage = parseInt(dmg[1]);
 
-  const itm = text.match(/\[ПРЕДМЕТ:\s*([^\]]+)\]/i);
-  if (itm) newItem = itm[1].trim();
+  const itemRe = /\[ПРЕДМЕТ:\s*([^\]]+)\]/gi;
+  let im: RegExpExecArray | null;
+  while ((im = itemRe.exec(text)) !== null) {
+    const name = im[1].trim();
+    if (name) {
+      newItems.push(name);
+      if (newItem === null) newItem = name;
+    }
+  }
+
+  const upgradeRe = /\[УЛУЧШЕНИЕ:\s*([^\]]+?)\s*->\s*([^\]]+?)\]/gi;
+  let um: RegExpExecArray | null;
+  while ((um = upgradeRe.exec(text)) !== null) {
+    upgrades.push({ from: um[1].trim(), to: um[2].trim() });
+  }
 
   const enemyRe = /\[ВРАГ:\s*([^,\]]+),\s*HP:(\d+)\]/gi;
   let em: RegExpExecArray | null;
