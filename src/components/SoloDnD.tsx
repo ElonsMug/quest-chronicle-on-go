@@ -5,6 +5,8 @@ import { initAnalytics, trackEvent } from "@/lib/analytics";
 // ДАННЫЕ
 // ─────────────────────────────────────────────────────────────────
 type Stat = "str" | "dex" | "int";
+type Cantrip = { name: string; dice: string; stat: Stat; description: string };
+type Spell = { name: string; cost: number; description: string };
 type Character = {
   id: string;
   name: string;
@@ -19,6 +21,9 @@ type Character = {
   color: string;
   backstory: string;
   startItems: string[];
+  spellSlots?: { current: number; max: number };
+  cantrips?: Cantrip[];
+  spells?: Spell[];
 };
 
 const CHARACTERS: Character[] = [
@@ -45,6 +50,16 @@ const CHARACTERS: Character[] = [
     weapon: { name: "Магический заряд", dice: "d6", stat: "int" }, color: "#2980B9",
     backstory: "Отчисленный студент Академии Серых Магов. Тебе запретили практиковать — ты практикуешь.",
     startItems: ["Посох", "Зелье лечения (d6+2 HP)", "Свиток Огненного Болта"],
+    spellSlots: { current: 3, max: 3 },
+    cantrips: [
+      { name: "Огненный болт", dice: "d10", stat: "int", description: "Дальняя атака огнём" },
+      { name: "Луч холода", dice: "d8", stat: "int", description: "Замедляет врага на 1 раунд" },
+    ],
+    spells: [
+      { name: "Магическая стрела", cost: 1, description: "3×d4+1 гарантированный урон, не требует броска" },
+      { name: "Усыпление", cost: 1, description: "Враг с HP ≤ 10 засыпает на 2 раунда" },
+      { name: "Щит", cost: 1, description: "+5 AC до начала следующего хода" },
+    ],
   },
 ];
 
@@ -60,17 +75,32 @@ const DEV_SCENES = [
 // ─────────────────────────────────────────────────────────────────
 // СИСТЕМНЫЙ ПРОМПТ
 // ─────────────────────────────────────────────────────────────────
-function buildSystemPrompt(character: Character, hp: number, inventory: string[], effects: string[]) {
+function buildSystemPrompt(character: Character, hp: number, inventory: string[], effects: string[], spellSlots: { current: number; max: number } | null) {
   const inv = inventory.length ? inventory.join(", ") : "пусто";
   const eff = effects.length ? effects.join(", ") : "нет";
   const s = (n: number) => (n >= 0 ? "+" : "") + n;
+  const spellsBlock = character.id === "mage" && spellSlots
+    ? `Слоты заклинаний: ${spellSlots.current}/${spellSlots.max}\n`
+    : "";
+  const mageRules = character.id === "mage" ? `
+
+ЗАКЛИНАНИЯ МАГА:
+- Кантрипы (Огненный болт, Луч холода) — бесплатно, неограниченно
+- Заклинания (Магическая стрела, Усыпление, Щит) — стоят 1 слот
+- Текущие слоты: ${spellSlots?.current ?? 0}/${spellSlots?.max ?? 0}
+- Когда игрок применяет заклинание через UI — система УЖЕ списала слот, не списывай повторно
+- DM описывает эффект заклинания в нарративе ярко и сочно
+- При Магической стреле урон гарантированный — DM пишет [ВРАГ_УРОН: Имя, сумма] (3×d4+1 без броска)
+- При Усыплении: если HP врага ≤ 10 — добавь эффект [ЭФФЕКТ: Враг_засыпает, 2 раунда]
+- При Щите: добавь эффект игроку [ЭФФЕКТ: Щит, 1 раунд]
+` : "";
   return `Ты — Мастер Подземелий в соло текстовой RPG (D&D 5e упрощённая). Один игрок.
 
 ПЕРСОНАЖ:
 Класс: ${character.name} | HP: ${hp}/${character.maxHp}
 Сила ${s(character.stats.str)} | Ловкость ${s(character.stats.dex)} | Интеллект ${s(character.stats.int)}
 Оружие: ${character.weapon.name} (${character.weapon.dice}+${s(character.stats[character.weapon.stat])})
-Инвентарь: ${inv} | Эффекты: ${eff}
+${spellsBlock}Инвентарь: ${inv} | Эффекты: ${eff}
 
 ФОРМАТ ОТВЕТА:
 - 3–5 предложений нарратива от второго лица
@@ -146,7 +176,9 @@ function buildSystemPrompt(character: Character, hp: number, inventory: string[]
 - Урон от атаки при попадании — посчитай сам исходя из кубика и модификатора, напиши [ВРАГ_УРОН: Имя, урон]
 - При промахе — просто опиши промах, не используй [ВРАГ_УРОН]
 
-СЮЖЕТ: тёмный фэнтезийный портовый город "Серый Берег". Краткость — мобильный, метро.`;
+[ЭФФЕКТ: название, длительность] — добавить временный эффект (например, [ЭФФЕКТ: Враг_замедлен, 1 раунд], [ЭФФЕКТ: Щит, 1 раунд]).
+
+СЮЖЕТ: тёмный фэнтезийный портовый город "Серый Берег". Краткость — мобильный, метро.${mageRules}`;
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -165,10 +197,11 @@ function parseDMResponse(text: string) {
   const upgrades: { from: string; to: string }[] = [];
   const newEnemies: { name: string; maxHp: number; hp: number }[] = [];
   const enemyDamages: { name: string; damage: number }[] = [];
+  const newEffects: { name: string; duration: string }[] = [];
   let initiativeTrigger = false;
   let combatEnd = false;
 
-  const TAG = /\[(АТАКА|БРОСОК|УРОН|ПРЕДМЕТ|УЛУЧШЕНИЕ|ВРАГ|ВРАГ_УРОН|ИНИЦИАТИВА|КОНЕЦ_БОЯ)[^\]]*\]/gi;
+  const TAG = /\[(АТАКА|БРОСОК|УРОН|ПРЕДМЕТ|УЛУЧШЕНИЕ|ВРАГ|ВРАГ_УРОН|ЭФФЕКТ|ИНИЦИАТИВА|КОНЕЦ_БОЯ)[^\]]*\]/gi;
 
   const atk = text.match(/\[АТАКА:\s*([^,\]]+),\s*([^,\]]+),\s*([^,\]]+),\s*AC(\d+)\]/i);
   if (atk) attackRequest = { weapon: atk[1].trim(), dice: atk[2].trim(), mod: parseInt(atk[3]) || 0, ac: parseInt(atk[4]) };
@@ -203,6 +236,14 @@ function parseDMResponse(text: string) {
   let ed: RegExpExecArray | null;
   while ((ed = edRe.exec(text)) !== null) enemyDamages.push({ name: ed[1].trim(), damage: parseInt(ed[2]) });
 
+  const effRe = /\[ЭФФЕКТ:\s*([^,\]]+)(?:,\s*([^\]]+))?\]/gi;
+  let efm: RegExpExecArray | null;
+  while ((efm = effRe.exec(text)) !== null) {
+    const name = efm[1].trim();
+    const duration = (efm[2] || "").trim();
+    if (name) newEffects.push({ name, duration });
+  }
+
   if (/\[ИНИЦИАТИВА\]/i.test(text)) initiativeTrigger = true;
   if (/\[КОНЕЦ_БОЯ\]/i.test(text)) combatEnd = true;
 
@@ -214,7 +255,7 @@ function parseDMResponse(text: string) {
     narrativeLines.push(line);
   }
 
-  return { narrative: narrativeLines.join("\n").trim(), choices, attackRequest, rollRequest, damage, newItem, newItems, upgrades, newEnemies, enemyDamages, initiativeTrigger, combatEnd };
+  return { narrative: narrativeLines.join("\n").trim(), choices, attackRequest, rollRequest, damage, newItem, newItems, upgrades, newEnemies, enemyDamages, newEffects, initiativeTrigger, combatEnd };
 }
 
 function rollDice(sides: number) { return Math.floor(Math.random() * sides) + 1; }
@@ -438,7 +479,18 @@ function RollBlock({ type, request, onResult }: { type: "attack" | "roll"; reque
   );
 }
 
-function InventoryPanel({ inventory, effects, onUseItem, onClose }: { inventory: string[]; effects: string[]; onUseItem: (item: string, idx: number) => void; onClose: () => void }) {
+function InventoryPanel({
+  inventory, effects, onUseItem, onShortRest, onLongRest, inCombat, onClose,
+}: {
+  inventory: string[];
+  effects: string[];
+  onUseItem: (item: string, idx: number) => void;
+  onShortRest: () => void;
+  onLongRest: () => void;
+  inCombat: boolean;
+  onClose: () => void;
+}) {
+  const restTitle = inCombat ? "Нельзя отдыхать в бою" : "";
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.75)" }} onClick={onClose}>
       <div className="w-full max-w-md bg-stone-900 border border-stone-700 rounded-t-3xl p-6 pb-10" onClick={e => e.stopPropagation()}>
@@ -474,6 +526,100 @@ function InventoryPanel({ inventory, effects, onUseItem, onClose }: { inventory:
             {effects.map((e, i) => (
               <div key={i} className="text-amber-300 text-sm bg-stone-800 rounded-lg px-3 py-2 mb-1">{e}</div>
             ))}
+          </div>
+        )}
+        <div className="mt-4 pt-4 border-t border-stone-800">
+          <div className="text-stone-500 text-xs uppercase tracking-widest mb-2">Отдых</div>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={onShortRest}
+              disabled={inCombat}
+              title={restTitle}
+              className="py-2.5 rounded-xl border border-stone-700 bg-stone-800 text-amber-100 text-sm font-bold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed hover:border-amber-700/50"
+              style={{ fontFamily: "serif" }}>
+              ☕ Короткий
+            </button>
+            <button
+              onClick={onLongRest}
+              disabled={inCombat}
+              title={restTitle}
+              className="py-2.5 rounded-xl text-stone-900 text-sm font-bold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ background: inCombat ? "#292524" : "linear-gradient(135deg,#d97706,#92400e)", color: inCombat ? "#57534e" : "#0c0a09", fontFamily: "serif" }}>
+              🌙 Длинный
+            </button>
+          </div>
+          {inCombat && <div className="text-stone-600 text-xs mt-2 text-center">Нельзя отдыхать в бою</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SpellPanel({
+  character, spellSlots, onCantrip, onSpell, onClose,
+}: {
+  character: Character;
+  spellSlots: { current: number; max: number };
+  onCantrip: (c: Cantrip) => void;
+  onSpell: (s: Spell) => void;
+  onClose: () => void;
+}) {
+  const slots = Array.from({ length: spellSlots.max }, (_, i) => i < spellSlots.current);
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.75)" }} onClick={onClose}>
+      <div className="w-full max-w-md bg-stone-900 border border-stone-700 rounded-t-3xl p-6 pb-10 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-amber-400 font-bold" style={{ fontFamily: "serif" }}>✦ Заклинания</div>
+          <button onClick={onClose} className="text-stone-500 text-xl leading-none">✕</button>
+        </div>
+        <div className="text-center text-2xl mb-4 tracking-widest" style={{ color: "#60a5fa" }}>
+          {slots.map((on, i) => (<span key={i}>{on ? "✦" : "◇"}</span>))}
+          <span className="text-stone-500 text-sm ml-2 align-middle">{spellSlots.current}/{spellSlots.max}</span>
+        </div>
+        {character.cantrips && character.cantrips.length > 0 && (
+          <div className="mb-4">
+            <div className="text-stone-500 text-xs uppercase tracking-widest mb-2">Кантрипы (бесплатно)</div>
+            <div className="space-y-2">
+              {character.cantrips.map((c, i) => (
+                <div key={i} className="bg-stone-800 rounded-xl px-4 py-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-amber-100 text-sm font-bold" style={{ fontFamily: "serif" }}>{c.name}</span>
+                    <button
+                      onClick={() => onCantrip(c)}
+                      className="text-xs px-3 py-1 rounded-lg font-bold text-stone-900 flex-shrink-0"
+                      style={{ background: "linear-gradient(135deg,#d97706,#92400e)" }}>
+                      Атаковать
+                    </button>
+                  </div>
+                  <div className="text-stone-400 text-xs">{c.description} · {c.dice}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {character.spells && character.spells.length > 0 && (
+          <div>
+            <div className="text-stone-500 text-xs uppercase tracking-widest mb-2">Заклинания (1 слот)</div>
+            <div className="space-y-2">
+              {character.spells.map((s, i) => {
+                const hasSlots = spellSlots.current > 0;
+                return (
+                  <div key={i} className="bg-stone-800 rounded-xl px-4 py-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-amber-100 text-sm font-bold" style={{ fontFamily: "serif" }}>{s.name}</span>
+                      <button
+                        onClick={() => hasSlots && onSpell(s)}
+                        disabled={!hasSlots}
+                        className="text-xs px-3 py-1 rounded-lg font-bold flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+                        style={{ background: hasSlots ? "linear-gradient(135deg,#3b82f6,#1e40af)" : "#292524", color: hasSlots ? "#0c0a09" : "#57534e" }}>
+                        {hasSlots ? "Применить" : "Нет слотов"}
+                      </button>
+                    </div>
+                    <div className="text-stone-400 text-xs">{s.description}</div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
@@ -551,6 +697,8 @@ export default function SoloDnD() {
   const [freeInput, setFreeInput] = useState(false);
   const [freeText, setFreeText] = useState("");
   const [showInventory, setShowInventory] = useState(false);
+  const [showSpells, setShowSpells] = useState(false);
+  const [spellSlots, setSpellSlots] = useState<{ current: number; max: number } | null>(null);
   const [showDev, setShowDev] = useState(false);
   const devTaps = useRef(0);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -586,11 +734,12 @@ export default function SoloDnD() {
 
   // ── API: запрос к серверной функции /api/dm ───────────────────
   async function callAPI(char: Character, currentHp: number, currentInv: string[], currentEff: string[], history: ChatMessage[], userMessage: string) {
+    const slotsForPrompt = char.id === "mage" ? (spellSlots ?? { current: 0, max: 0 }) : null;
     const res = await fetch("/api/dm", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        system: buildSystemPrompt(char, currentHp, currentInv, currentEff),
+        system: buildSystemPrompt(char, currentHp, currentInv, currentEff, slotsForPrompt),
         messages: [...history, { role: "user", content: userMessage }].map(m => ({ role: m.role, content: m.content })),
       }),
     });
@@ -702,6 +851,14 @@ export default function SoloDnD() {
       }
     }
 
+    if (parsed.newEffects?.length) {
+      const labels = parsed.newEffects.map(e => e.duration ? `${e.name} (${e.duration})` : e.name);
+      const merged = [...newEff, ...labels];
+      newEff.length = 0;
+      newEff.push(...merged);
+      setEffects(merged);
+    }
+
     return { newHp, newInv, newEff, newEnemies };
   }
 
@@ -749,6 +906,7 @@ export default function SoloDnD() {
     setInCombat(false);
     setPendingRoll(null);
     setPendingInitiative(false);
+    setSpellSlots(char.spellSlots ? { ...char.spellSlots } : null);
     setMessages([]);
     setScreen("game");
     setLoading(true);
@@ -827,6 +985,61 @@ export default function SoloDnD() {
       content: `Зелье выпито. +${heal} HP. (${newHp}/${c.maxHp})`,
       parsed: parseDMResponse(`✦ Ты выпиваешь зелье лечения. Тёплая волна прокатывается по телу. +${heal} HP. (${newHp}/${c.maxHp})`)
     }]);
+  }
+
+  function handleShortRest() {
+    const { character: c, hp: h } = stateRef.current;
+    if (!c || inCombat) return;
+    const heal = rollDice(6);
+    const newHp = Math.min(c.maxHp, h + heal);
+    setHp(newHp);
+    setShowInventory(false);
+    setMessages(prev => [...prev, {
+      role: "assistant",
+      content: `✦ Короткий отдых. Восстановлено ${heal} HP. (${newHp}/${c.maxHp})`,
+      parsed: parseDMResponse(`✦ Короткий отдых. Восстановлено ${heal} HP. (${newHp}/${c.maxHp})`)
+    }]);
+  }
+
+  function handleLongRest() {
+    const { character: c } = stateRef.current;
+    if (!c || inCombat) return;
+    setHp(c.maxHp);
+    if (c.spellSlots) setSpellSlots({ current: c.spellSlots.max, max: c.spellSlots.max });
+    setShowInventory(false);
+    setMessages(prev => [...prev, {
+      role: "assistant",
+      content: `✦ Длинный отдых. HP и слоты полностью восстановлены.`,
+      parsed: parseDMResponse(`✦ Длинный отдых. HP и слоты полностью восстановлены.`)
+    }]);
+  }
+
+  async function handleCantrip(c: Cantrip) {
+    const { character: ch } = stateRef.current;
+    if (!ch) return;
+    setShowSpells(false);
+    const mod = ch.stats[c.stat] || 0;
+    const modStr = (mod >= 0 ? "+" : "") + mod;
+    const slowEff = c.name === "Луч холода" ? " [ЭФФЕКТ: Враг_замедлен, 1 раунд]" : "";
+    const msg = `[АТАКА: ${c.name}, ${c.dice}, ${modStr}, AC врага]${slowEff}`;
+    await handleChoice(msg);
+  }
+
+  async function handleSpell(s: Spell) {
+    if (!spellSlots || spellSlots.current <= 0) return;
+    setShowSpells(false);
+    setSpellSlots({ current: spellSlots.current - 1, max: spellSlots.max });
+    let msg: string;
+    if (s.name === "Магическая стрела") {
+      msg = `[Применено: Магическая стрела — 3×d4+1 гарантированный урон]`;
+    } else if (s.name === "Усыпление") {
+      msg = `[Применено: Усыпление]`;
+    } else if (s.name === "Щит") {
+      msg = `[Применено: Щит — +5 AC до следующего хода]`;
+    } else {
+      msg = `[Применено: ${s.name}]`;
+    }
+    await handleChoice(msg);
   }
 
   function exitToMenu() {
@@ -913,7 +1126,26 @@ export default function SoloDnD() {
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(180deg,#0c0a09 0%,#1c1917 100%)", fontFamily: "serif" }}>
 
-      {showInventory && <InventoryPanel inventory={inventory} effects={effects} onUseItem={handleUseItem} onClose={() => setShowInventory(false)} />}
+      {showInventory && (
+        <InventoryPanel
+          inventory={inventory}
+          effects={effects}
+          onUseItem={handleUseItem}
+          onShortRest={handleShortRest}
+          onLongRest={handleLongRest}
+          inCombat={inCombat}
+          onClose={() => setShowInventory(false)}
+        />
+      )}
+      {showSpells && character && spellSlots && (
+        <SpellPanel
+          character={character}
+          spellSlots={spellSlots}
+          onCantrip={handleCantrip}
+          onSpell={handleSpell}
+          onClose={() => setShowSpells(false)}
+        />
+      )}
       {showDev && <DevPanel onJump={jumpToScene} onClose={() => setShowDev(false)} />}
 
       <div className="sticky top-0 z-20 border-b border-stone-800/60 backdrop-blur" style={{ background: "rgba(12,10,9,0.93)" }}>
@@ -930,10 +1162,22 @@ export default function SoloDnD() {
             </button>
           </div>
 
-          <div className="flex items-center gap-1.5 min-w-[60px] justify-end">
-            <div className="text-xs text-stone-500">HP</div>
-            <div className="font-bold text-sm" style={{ color: character && hp / character.maxHp > 0.5 ? "#f87171" : character && hp / character.maxHp > 0.25 ? "#fbbf24" : "#ef4444" }}>{hp}</div>
-            <div className="text-stone-600 text-xs">/{character?.maxHp}</div>
+          <div className="flex items-center gap-2 min-w-[60px] justify-end">
+            {character?.id === "mage" && spellSlots && (
+              <button
+                onClick={() => setShowSpells(true)}
+                className="text-sm tracking-widest hover:opacity-80 transition-opacity"
+                style={{ color: "#60a5fa", fontFamily: "serif" }}
+                title={`Слоты заклинаний: ${spellSlots.current}/${spellSlots.max}`}
+              >
+                {Array.from({ length: spellSlots.max }, (_, i) => i < spellSlots.current ? "✦" : "◇").join("")}
+              </button>
+            )}
+            <div className="flex items-center gap-1.5">
+              <div className="text-xs text-stone-500">HP</div>
+              <div className="font-bold text-sm" style={{ color: character && hp / character.maxHp > 0.5 ? "#f87171" : character && hp / character.maxHp > 0.25 ? "#fbbf24" : "#ef4444" }}>{hp}</div>
+              <div className="text-stone-600 text-xs">/{character?.maxHp}</div>
+            </div>
           </div>
         </div>
 
