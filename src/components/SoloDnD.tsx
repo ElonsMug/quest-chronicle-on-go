@@ -746,6 +746,14 @@ export default function SoloDnD() {
       }
     }
 
+    if (parsed.newEffects?.length) {
+      const labels = parsed.newEffects.map(e => e.duration ? `${e.name} (${e.duration})` : e.name);
+      const merged = [...newEff, ...labels];
+      newEff.length = 0;
+      newEff.push(...merged);
+      setEffects(merged);
+    }
+
     return { newHp, newInv, newEff, newEnemies };
   }
 
