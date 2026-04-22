@@ -590,7 +590,31 @@ export default function SoloDnD() {
     let newEnemies = [...currentEnemies];
 
     if (parsed.damage) { newHp = Math.max(0, newHp - parsed.damage); setHp(newHp); }
-    if (parsed.newItem) { newInv = [...newInv, parsed.newItem]; setInventory(newInv); }
+
+    if (parsed.newItems?.length) {
+      newInv = [...newInv, ...parsed.newItems];
+      setInventory(newInv);
+    } else if (parsed.newItem) {
+      newInv = [...newInv, parsed.newItem];
+      setInventory(newInv);
+    }
+
+    if (parsed.upgrades?.length) {
+      let changed = false;
+      for (const up of parsed.upgrades) {
+        const fromLc = up.from.toLowerCase();
+        const idx = newInv.findIndex(it => it.toLowerCase() === fromLc || it.toLowerCase().includes(fromLc));
+        if (idx >= 0) {
+          newInv = [...newInv.slice(0, idx), up.to, ...newInv.slice(idx + 1)];
+          changed = true;
+        } else {
+          // если старого нет — просто добавим новый
+          newInv = [...newInv, up.to];
+          changed = true;
+        }
+      }
+      if (changed) setInventory(newInv);
+    }
 
     if (parsed.newEnemies?.length) {
       const wasInCombat = currentEnemies.length > 0;
