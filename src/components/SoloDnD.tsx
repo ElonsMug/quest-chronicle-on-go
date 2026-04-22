@@ -1306,6 +1306,40 @@ export default function SoloDnD() {
 
       <div className="fixed bottom-0 left-0 right-0 z-10" style={{ background: "linear-gradient(0deg,#0c0a09 60%,transparent 100%)" }}>
         <div className="px-4 pb-6 pt-3 max-w-md mx-auto space-y-2">
+          {showCombatButtons && character && (
+            <>
+              {character.id === "warrior" && (
+                <CombatButtonsWarrior
+                  berserkUsed={berserkUsedThisCombat}
+                  onAttack={handleAttack}
+                  onBerserk={handleBerserk}
+                  onDefend={handleDefend}
+                  onFree={() => { trackEvent("free_input_used", { characterId: character.id, messageNumber: messages.length, inCombat: true }); setFreeInput(true); }}
+                />
+              )}
+              {character.id === "rogue" && (
+                <CombatButtonsRogue
+                  canSneak={didDodgeLastTurn}
+                  onAttack={handleAttack}
+                  onDodge={handleDodge}
+                  onFree={() => { trackEvent("free_input_used", { characterId: character.id, messageNumber: messages.length, inCombat: true }); setFreeInput(true); }}
+                />
+              )}
+              {character.id === "mage" && spellSlots && (
+                <CombatButtonsMage
+                  spellSlots={spellSlots}
+                  showMini={showSpellMini}
+                  spells={character.spells || []}
+                  onAttack={handleAttack}
+                  onToggleSpells={() => setShowSpellMini(v => !v)}
+                  onCastSpell={handleSpell}
+                  onDodge={handleDodge}
+                  onFree={() => { trackEvent("free_input_used", { characterId: character.id, messageNumber: messages.length, inCombat: true }); setFreeInput(true); }}
+                />
+              )}
+            </>
+          )}
+
           {showChoices && parsed && (
             <>
               {parsed.choices
