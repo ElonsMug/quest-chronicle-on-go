@@ -571,6 +571,31 @@ export default function SoloDnD() {
       newEnemies = [...newEnemies, ...parsed.newEnemies];
       setEnemies(newEnemies);
       setInCombat(true);
+    } else if (newEnemies.length === 0) {
+      // Защита: DM забыл объявить врагов через [ВРАГ:], но в нарративе явно идёт бой.
+      // Пробуем извлечь имена и HP из текста по паттерну "Имя (HP: X/Y)".
+      const combatHints = /(атакует|нападает|нападают|HP:|культист|бандит|враг|разбойник|гоблин|орк|скелет|гнолл)/i;
+      if (combatHints.test(parsed.narrative)) {
+        const inferred: Enemy[] = [];
+        const hpRe = /([A-Za-zА-Яа-яЁё][A-Za-zА-Яа-яЁё\s'`-]{1,30}?)\s*\(\s*HP:\s*(\d+)\s*\/\s*(\d+)\s*\)/gi;
+        let m: RegExpExecArray | null;
+        const seen = new Set<string>();
+        while ((m = hpRe.exec(parsed.narrative)) !== null) {
+          const name = m[1].trim().replace(/^[—–\-•:,\.]+/, "").trim();
+          const hp = parseInt(m[2]);
+          const maxHp = parseInt(m[3]);
+          const key = `${name.toLowerCase()}|${maxHp}`;
+          if (name && maxHp > 0 && !seen.has(key)) {
+            seen.add(key);
+            inferred.push({ name, hp, maxHp });
+          }
+        }
+        if (inferred.length) {
+          newEnemies = [...newEnemies, ...inferred];
+          setEnemies(newEnemies);
+          setInCombat(true);
+        }
+      }
     }
 
     if (parsed.enemyDamages?.length) {
