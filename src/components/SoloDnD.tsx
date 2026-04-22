@@ -236,6 +236,14 @@ function parseDMResponse(text: string) {
   let ed: RegExpExecArray | null;
   while ((ed = edRe.exec(text)) !== null) enemyDamages.push({ name: ed[1].trim(), damage: parseInt(ed[2]) });
 
+  const effRe = /\[ЭФФЕКТ:\s*([^,\]]+)(?:,\s*([^\]]+))?\]/gi;
+  let efm: RegExpExecArray | null;
+  while ((efm = effRe.exec(text)) !== null) {
+    const name = efm[1].trim();
+    const duration = (efm[2] || "").trim();
+    if (name) newEffects.push({ name, duration });
+  }
+
   if (/\[ИНИЦИАТИВА\]/i.test(text)) initiativeTrigger = true;
   if (/\[КОНЕЦ_БОЯ\]/i.test(text)) combatEnd = true;
 
@@ -247,7 +255,7 @@ function parseDMResponse(text: string) {
     narrativeLines.push(line);
   }
 
-  return { narrative: narrativeLines.join("\n").trim(), choices, attackRequest, rollRequest, damage, newItem, newItems, upgrades, newEnemies, enemyDamages, initiativeTrigger, combatEnd };
+  return { narrative: narrativeLines.join("\n").trim(), choices, attackRequest, rollRequest, damage, newItem, newItems, upgrades, newEnemies, enemyDamages, newEffects, initiativeTrigger, combatEnd };
 }
 
 function rollDice(sides: number) { return Math.floor(Math.random() * sides) + 1; }
