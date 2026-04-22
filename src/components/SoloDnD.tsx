@@ -564,11 +564,10 @@ function InventoryPanel({
 }
 
 function SpellPanel({
-  character, spellSlots, onCantrip, onSpell, onClose,
+  character, spellSlots, onSpell, onClose,
 }: {
   character: Character;
   spellSlots: { current: number; max: number };
-  onCantrip: (c: Cantrip) => void;
   onSpell: (s: Spell) => void;
   onClose: () => void;
 }) {
@@ -584,27 +583,6 @@ function SpellPanel({
           {slots.map((on, i) => (<span key={i}>{on ? "✦" : "◇"}</span>))}
           <span className="text-stone-500 text-sm ml-2 align-middle">{spellSlots.current}/{spellSlots.max}</span>
         </div>
-        {character.cantrips && character.cantrips.length > 0 && (
-          <div className="mb-4">
-            <div className="text-stone-500 text-xs uppercase tracking-widest mb-2">Кантрипы (бесплатно)</div>
-            <div className="space-y-2">
-              {character.cantrips.map((c, i) => (
-                <div key={i} className="bg-stone-800 rounded-xl px-4 py-3">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-amber-100 text-sm font-bold" style={{ fontFamily: "serif" }}>{c.name}</span>
-                    <button
-                      onClick={() => onCantrip(c)}
-                      className="text-xs px-3 py-1 rounded-lg font-bold text-stone-900 flex-shrink-0"
-                      style={{ background: "linear-gradient(135deg,#d97706,#92400e)" }}>
-                      Атаковать
-                    </button>
-                  </div>
-                  <div className="text-stone-400 text-xs">{c.description} · {c.dice}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
         {character.spells && character.spells.length > 0 && (
           <div>
             <div className="text-stone-500 text-xs uppercase tracking-widest mb-2">Заклинания (1 слот)</div>
