@@ -1045,6 +1045,11 @@ export default function SoloDnD() {
     setPendingRoll(null);
     setPendingInitiative(false);
     setSpellSlots(char.spellSlots ? { ...char.spellSlots } : null);
+    setBerserkChargesLeft(0);
+    setBerserkUsedThisCombat(false);
+    setDidDodgeLastTurn(false);
+    setDefensiveStance(false);
+    setShowSpellMini(false);
     setMessages([]);
     setScreen("game");
     setLoading(true);
