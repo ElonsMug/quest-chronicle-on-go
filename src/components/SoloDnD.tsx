@@ -176,7 +176,7 @@ type ChatMessage = {
 };
 
 type Enemy = { name: string; hp: number; maxHp: number };
-type RollRequest = { stat?: string; weapon?: string; dice?: string; mod: number; dc: number };
+type RollRequest = { stat?: string; weapon?: string; dice?: string; mod: number; dc?: number; ac?: number };
 type PendingRoll = { type: "attack" | "roll"; request: RollRequest };
 
 // ─────────────────────────────────────────────────────────────────
