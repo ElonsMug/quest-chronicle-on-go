@@ -50,6 +50,16 @@ const CHARACTERS: Character[] = [
     weapon: { name: "Магический заряд", dice: "d6", stat: "int" }, color: "#2980B9",
     backstory: "Отчисленный студент Академии Серых Магов. Тебе запретили практиковать — ты практикуешь.",
     startItems: ["Посох", "Зелье лечения (d6+2 HP)", "Свиток Огненного Болта"],
+    spellSlots: { current: 3, max: 3 },
+    cantrips: [
+      { name: "Огненный болт", dice: "d10", stat: "int", description: "Дальняя атака огнём" },
+      { name: "Луч холода", dice: "d8", stat: "int", description: "Замедляет врага на 1 раунд" },
+    ],
+    spells: [
+      { name: "Магическая стрела", cost: 1, description: "3×d4+1 гарантированный урон, не требует броска" },
+      { name: "Усыпление", cost: 1, description: "Враг с HP ≤ 10 засыпает на 2 раунда" },
+      { name: "Щит", cost: 1, description: "+5 AC до начала следующего хода" },
+    ],
   },
 ];
 
