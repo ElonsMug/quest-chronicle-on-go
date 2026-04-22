@@ -182,9 +182,24 @@ DM в бою НЕ предлагает варианты 1-2-3 — только �
 Исключение: после окончания боя [КОНЕЦ_БОЯ] — снова предлагай 3 варианта.
 
 Берсерк: когда получаешь [Активирован Берсерк] — следующие 2 атаки игрока наносят +2 урона, враги бьют игрока с +2 урона (AC снижен).
-Уклонение: когда получаешь [Уклонение] — опиши как персонаж уходит от удара, следующая атака врага делается с помехой.
+Уклонение: когда получаешь [Уклонение] — враг атакует с помехой: бросает d20 ДВАЖДЫ и использует МЕНЬШИЙ результат. Это всё равно может быть попаданием если оба броска высокие. DM ОБЯЗАН явно написать оба результата броска в нарративе. Примеры:
+   "Враг бросает 14 и 7 — использует 7, промах"
+   "Враг бросает 15 и 18 — использует 15, попадание [УРОН: 4]"
+   Уклонение НЕ гарантирует избегание урона — это лишь снижает шанс попасть.
 Скрытая атака: когда получаешь атаку после уклонения — добавь +d6 к урону в описании.
 Магическая стрела: когда получаешь [Магическая стрела: X урона] — напиши [ВРАГ_УРОН: Имя, X] для первого живого врага.
+
+УНИКАЛЬНЫЕ ИМЕНА ВРАГОВ (КРИТИЧНО):
+Если в одном бою несколько врагов одного типа — ты ОБЯЗАН дать им уникальные описательные имена при объявлении через [ВРАГ:].
+Никогда не используй одинаковые имена для разных врагов в одном бою — система применит урон только к одному из них.
+Примеры правильных имён:
+   [ВРАГ: Лысый бандит, HP:8]
+   [ВРАГ: Тощий бандит, HP:8]
+   [ВРАГ: Бандит со шрамом, HP:8]
+Или:
+   [ВРАГ: Старший культист, HP:10]
+   [ВРАГ: Младший культист, HP:6]
+В тегах [ВРАГ_УРОН: Имя, X] используй ровно те же уникальные имена.
 
 СЮЖЕТ: тёмный фэнтезийный портовый город "Серый Берег". Краткость — мобильный, метро.${mageRules}`;
 }
@@ -759,6 +774,44 @@ function DevPanel({ onJump, onClose }: { onJump: (prompt: string) => void; onClo
   );
 }
 
+function DefeatedScreen({
+  hasPotion, onUsePotion, onRetry, onMenu,
+}: {
+  hasPotion: boolean;
+  onUsePotion: () => void;
+  onRetry: () => void;
+  onMenu: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.9)" }}>
+      <div className="max-w-sm w-full mx-4 text-center">
+        <div className="text-6xl mb-4">💀</div>
+        <div className="text-2xl font-bold text-red-400 mb-2" style={{ fontFamily: "serif" }}>Ты повержен</div>
+        <div className="text-stone-400 text-sm mb-6">Силы покидают тебя. Тьма смыкается...</div>
+        <div className="space-y-3">
+          {hasPotion && (
+            <button onClick={onUsePotion}
+              className="w-full py-3 rounded-xl font-bold text-stone-900"
+              style={{ background: "linear-gradient(135deg,#d97706,#92400e)", fontFamily: "serif" }}>
+              🧪 Выпить зелье лечения
+            </button>
+          )}
+          <button onClick={onRetry}
+            className="w-full py-3 rounded-xl border border-stone-600 bg-stone-800 text-amber-100 font-bold"
+            style={{ fontFamily: "serif" }}>
+            ⚔️ Начать бой заново
+          </button>
+          <button onClick={onMenu}
+            className="w-full py-3 rounded-xl border border-stone-700 bg-stone-900 text-stone-400 text-sm"
+            style={{ fontFamily: "serif" }}>
+            ← Вернуться в меню
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CharacterCard({ char, selected, onSelect }: { char: Character; selected: boolean; onSelect: (c: Character) => void }) {
   return (
     <button onClick={() => onSelect(char)}
@@ -815,6 +868,8 @@ export default function SoloDnD() {
   const [defensiveStance, setDefensiveStance] = useState(false);
   const [showSpellMini, setShowSpellMini] = useState(false);
   const [showDev, setShowDev] = useState(false);
+  const [showDefeated, setShowDefeated] = useState(false);
+  const combatStartSnapshotRef = useRef<{ hp: number; enemies: Enemy[] } | null>(null);
   const devTaps = useRef(0);
   const bottomRef = useRef<HTMLDivElement>(null);
   const stateRef = useRef<{
@@ -874,7 +929,11 @@ export default function SoloDnD() {
     const newEff = [...currentEff];
     let newEnemies = [...currentEnemies];
 
-    if (parsed.damage) { newHp = Math.max(0, newHp - parsed.damage); setHp(newHp); }
+    if (parsed.damage) {
+      newHp = Math.max(0, newHp - parsed.damage);
+      setHp(newHp);
+      if (newHp <= 0) setShowDefeated(true);
+    }
 
     if (parsed.newItems?.length) {
       newInv = [...newInv, ...parsed.newItems];
@@ -948,11 +1007,12 @@ export default function SoloDnD() {
 
     if (parsed.enemyDamages?.length) {
       for (const ed of parsed.enemyDamages) {
-        newEnemies = newEnemies.map(e =>
-          e.name.toLowerCase() === ed.name.toLowerCase()
-            ? { ...e, hp: Math.max(0, e.hp - ed.damage) }
-            : e
-        );
+        const targetIdx = newEnemies.findIndex(e => e.hp > 0 && e.name.toLowerCase() === ed.name.toLowerCase());
+        if (targetIdx >= 0) {
+          newEnemies = newEnemies.map((e, i) =>
+            i === targetIdx ? { ...e, hp: Math.max(0, e.hp - ed.damage) } : e
+          );
+        }
       }
       setEnemies(newEnemies);
     }
@@ -1000,18 +1060,58 @@ export default function SoloDnD() {
     return { newHp, newInv, newEff: finalEffects, newEnemies };
   }
 
+  // Авто-бросок атаки: считает d20+mod+prof vs AC, формирует системное сообщение для DM,
+  // отправляет его через handleChoice. Никакого RollBlock — всё мгновенно.
+  async function executeAttackRoll(req: { weapon: string; dice: string; mod: number; ac: number }) {
+    const hitRoll = rollDice(20);
+    const prof = PROFICIENCY_BONUS;
+    const total = hitRoll + req.mod + prof;
+    const crit = hitRoll === 20;
+    const autoMiss = hitRoll === 1;
+    const hit = !autoMiss && (crit || total >= req.ac);
+    let damage = 0;
+    if (hit) {
+      const dmgDice = parseDiceSides(req.dice || "d6");
+      damage = crit
+        ? rollDice(dmgDice) + rollDice(dmgDice) + req.mod
+        : rollDice(dmgDice) + req.mod;
+      if (damage < 1) damage = 1;
+    }
+    let msg: string;
+    if (autoMiss) {
+      msg = `[Атака: ${req.weapon} — d20(1) АВТОПРОМАХ vs AC${req.ac}]`;
+    } else if (crit) {
+      msg = `[Атака: ${req.weapon} — d20(20) КРИТ vs AC${req.ac} → Урон врагу: ${damage}. Опиши удар и напиши [ВРАГ_УРОН: Имя, ${damage}].]`;
+    } else if (hit) {
+      msg = `[Атака: ${req.weapon} — d20(${hitRoll})+mod(${req.mod})+prof(${prof})=${total} vs AC${req.ac} ПОПАЛ → Урон врагу: ${damage}. Опиши удар и напиши [ВРАГ_УРОН: Имя, ${damage}].]`;
+    } else {
+      msg = `[Атака: ${req.weapon} — d20(${hitRoll})+mod(${req.mod})+prof(${prof})=${total} vs AC${req.ac} МИМО]`;
+    }
+    await handleChoice(msg);
+  }
+
   async function processAndSetMessages(char: Character, currentHp: number, currentInv: string[], currentEff: string[], currentEnemies: Enemy[], reply: string, prevMessages: ChatMessage[]) {
     const parsed = parseDMResponse(reply);
     const newMsgs: ChatMessage[] = [...prevMessages, { role: "assistant", content: reply, parsed }];
     const { newHp, newInv, newEff } = applyParsed(parsed, currentHp, currentInv, currentEff, currentEnemies);
     setMessages(newMsgs);
 
+    // Сохраняем снапшот в начале каждого боя — для кнопки "Начать заново"
+    if (parsed.initiativeTrigger) {
+      const snapEnemies = (parsed.newEnemies?.length ? parsed.newEnemies : stateRef.current.enemies).map(e => ({ ...e }));
+      combatStartSnapshotRef.current = { hp: newHp, enemies: snapEnemies };
+    }
+
+    let autoAttackReq: { weapon: string; dice: string; mod: number; ac: number } | null = null;
+
     if (parsed.initiativeTrigger) {
       setPendingInitiative(true);
       setPendingRoll(null);
     } else if (parsed.attackRequest) {
+      // БАГ 1: атаки идут АВТОМАТИЧЕСКИ — без RollBlock
       const mod = char.stats[char.weapon.stat] || 0;
-      setPendingRoll({ type: "attack", request: { ...parsed.attackRequest, mod } });
+      autoAttackReq = { ...parsed.attackRequest, mod };
+      setPendingRoll(null);
       setPendingInitiative(false);
     } else if (parsed.rollRequest) {
       const lower = parsed.rollRequest.stat.toLowerCase();
@@ -1030,6 +1130,12 @@ export default function SoloDnD() {
       messageNumber: newMsgs.length,
       inCombat: stateRef.current.enemies.length > 0,
     });
+
+    if (autoAttackReq) {
+      // Запускаем авто-бросок асинхронно после возврата текущего тика, чтобы стейт успел примениться
+      setTimeout(() => { void executeAttackRoll(autoAttackReq!); }, 0);
+    }
+
     return newMsgs;
   }
 
@@ -1128,6 +1234,46 @@ export default function SoloDnD() {
       content: `Зелье выпито. +${heal} HP. (${newHp}/${c.maxHp})`,
       parsed: parseDMResponse(`✦ Ты выпиваешь зелье лечения. Тёплая волна прокатывается по телу. +${heal} HP. (${newHp}/${c.maxHp})`)
     }]);
+    // БАГ 4: в бою зелье — бонусное действие. Не закрываем бой, не вызываем DM.
+    // Боевые кнопки покажутся автоматически (inCombat=true, нет pendingRoll/Initiative).
+  }
+
+  // Использование зелья на экране поражения — лечит и продолжает бой
+  function handleDefeatedUsePotion() {
+    const { inventory: inv, character: c } = stateRef.current;
+    if (!c) return;
+    const potionIdx = inv.findIndex(i => i.toLowerCase().includes("зелье"));
+    if (potionIdx < 0) return;
+    const heal = rollDice(6) + 2;
+    setHp(Math.min(c.maxHp, heal));
+    setInventory(prev => prev.filter((_, i) => i !== potionIdx));
+    setShowDefeated(false);
+    setMessages(prev => [...prev, {
+      role: "assistant",
+      content: `🧪 Последним усилием ты выпиваешь зелье. +${heal} HP. Ты снова в строю.`,
+      parsed: parseDMResponse(`🧪 Последним усилием ты выпиваешь зелье. +${heal} HP. Ты снова в строю.`),
+    }]);
+  }
+
+  // Начать бой заново — восстанавливаем снапшот
+  function handleDefeatedRetry() {
+    const snap = combatStartSnapshotRef.current;
+    const { character: c } = stateRef.current;
+    if (!snap || !c) {
+      setShowDefeated(false);
+      return;
+    }
+    setHp(snap.hp);
+    setEnemies(snap.enemies.map(e => ({ ...e, hp: e.maxHp })));
+    setInCombat(true);
+    setShowDefeated(false);
+    setBerserkChargesLeft(0);
+    setBerserkUsedThisCombat(false);
+    setDidDodgeLastTurn(false);
+    setDefensiveStance(false);
+    setPendingRoll(null);
+    setPendingInitiative(false);
+    void handleChoice(`[Игрок начинает бой заново — то же столкновение, исходные HP и враги]`);
   }
 
   function handleShortRest() {
@@ -1165,19 +1311,17 @@ export default function SoloDnD() {
     if (!ch) return;
     setDidDodgeLastTurn(false);
     let mod = ch.stats[ch.weapon.stat] || 0;
-    let bonusNote = "";
     if (bcl > 0) {
       mod += 2;
       setBerserkChargesLeft(prev => Math.max(0, prev - 1));
-      bonusNote = " [Берсерк +2 урон]";
     }
     if (stateRef.current.defensiveStance) {
       setDefensiveStance(false);
     }
     const target = en.find(e => e.hp > 0);
-    const ac = target?.name ? 12 : 12;
-    const modStr = (mod >= 0 ? "+" : "") + mod;
-    await handleChoice(`[АТАКА: ${ch.weapon.name}, ${ch.weapon.dice}, ${modStr}, AC${ac}]${bonusNote}`);
+    const ac = target ? 12 : 12;
+    // БАГ 1: бросок происходит АВТОМАТИЧЕСКИ — без RollBlock и кнопки "Бросить d20"
+    await executeAttackRoll({ weapon: ch.weapon.name, dice: ch.weapon.dice, mod, ac });
   }
 
   async function handleBerserk() {
@@ -1211,14 +1355,11 @@ export default function SoloDnD() {
     setDidDodgeLastTurn(false);
 
     if (s.type === "attack") {
-      // Огненный болт — атака со слотом
+      // Огненный болт — атака со слотом, БАГ 1: тоже автоматически без RollBlock
       const statKey: Stat = s.stat ?? "int";
       const mod = ch.stats[statKey] || 0;
       const target = en.find(e => e.hp > 0);
-      setPendingRoll({
-        type: "attack",
-        request: { weapon: s.name, dice: s.dice ?? "d10", mod, ac: target ? 12 : 12 },
-      });
+      await executeAttackRoll({ weapon: s.name, dice: s.dice ?? "d10", mod, ac: target ? 12 : 12 });
       return;
     }
     if (s.name === "Магическая стрела") {
@@ -1315,7 +1456,7 @@ export default function SoloDnD() {
   // ─────────────────────────────────────────────────────────────
   const lastMsg = messages[messages.length - 1];
   const parsed = lastMsg?.parsed;
-  const showCombatButtons = !loading && !freeInput && !pendingRoll && !pendingInitiative && inCombat && !!character;
+  const showCombatButtons = !loading && !freeInput && !pendingRoll && !pendingInitiative && !showDefeated && inCombat && !!character;
   const showChoices = !loading && !freeInput && !pendingRoll && !pendingInitiative && !inCombat && (parsed?.choices?.length ?? 0) > 0;
   const showFreeArea = freeInput && !loading;
 
@@ -1342,6 +1483,14 @@ export default function SoloDnD() {
         />
       )}
       {showDev && <DevPanel onJump={jumpToScene} onClose={() => setShowDev(false)} />}
+      {showDefeated && (
+        <DefeatedScreen
+          hasPotion={inventory.some(i => i.toLowerCase().includes("зелье"))}
+          onUsePotion={handleDefeatedUsePotion}
+          onRetry={handleDefeatedRetry}
+          onMenu={() => { setShowDefeated(false); exitToMenu(); }}
+        />
+      )}
 
       <div className="sticky top-0 z-20 border-b border-stone-800/60 backdrop-blur" style={{ background: "rgba(12,10,9,0.93)" }}>
         <div className="flex items-center justify-between px-4 py-2.5">
