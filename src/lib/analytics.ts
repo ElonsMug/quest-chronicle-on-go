@@ -9,8 +9,7 @@ let initialized = false;
 export function initAnalytics() {
   if (initialized) return;
   if (typeof window === "undefined") return;
-  if (!POSTHOG_KEY || POSTHOG_KEY === "phc_YOUR_KEY_HERE") {
-    // Ключ не задан — тихо отключаемся, чтобы не ронять прод.
+  if (!POSTHOG_KEY) {
     return;
   }
   posthog.init(POSTHOG_KEY, {
