@@ -592,6 +592,8 @@ export default function SoloDnD() {
   const [freeInput, setFreeInput] = useState(false);
   const [freeText, setFreeText] = useState("");
   const [showInventory, setShowInventory] = useState(false);
+  const [showSpells, setShowSpells] = useState(false);
+  const [spellSlots, setSpellSlots] = useState<{ current: number; max: number } | null>(null);
   const [showDev, setShowDev] = useState(false);
   const devTaps = useRef(0);
   const bottomRef = useRef<HTMLDivElement>(null);
