@@ -571,9 +571,17 @@ export default function SoloDnD() {
     if (parsed.newItem) { newInv = [...newInv, parsed.newItem]; setInventory(newInv); }
 
     if (parsed.newEnemies?.length) {
+      const wasInCombat = currentEnemies.length > 0;
       newEnemies = [...newEnemies, ...parsed.newEnemies];
       setEnemies(newEnemies);
       setInCombat(true);
+      if (!wasInCombat) {
+        trackEvent("combat_started", {
+          characterId: stateRef.current.character?.id,
+          messageNumber: stateRef.current.messages.length,
+          enemyCount: parsed.newEnemies.length,
+        });
+      }
     } else if (newEnemies.length === 0) {
       // Защита: DM забыл объявить врагов через [ВРАГ:], но в нарративе явно идёт бой.
       // Пробуем извлечь имена и HP из текста по паттерну "Имя (HP: X/Y)".
@@ -597,6 +605,12 @@ export default function SoloDnD() {
           newEnemies = [...newEnemies, ...inferred];
           setEnemies(newEnemies);
           setInCombat(true);
+          trackEvent("combat_started", {
+            characterId: stateRef.current.character?.id,
+            messageNumber: stateRef.current.messages.length,
+            enemyCount: inferred.length,
+            inferred: true,
+          });
         }
       }
     }
