@@ -23,6 +23,7 @@ type Character = {
   backstory: string;
   startItems: string[];
   spellSlots?: { current: number; max: number };
+  spellSaveDC?: number;
   spells?: Spell[];
   classAbility?: ClassAbility;
 };
@@ -54,10 +55,11 @@ const CHARACTERS: Character[] = [
     backstory: "Отчисленный студент Академии Серых Магов. Тебе запретили практиковать — ты практикуешь.",
     startItems: ["Посох", "Зелье лечения (d6+2 HP)", "Свиток Огненного Болта"],
     spellSlots: { current: 3, max: 3 },
+    spellSaveDC: 14,
     spells: [
       { name: "Огненный болт", cost: 1, dice: "d10", stat: "int", type: "attack", description: "d10+INT урон" },
       { name: "Щит", cost: 1, type: "defense", description: "+5 AC до следующего хода" },
-      { name: "Усыпление", cost: 1, type: "control", description: "Враг с HP ≤ 10 засыпает на 2 раунда" },
+      { name: "Усыпление", cost: 1, type: "control", description: "Бросаем 5d8 пул HP. Засыпают враги от слабых к сильным пока пул не иссякнет. Нежить — иммунны." },
     ],
   },
 ];
@@ -174,6 +176,8 @@ ${spellsBlock}Инвентарь: ${inv} | Эффекты: ${eff}
   * Пытается договориться? → [БРОСОК: Убеждение, DC14]
   * Физическое действие? → [БРОСОК: Сила, DC12]
   Никогда не отказывай. Всегда найди механику.
+
+[ЭФФЕКТ: название, длительность] — добавить временный эффект (например, [ЭФФЕКТ: Враг_замедлен, 1 раунд], [ЭФФЕКТ: Щит, 1 раунд]).
 
 БОЙ:
 - ⚠️ КРИТИЧНО: В ПЕРВОМ сообщении любой боевой сцены ты ОБЯЗАН объявить ВСЕХ врагов
