@@ -1207,7 +1207,6 @@ export default function SoloDnD() {
         <SpellPanel
           character={character}
           spellSlots={spellSlots}
-          onCantrip={handleCantrip}
           onSpell={handleSpell}
           onClose={() => setShowSpells(false)}
         />
