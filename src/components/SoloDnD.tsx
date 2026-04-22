@@ -1126,7 +1126,26 @@ export default function SoloDnD() {
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(180deg,#0c0a09 0%,#1c1917 100%)", fontFamily: "serif" }}>
 
-      {showInventory && <InventoryPanel inventory={inventory} effects={effects} onUseItem={handleUseItem} onClose={() => setShowInventory(false)} />}
+      {showInventory && (
+        <InventoryPanel
+          inventory={inventory}
+          effects={effects}
+          onUseItem={handleUseItem}
+          onShortRest={handleShortRest}
+          onLongRest={handleLongRest}
+          inCombat={inCombat}
+          onClose={() => setShowInventory(false)}
+        />
+      )}
+      {showSpells && character && spellSlots && (
+        <SpellPanel
+          character={character}
+          spellSlots={spellSlots}
+          onCantrip={handleCantrip}
+          onSpell={handleSpell}
+          onClose={() => setShowSpells(false)}
+        />
+      )}
       {showDev && <DevPanel onJump={jumpToScene} onClose={() => setShowDev(false)} />}
 
       <div className="sticky top-0 z-20 border-b border-stone-800/60 backdrop-blur" style={{ background: "rgba(12,10,9,0.93)" }}>
@@ -1143,10 +1162,22 @@ export default function SoloDnD() {
             </button>
           </div>
 
-          <div className="flex items-center gap-1.5 min-w-[60px] justify-end">
-            <div className="text-xs text-stone-500">HP</div>
-            <div className="font-bold text-sm" style={{ color: character && hp / character.maxHp > 0.5 ? "#f87171" : character && hp / character.maxHp > 0.25 ? "#fbbf24" : "#ef4444" }}>{hp}</div>
-            <div className="text-stone-600 text-xs">/{character?.maxHp}</div>
+          <div className="flex items-center gap-2 min-w-[60px] justify-end">
+            {character?.id === "mage" && spellSlots && (
+              <button
+                onClick={() => setShowSpells(true)}
+                className="text-sm tracking-widest hover:opacity-80 transition-opacity"
+                style={{ color: "#60a5fa", fontFamily: "serif" }}
+                title={`Слоты заклинаний: ${spellSlots.current}/${spellSlots.max}`}
+              >
+                {Array.from({ length: spellSlots.max }, (_, i) => i < spellSlots.current ? "✦" : "◇").join("")}
+              </button>
+            )}
+            <div className="flex items-center gap-1.5">
+              <div className="text-xs text-stone-500">HP</div>
+              <div className="font-bold text-sm" style={{ color: character && hp / character.maxHp > 0.5 ? "#f87171" : character && hp / character.maxHp > 0.25 ? "#fbbf24" : "#ef4444" }}>{hp}</div>
+              <div className="text-stone-600 text-xs">/{character?.maxHp}</div>
+            </div>
           </div>
         </div>
 
