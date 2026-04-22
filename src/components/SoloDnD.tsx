@@ -685,6 +685,11 @@ export default function SoloDnD() {
   const [showInventory, setShowInventory] = useState(false);
   const [showSpells, setShowSpells] = useState(false);
   const [spellSlots, setSpellSlots] = useState<{ current: number; max: number } | null>(null);
+  const [berserkChargesLeft, setBerserkChargesLeft] = useState(0);
+  const [berserkUsedThisCombat, setBerserkUsedThisCombat] = useState(false);
+  const [didDodgeLastTurn, setDidDodgeLastTurn] = useState(false);
+  const [defensiveStance, setDefensiveStance] = useState(false);
+  const [showSpellMini, setShowSpellMini] = useState(false);
   const [showDev, setShowDev] = useState(false);
   const devTaps = useRef(0);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -695,8 +700,12 @@ export default function SoloDnD() {
     effects: string[];
     enemies: Enemy[];
     messages: ChatMessage[];
-  }>({ character: null, hp: 0, inventory: [], effects: [], enemies: [], messages: [] });
-  stateRef.current = { character, hp, inventory, effects, enemies, messages };
+    spellSlots: { current: number; max: number } | null;
+    berserkChargesLeft: number;
+    didDodgeLastTurn: boolean;
+    defensiveStance: boolean;
+  }>({ character: null, hp: 0, inventory: [], effects: [], enemies: [], messages: [], spellSlots: null, berserkChargesLeft: 0, didDodgeLastTurn: false, defensiveStance: false });
+  stateRef.current = { character, hp, inventory, effects, enemies, messages, spellSlots, berserkChargesLeft, didDodgeLastTurn, defensiveStance };
 
   useEffect(() => { initAnalytics(); }, []);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, loading, pendingRoll, pendingInitiative]);
