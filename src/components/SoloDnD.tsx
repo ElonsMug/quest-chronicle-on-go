@@ -627,8 +627,16 @@ export default function SoloDnD() {
     }
 
     if (parsed.combatEnd || (newEnemies.length > 0 && newEnemies.every(e => e.hp <= 0))) {
+      const wasInCombat = currentEnemies.length > 0 || stateRef.current.enemies.length > 0;
       setInCombat(false);
       setEnemies([]);
+      if (wasInCombat) {
+        trackEvent("combat_ended", {
+          characterId: stateRef.current.character?.id,
+          messageNumber: stateRef.current.messages.length,
+          playerHp: newHp,
+        });
+      }
     }
 
     return { newHp, newInv, newEff, newEnemies };
@@ -659,6 +667,11 @@ export default function SoloDnD() {
     }
 
     doSave(char, newHp, newInv, newEff, newMsgs);
+    trackEvent("scene_completed", {
+      characterId: char.id,
+      messageNumber: newMsgs.length,
+      inCombat: stateRef.current.enemies.length > 0,
+    });
     return newMsgs;
   }
 
@@ -676,6 +689,7 @@ export default function SoloDnD() {
     setMessages([]);
     setScreen("game");
     setLoading(true);
+    trackEvent("game_started", { characterId: char.id, messageNumber: 0, characterName: char.name });
     const prompt = customPrompt || "Начни приключение. Вводная сцена в Сером Берегу. 3 варианта действий.";
     try {
       const reply = await callAPI(char, char.hp, startInv, [], [], prompt);
@@ -930,7 +944,13 @@ export default function SoloDnD() {
                   <span className="text-amber-600 font-bold mr-2">{choice.num}.</span>{choice.text}
                 </button>
               ))}
-              <button onClick={() => setFreeInput(true)}
+              <button onClick={() => {
+                trackEvent("free_input_used", {
+                  characterId: stateRef.current.character?.id,
+                  messageNumber: stateRef.current.messages.length,
+                });
+                setFreeInput(true);
+              }}
                 className="w-full text-left px-4 py-3 rounded-xl border border-stone-800 bg-stone-950/90 text-stone-400 text-sm transition-all active:scale-[0.98] hover:border-stone-600 hover:text-stone-300"
                 style={{ fontFamily: "serif" }}>
                 <span className="text-stone-600 mr-2">✍</span>Свой вариант...
