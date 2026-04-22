@@ -836,8 +836,8 @@ export default function SoloDnD() {
           const isLast = i === messages.length - 1;
           return (
             <div key={i} className="space-y-2">
-              <div className="bg-stone-900/60 rounded-2xl rounded-tl-sm px-4 py-4 border border-stone-800/40">
-                <p className="text-amber-100/90 text-sm leading-relaxed whitespace-pre-line" style={{ fontFamily: "serif" }}>
+              <div className="bg-stone-900/60 rounded-2xl rounded-tl-sm px-4 py-4 border border-stone-800/40 max-w-full overflow-hidden">
+                <p className="text-amber-100/90 text-sm leading-relaxed whitespace-pre-line" style={{ fontFamily: "serif", overflowWrap: "break-word", wordBreak: "break-word" }}>
                   {p.narrative}
                 </p>
                 {p.newItem && <div className="mt-2 text-xs text-amber-500">✦ Получен: {p.newItem}</div>}
