@@ -1149,11 +1149,16 @@ export default function SoloDnD() {
 
     let autoAttackReq: { weapon: string; dice: string; mod: number; ac: number } | null = null;
 
+    // В бою атаки идут только через боевые кнопки игрока — не от DM-инициированных [АТАКА:].
+    // Если DM всё-таки прислал [АТАКА:] в бою (игнорируя промпт) — игнорируем тег, чтобы не
+    // ломать порядок хода и не атаковать после победы в инициативе автоматически.
+    const wasInCombat = stateRef.current.enemies.length > 0 || currentEnemies.length > 0;
+
     if (parsed.initiativeTrigger) {
       setPendingInitiative(true);
       setPendingRoll(null);
-    } else if (parsed.attackRequest) {
-      // БАГ 1: атаки идут АВТОМАТИЧЕСКИ — без RollBlock
+    } else if (parsed.attackRequest && !wasInCombat) {
+      // Атака вне боя (например, скрытная атака из засады) — авто-бросок
       const mod = char.stats[char.weapon.stat] || 0;
       autoAttackReq = { ...parsed.attackRequest, mod };
       setPendingRoll(null);
