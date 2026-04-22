@@ -77,14 +77,16 @@ function buildSystemPrompt(character: Character, hp: number, inventory: string[]
 - 4-й вариант НЕ ПИШИ — в UI есть кнопка "Свой вариант"
 
 МЕХАНИКА ТЕГОВ (всегда на отдельной строке):
-[БРОСОК: Характеристика, DC число] — любая проверка навыка
-[АТАКА: Название, кубик_урона, модификатор, DC число] — атака игрока в бою.
-   ВАЖНО: кубик в теге — это КУБИК УРОНА оружия, НЕ бросок попадания!
-   Бросок попадания ВСЕГДА d20 + модификатор vs DC врага (это делает система автоматически).
-   Кубик урона бросается ОТДЕЛЬНО и ТОЛЬКО при успешном попадании.
-   Пример: [АТАКА: Меч, d8, +3, DC13] — система бросит d20+3 vs DC13;
-   при успехе бросит d8+3 урона; при промахе урона нет.
-[УРОН: число] — урон игроку от врага
+[БРОСОК: Характеристика, DC число] — любая небоевая проверка навыка
+[АТАКА: Оружие, кубик_урона, модификатор, AC число] — атака игрока в бою.
+   AC = Armor Class врага (НЕ DC!).
+   Система САМА бросает d20 + модификатор + proficiency vs AC.
+   DM НЕ пишет результат попадания в тексте — система вернёт исход.
+   После получения результата DM описывает исход.
+   При попадании DM пишет [ВРАГ_УРОН: Имя, число] с уроном, который посчитала система.
+   Пример: [АТАКА: Меч, d8, +3, AC13]
+[УРОН: число] — урон игроку от врага. ТОЛЬКО числом, без комментариев в нарративе.
+   DM НИКОГДА не пишет "Твой HP: X/Y" в тексте — UI показывает HP сам.
 [ПРЕДМЕТ: название] — добавить предмет в инвентарь
 [ВРАГ: Имя, HP:число] — объявить врага (в начале боя или при появлении нового)
 [ВРАГ_УРОН: Имя, число] — нанести урон врагу (система отслеживает HP врагов)
@@ -119,7 +121,7 @@ type Parsed = ReturnType<typeof parseDMResponse>;
 function parseDMResponse(text: string) {
   const choices: { num: string; text: string }[] = [];
   const narrativeLines: string[] = [];
-  let attackRequest: { weapon: string; dice: string; mod: number; dc: number } | null = null;
+  let attackRequest: { weapon: string; dice: string; mod: number; ac: number } | null = null;
   let rollRequest: { stat: string; dc: number } | null = null;
   let damage: number | null = null;
   let newItem: string | null = null;
@@ -130,8 +132,8 @@ function parseDMResponse(text: string) {
 
   const TAG = /\[(АТАКА|БРОСОК|УРОН|ПРЕДМЕТ|ВРАГ|ВРАГ_УРОН|ИНИЦИАТИВА|КОНЕЦ_БОЯ)[^\]]*\]/gi;
 
-  const atk = text.match(/\[АТАКА:\s*([^,\]]+),\s*([^,\]]+),\s*([^,\]]+),\s*DC(\d+)\]/i);
-  if (atk) attackRequest = { weapon: atk[1].trim(), dice: atk[2].trim(), mod: parseInt(atk[3]) || 0, dc: parseInt(atk[4]) };
+  const atk = text.match(/\[АТАКА:\s*([^,\]]+),\s*([^,\]]+),\s*([^,\]]+),\s*AC(\d+)\]/i);
+  if (atk) attackRequest = { weapon: atk[1].trim(), dice: atk[2].trim(), mod: parseInt(atk[3]) || 0, ac: parseInt(atk[4]) };
 
   const rol = text.match(/\[БРОСОК:\s*([^,\]]+)(?:,\s*DC(\d+))?\]/i);
   if (rol) rollRequest = { stat: rol[1].trim(), dc: parseInt(rol[2] || "15") };
@@ -174,7 +176,7 @@ type ChatMessage = {
 };
 
 type Enemy = { name: string; hp: number; maxHp: number };
-type RollRequest = { stat?: string; weapon?: string; dice?: string; mod: number; dc: number };
+type RollRequest = { stat?: string; weapon?: string; dice?: string; mod: number; dc?: number; ac?: number };
 type PendingRoll = { type: "attack" | "roll"; request: RollRequest };
 
 // ─────────────────────────────────────────────────────────────────
@@ -195,18 +197,19 @@ function EnemyHP({ name, hp, maxHp }: { name: string; hp: number; maxHp: number 
   );
 }
 
-function InitiativeBlock({ onResult }: { onResult: (r: { player: number; enemy: number; playerWins: boolean }) => void }) {
+function InitiativeBlock({ dexMod, onResult }: { dexMod: number; onResult: (r: { player: number; enemy: number; playerWins: boolean }) => void }) {
   const [done, setDone] = useState(false);
-  const [res, setRes] = useState<{ player: number; enemy: number; playerWins: boolean } | null>(null);
+  const [res, setRes] = useState<{ playerRaw: number; player: number; enemy: number; playerWins: boolean } | null>(null);
 
   function roll() {
-    const player = rollDice(20);
+    const playerRaw = rollDice(20);
+    const player = playerRaw + dexMod;
     const enemy = rollDice(20);
     const playerWins = player >= enemy;
-    setRes({ player, enemy, playerWins });
+    setRes({ playerRaw, player, enemy, playerWins });
   }
 
-  function confirm() { if (res) { setDone(true); onResult(res); } }
+  function confirm() { if (res) { setDone(true); onResult({ player: res.player, enemy: res.enemy, playerWins: res.playerWins }); } }
 
   if (done && res) return (
     <div className="rounded-xl border border-stone-800 bg-stone-950/80 px-4 py-2 text-xs text-stone-500">
@@ -214,9 +217,11 @@ function InitiativeBlock({ onResult }: { onResult: (r: { player: number; enemy: 
     </div>
   );
 
+  const dexLabel = dexMod >= 0 ? `+${dexMod}` : `${dexMod}`;
+
   return (
     <div className="rounded-xl border border-amber-900/50 bg-stone-950/80 px-4 py-3 my-2">
-      <div className="text-amber-500 text-xs uppercase tracking-widest mb-2">⚡ Инициатива — кто ходит первым?</div>
+      <div className="text-amber-500 text-xs uppercase tracking-widest mb-2">⚡ Инициатива (d20 {dexLabel} ЛОВ)</div>
       {!res ? (
         <button onClick={roll} className="w-full py-2.5 rounded-lg text-sm font-bold text-stone-900 active:scale-95 transition-transform"
           style={{ background: "linear-gradient(135deg,#d97706,#92400e)", fontFamily: "serif" }}>
@@ -227,7 +232,7 @@ function InitiativeBlock({ onResult }: { onResult: (r: { player: number; enemy: 
           <div className="flex justify-around mb-3 text-center">
             <div>
               <div className="text-2xl font-bold" style={{ fontFamily: "serif", color: res.playerWins ? "#4ade80" : "#f87171" }}>{res.player}</div>
-              <div className="text-xs text-stone-500">Ты</div>
+              <div className="text-xs text-stone-500">Ты ({res.playerRaw}{dexMod !== 0 ? ` ${dexLabel}` : ""})</div>
             </div>
             <div className="text-stone-600 self-center text-lg">vs</div>
             <div>
@@ -247,7 +252,20 @@ function InitiativeBlock({ onResult }: { onResult: (r: { player: number; enemy: 
   );
 }
 
-type RollResult = { raw: number; total: number; mod: number; dc: number; success: boolean; sides: number };
+type RollResult = {
+  hitRoll: number;
+  mod: number;
+  prof: number;
+  total: number;
+  ac: number;
+  dc: number;
+  success: boolean;
+  crit: boolean;
+  autoMiss: boolean;
+  damage: number;
+};
+
+const PROFICIENCY_BONUS = 2;
 
 function RollBlock({ type, request, onResult }: { type: "attack" | "roll"; request: RollRequest; onResult: (r: RollResult) => void }) {
   const [done, setDone] = useState(false);
@@ -255,45 +273,111 @@ function RollBlock({ type, request, onResult }: { type: "attack" | "roll"; reque
 
   function execute() {
     if (done) return;
-    const sides = type === "attack" && request.dice ? parseDiceSides(request.dice) : 20;
-    const raw = rollDice(sides);
     const mod = request.mod || 0;
-    const total = raw + mod;
-    const success = total >= request.dc;
-    setRes({ raw, total, mod, dc: request.dc, success, sides });
+
+    if (type === "attack") {
+      const ac = request.ac ?? 10;
+      const hitRoll = rollDice(20);
+      const proficiencyBonus = PROFICIENCY_BONUS;
+      const total = hitRoll + mod + proficiencyBonus;
+      const crit = hitRoll === 20;
+      const autoMiss = hitRoll === 1;
+      const hit = !autoMiss && (crit || total >= ac);
+
+      let damage = 0;
+      if (hit) {
+        const dmgDice = parseDiceSides(request.dice || "d6");
+        damage = crit
+          ? rollDice(dmgDice) + rollDice(dmgDice) + mod
+          : rollDice(dmgDice) + mod;
+      }
+
+      setRes({
+        hitRoll, mod, prof: proficiencyBonus, total,
+        ac, dc: ac, success: hit, crit, autoMiss, damage,
+      });
+    } else {
+      const dc = request.dc ?? 15;
+      const hitRoll = rollDice(20);
+      const total = hitRoll + mod;
+      const success = total >= dc;
+      setRes({
+        hitRoll, mod, prof: 0, total,
+        ac: dc, dc, success, crit: false, autoMiss: false, damage: 0,
+      });
+    }
   }
 
   function confirm() { if (res) { setDone(true); onResult(res); } }
 
   const diceLabel = type === "attack" ? `${request.weapon} (${request.dice})` : `${request.stat} d20`;
   const modLabel = (request.mod || 0) >= 0 ? `+${request.mod || 0}` : `${request.mod}`;
+  const targetLabel = type === "attack" ? `AC${request.ac ?? 10}` : `DC${request.dc ?? 15}`;
 
-  if (done && res) return (
-    <div className="rounded-xl border border-stone-800 bg-stone-950/80 px-4 py-2 text-xs text-stone-500">
-      {type === "attack" ? "⚔️" : "🎲"} {diceLabel}: {res.raw}{res.mod !== 0 ? ` ${modLabel}` : ""} = {res.total} vs DC{res.dc} → {res.success ? "✦ Попал" : "✦ Мимо"}
-    </div>
-  );
+  if (done && res) {
+    let summary: string;
+    if (type === "attack") {
+      if (res.autoMiss) {
+        summary = `d20(1) ✦ АВТОПРОМАХ`;
+      } else if (res.crit) {
+        summary = `d20(20) ✦ КРИТ → Урон: ${res.damage}`;
+      } else if (res.success) {
+        summary = `d20(${res.hitRoll}) + mod(${res.mod}) + prof(${res.prof}) = ${res.total} vs AC${res.ac} → ✦ Попал → Урон: ${res.damage}`;
+      } else {
+        summary = `d20(${res.hitRoll}) + mod(${res.mod}) + prof(${res.prof}) = ${res.total} vs AC${res.ac} → ✦ Мимо`;
+      }
+    } else {
+      summary = `🎲 ${diceLabel}: ${res.hitRoll}${res.mod !== 0 ? ` ${modLabel}` : ""} = ${res.total} vs DC${res.dc} → ${res.success ? "✦ Успех" : "✦ Провал"}`;
+    }
+    return (
+      <div className="rounded-xl border border-stone-800 bg-stone-950/80 px-4 py-2 text-xs text-stone-500">
+        {type === "attack" ? "⚔️ " : ""}{summary}
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-xl border border-amber-900/40 bg-stone-950/80 px-4 py-3 my-2">
       <div className="text-amber-600 text-xs uppercase tracking-widest mb-2">
-        {type === "attack" ? "⚔️ Атака" : "🎲 Проверка"}: {diceLabel} {modLabel} vs DC{request.dc}
+        {type === "attack" ? "⚔️ Атака" : "🎲 Проверка"}: {diceLabel} {modLabel} vs {targetLabel}
       </div>
       {!res ? (
         <button onClick={execute}
           className="w-full py-2.5 rounded-lg text-sm font-bold text-stone-900 active:scale-95 transition-transform"
           style={{ background: "linear-gradient(135deg,#d97706,#92400e)", fontFamily: "serif" }}>
-          {type === "attack" ? `⚔️ Бросить ${request.dice}` : "🎲 Бросить d20"}
+          🎲 Бросить d20
         </button>
       ) : (
         <div>
-          <div className="flex items-center gap-2 mb-2 flex-wrap">
-            <span className="bg-stone-800 rounded-lg px-3 py-1 text-lg font-bold" style={{ fontFamily: "serif", color: res.success ? "#4ade80" : "#f87171" }}>{res.raw}</span>
-            {res.mod !== 0 && <><span className="text-stone-500 text-sm">{res.mod > 0 ? "+" : ""}{res.mod}</span><span className="text-stone-600">=</span></>}
-            <span className="text-amber-200 font-bold text-lg" style={{ fontFamily: "serif" }}>{res.total}</span>
-            <span className="text-stone-600 text-sm">vs DC{res.dc}</span>
-            <span className={`font-bold text-sm ${res.success ? "text-green-400" : "text-red-400"}`}>{res.success ? "✦ УСПЕХ" : "✦ ПРОВАЛ"}</span>
-          </div>
+          {type === "attack" ? (
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              <span className="bg-stone-800 rounded-lg px-3 py-1 text-lg font-bold"
+                style={{ fontFamily: "serif", color: res.crit ? "#fbbf24" : res.autoMiss ? "#ef4444" : res.success ? "#4ade80" : "#f87171" }}>
+                {res.hitRoll}
+              </span>
+              {!res.crit && !res.autoMiss && (
+                <>
+                  <span className="text-stone-500 text-sm">+{res.mod}</span>
+                  <span className="text-stone-500 text-sm">+{res.prof}</span>
+                  <span className="text-stone-600">=</span>
+                  <span className="text-amber-200 font-bold text-lg" style={{ fontFamily: "serif" }}>{res.total}</span>
+                  <span className="text-stone-600 text-sm">vs AC{res.ac}</span>
+                </>
+              )}
+              <span className={`font-bold text-sm ${res.crit ? "text-amber-300" : res.autoMiss ? "text-red-400" : res.success ? "text-green-400" : "text-red-400"}`}>
+                {res.crit ? "✦ КРИТ" : res.autoMiss ? "✦ АВТОПРОМАХ" : res.success ? "✦ ПОПАЛ" : "✦ МИМО"}
+              </span>
+              {res.success && <span className="text-amber-200 text-sm">→ Урон: <b>{res.damage}</b></span>}
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              <span className="bg-stone-800 rounded-lg px-3 py-1 text-lg font-bold" style={{ fontFamily: "serif", color: res.success ? "#4ade80" : "#f87171" }}>{res.hitRoll}</span>
+              {res.mod !== 0 && <><span className="text-stone-500 text-sm">{res.mod > 0 ? "+" : ""}{res.mod}</span><span className="text-stone-600">=</span></>}
+              <span className="text-amber-200 font-bold text-lg" style={{ fontFamily: "serif" }}>{res.total}</span>
+              <span className="text-stone-600 text-sm">vs DC{res.dc}</span>
+              <span className={`font-bold text-sm ${res.success ? "text-green-400" : "text-red-400"}`}>{res.success ? "✦ УСПЕХ" : "✦ ПРОВАЛ"}</span>
+            </div>
+          )}
           <button onClick={confirm} className="w-full py-2 rounded-lg text-xs font-bold bg-stone-700 hover:bg-stone-600 text-amber-100 transition-colors">
             OK
           </button>
@@ -577,17 +661,17 @@ export default function SoloDnD() {
     setPendingRoll(null);
     let msg: string;
     if (r.type === "attack") {
-      if (rollRes.success) {
-        const sides = parseDiceSides(r.request.dice || "d6");
-        const dmgRoll = rollDice(sides);
-        const mod = r.request.mod || 0;
-        const total = dmgRoll + mod;
-        msg = `[Атака попала: ${r.request.weapon} — бросок ${rollRes.raw}${rollRes.mod !== 0 ? `+${rollRes.mod}` : ""}=${rollRes.total} vs DC${rollRes.dc} → Урон: ${dmgRoll}${mod !== 0 ? `${mod >= 0 ? "+" : ""}${mod}` : ""}=${total}]`;
+      if (rollRes.autoMiss) {
+        msg = `[Атака: ${r.request.weapon} — d20(1) АВТОПРОМАХ vs AC${rollRes.ac}]`;
+      } else if (rollRes.crit) {
+        msg = `[Атака: ${r.request.weapon} — d20(20) КРИТ vs AC${rollRes.ac} → Урон врагу: ${rollRes.damage}. Опиши удар и напиши [ВРАГ_УРОН: Имя, ${rollRes.damage}].]`;
+      } else if (rollRes.success) {
+        msg = `[Атака: ${r.request.weapon} — d20(${rollRes.hitRoll})+mod(${rollRes.mod})+prof(${rollRes.prof})=${rollRes.total} vs AC${rollRes.ac} ПОПАЛ → Урон врагу: ${rollRes.damage}. Опиши удар и напиши [ВРАГ_УРОН: Имя, ${rollRes.damage}].]`;
       } else {
-        msg = `[Атака мимо: ${r.request.weapon} — бросок ${rollRes.raw}${rollRes.mod !== 0 ? `+${rollRes.mod}` : ""}=${rollRes.total} vs DC${rollRes.dc}]`;
+        msg = `[Атака: ${r.request.weapon} — d20(${rollRes.hitRoll})+mod(${rollRes.mod})+prof(${rollRes.prof})=${rollRes.total} vs AC${rollRes.ac} МИМО]`;
       }
     } else {
-      msg = `[Проверка: ${r.request.stat} — ${rollRes.success ? "УСПЕХ" : "ПРОВАЛ"} (${rollRes.raw}${rollRes.mod !== 0 ? `+${rollRes.mod}` : ""}=${rollRes.total} vs DC${rollRes.dc})]`;
+      msg = `[Проверка: ${r.request.stat} — ${rollRes.success ? "УСПЕХ" : "ПРОВАЛ"} (${rollRes.hitRoll}${rollRes.mod !== 0 ? `${rollRes.mod >= 0 ? "+" : ""}${rollRes.mod}` : ""}=${rollRes.total} vs DC${rollRes.dc})]`;
     }
     await handleChoice(msg);
   }
@@ -759,7 +843,7 @@ export default function SoloDnD() {
                 {p.newItem && <div className="mt-2 text-xs text-amber-500">✦ Получен: {p.newItem}</div>}
                 {p.damage && <div className="mt-2 text-xs text-red-400">⚡ Урон: -{p.damage} HP</div>}
               </div>
-              {isLast && pendingInitiative && <InitiativeBlock onResult={handleInitiativeResult} />}
+              {isLast && pendingInitiative && <InitiativeBlock dexMod={character?.stats.dex ?? 0} onResult={handleInitiativeResult} />}
               {isLast && pendingRoll && !pendingInitiative && (
                 <RollBlock type={pendingRoll.type} request={pendingRoll.request} onResult={handleRollResult} />
               )}
