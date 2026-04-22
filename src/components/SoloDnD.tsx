@@ -102,7 +102,18 @@ function buildSystemPrompt(character: Character, hp: number, inventory: string[]
   Никогда не отказывай. Всегда найди механику.
 
 БОЙ:
-- Порядок: сначала [ИНИЦИАТИВА], потом чередование ходов
+- ⚠️ КРИТИЧНО: В ПЕРВОМ сообщении любой боевой сцены ты ОБЯЗАН объявить ВСЕХ врагов
+  тегами [ВРАГ: Имя, HP:число] — каждый на отдельной строке — ДО любого описания атак,
+  ДО нарратива про удары, ДО [ИНИЦИАТИВА]. Без этих тегов система НЕ показывает полоски HP врагов.
+  Пример правильного начала боя:
+    [ВРАГ: Культист, HP:6]
+    [ВРАГ: Культист, HP:6]
+    [ВРАГ: Культист, HP:6]
+    [ИНИЦИАТИВА]
+    (затем нарратив и варианты)
+- Если ты забыл объявить врагов в первом сообщении боя — СДЕЛАЙ ЭТО В СЛЕДУЮЩЕМ ЖЕ сообщении,
+  до любых других действий и тегов.
+- Порядок: сначала [ВРАГ: ...] для всех врагов, затем [ИНИЦИАТИВА], потом чередование ходов
 - Если игрок выиграл инициативу — сначала его атака, потом враг
 - Если проиграл — враг бьёт первым [УРОН: X], потом варианты игроку
 - Показывай HP врага в скобках после имени: "Бандит (HP: 5/8)"
@@ -560,6 +571,31 @@ export default function SoloDnD() {
       newEnemies = [...newEnemies, ...parsed.newEnemies];
       setEnemies(newEnemies);
       setInCombat(true);
+    } else if (newEnemies.length === 0) {
+      // Защита: DM забыл объявить врагов через [ВРАГ:], но в нарративе явно идёт бой.
+      // Пробуем извлечь имена и HP из текста по паттерну "Имя (HP: X/Y)".
+      const combatHints = /(атакует|нападает|нападают|HP:|культист|бандит|враг|разбойник|гоблин|орк|скелет|гнолл)/i;
+      if (combatHints.test(parsed.narrative)) {
+        const inferred: Enemy[] = [];
+        const hpRe = /([A-Za-zА-Яа-яЁё][A-Za-zА-Яа-яЁё\s'`-]{1,30}?)\s*\(\s*HP:\s*(\d+)\s*\/\s*(\d+)\s*\)/gi;
+        let m: RegExpExecArray | null;
+        const seen = new Set<string>();
+        while ((m = hpRe.exec(parsed.narrative)) !== null) {
+          const name = m[1].trim().replace(/^[—–\-•:,\.]+/, "").trim();
+          const hp = parseInt(m[2]);
+          const maxHp = parseInt(m[3]);
+          const key = `${name.toLowerCase()}|${maxHp}`;
+          if (name && maxHp > 0 && !seen.has(key)) {
+            seen.add(key);
+            inferred.push({ name, hp, maxHp });
+          }
+        }
+        if (inferred.length) {
+          newEnemies = [...newEnemies, ...inferred];
+          setEnemies(newEnemies);
+          setInCombat(true);
+        }
+      }
     }
 
     if (parsed.enemyDamages?.length) {
