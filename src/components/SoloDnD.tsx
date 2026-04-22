@@ -987,6 +987,61 @@ export default function SoloDnD() {
     }]);
   }
 
+  function handleShortRest() {
+    const { character: c, hp: h } = stateRef.current;
+    if (!c || inCombat) return;
+    const heal = rollDice(6);
+    const newHp = Math.min(c.maxHp, h + heal);
+    setHp(newHp);
+    setShowInventory(false);
+    setMessages(prev => [...prev, {
+      role: "assistant",
+      content: `✦ Короткий отдых. Восстановлено ${heal} HP. (${newHp}/${c.maxHp})`,
+      parsed: parseDMResponse(`✦ Короткий отдых. Восстановлено ${heal} HP. (${newHp}/${c.maxHp})`)
+    }]);
+  }
+
+  function handleLongRest() {
+    const { character: c } = stateRef.current;
+    if (!c || inCombat) return;
+    setHp(c.maxHp);
+    if (c.spellSlots) setSpellSlots({ current: c.spellSlots.max, max: c.spellSlots.max });
+    setShowInventory(false);
+    setMessages(prev => [...prev, {
+      role: "assistant",
+      content: `✦ Длинный отдых. HP и слоты полностью восстановлены.`,
+      parsed: parseDMResponse(`✦ Длинный отдых. HP и слоты полностью восстановлены.`)
+    }]);
+  }
+
+  async function handleCantrip(c: Cantrip) {
+    const { character: ch } = stateRef.current;
+    if (!ch) return;
+    setShowSpells(false);
+    const mod = ch.stats[c.stat] || 0;
+    const modStr = (mod >= 0 ? "+" : "") + mod;
+    const slowEff = c.name === "Луч холода" ? " [ЭФФЕКТ: Враг_замедлен, 1 раунд]" : "";
+    const msg = `[АТАКА: ${c.name}, ${c.dice}, ${modStr}, AC врага]${slowEff}`;
+    await handleChoice(msg);
+  }
+
+  async function handleSpell(s: Spell) {
+    if (!spellSlots || spellSlots.current <= 0) return;
+    setShowSpells(false);
+    setSpellSlots({ current: spellSlots.current - 1, max: spellSlots.max });
+    let msg: string;
+    if (s.name === "Магическая стрела") {
+      msg = `[Применено: Магическая стрела — 3×d4+1 гарантированный урон]`;
+    } else if (s.name === "Усыпление") {
+      msg = `[Применено: Усыпление]`;
+    } else if (s.name === "Щит") {
+      msg = `[Применено: Щит — +5 AC до следующего хода]`;
+    } else {
+      msg = `[Применено: ${s.name}]`;
+    }
+    await handleChoice(msg);
+  }
+
   function exitToMenu() {
     const { character: c, hp: h, inventory: inv, effects: eff, messages: msgs } = stateRef.current;
     if (c) doSave(c, h, inv, eff, msgs);
