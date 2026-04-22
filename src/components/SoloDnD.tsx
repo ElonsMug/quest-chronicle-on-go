@@ -95,7 +95,24 @@ function buildSystemPrompt(character: Character, hp: number, inventory: string[]
    Пример: [АТАКА: Меч, d8, +3, AC13]
 [УРОН: число] — урон игроку от врага. ТОЛЬКО числом, без комментариев в нарративе.
    DM НИКОГДА не пишет "Твой HP: X/Y" в тексте — UI показывает HP сам.
-[ПРЕДМЕТ: название] — добавить предмет в инвентарь
+[ПРЕДМЕТ: название] — добавить предмет в инвентарь.
+   ⚠️ КРИТИЧНО: КАЖДЫЙ РАЗ когда игрок получает предмет любым способом
+   (находит, покупает, крадёт, получает в награду, берёт у NPC, поднимает с трупа,
+   получает золото/монеты) — ты ОБЯЗАН написать тег [ПРЕДМЕТ: название] на отдельной
+   строке. Без исключений.
+   Примеры:
+     Купил зелье → [ПРЕДМЕТ: Зелье лечения (d6+2 HP)]
+     Нашёл верёвку → [ПРЕДМЕТ: Верёвка]
+     Получил награду → [ПРЕДМЕТ: 10 золотых]
+     Снял с врага → [ПРЕДМЕТ: Кинжал бандита]
+   Несколько предметов = несколько тегов, каждый на своей строке.
+[УЛУЧШЕНИЕ: старое_название -> новое_название] — когда игрок улучшает, чинит,
+   зачаровывает или модифицирует существующий предмет. Система найдёт предмет со
+   старым названием в инвентаре и заменит на новое.
+   Примеры:
+     [УЛУЧШЕНИЕ: Кинжал -> Заточенный кинжал]
+     [УЛУЧШЕНИЕ: Меч -> Меч +1]
+     [УЛУЧШЕНИЕ: Сломанный щит -> Починенный щит]
 [ВРАГ: Имя, HP:число] — объявить врага (в начале боя или при появлении нового)
 [ВРАГ_УРОН: Имя, число] — нанести урон врагу (система отслеживает HP врагов)
 [ИНИЦИАТИВА] — в начале КАЖДОГО боя, система бросит d20 за обе стороны
@@ -144,12 +161,14 @@ function parseDMResponse(text: string) {
   let rollRequest: { stat: string; dc: number } | null = null;
   let damage: number | null = null;
   let newItem: string | null = null;
+  const newItems: string[] = [];
+  const upgrades: { from: string; to: string }[] = [];
   const newEnemies: { name: string; maxHp: number; hp: number }[] = [];
   const enemyDamages: { name: string; damage: number }[] = [];
   let initiativeTrigger = false;
   let combatEnd = false;
 
-  const TAG = /\[(АТАКА|БРОСОК|УРОН|ПРЕДМЕТ|ВРАГ|ВРАГ_УРОН|ИНИЦИАТИВА|КОНЕЦ_БОЯ)[^\]]*\]/gi;
+  const TAG = /\[(АТАКА|БРОСОК|УРОН|ПРЕДМЕТ|УЛУЧШЕНИЕ|ВРАГ|ВРАГ_УРОН|ИНИЦИАТИВА|КОНЕЦ_БОЯ)[^\]]*\]/gi;
 
   const atk = text.match(/\[АТАКА:\s*([^,\]]+),\s*([^,\]]+),\s*([^,\]]+),\s*AC(\d+)\]/i);
   if (atk) attackRequest = { weapon: atk[1].trim(), dice: atk[2].trim(), mod: parseInt(atk[3]) || 0, ac: parseInt(atk[4]) };
@@ -160,8 +179,21 @@ function parseDMResponse(text: string) {
   const dmg = text.match(/\[УРОН:\s*(\d+)\]/i);
   if (dmg) damage = parseInt(dmg[1]);
 
-  const itm = text.match(/\[ПРЕДМЕТ:\s*([^\]]+)\]/i);
-  if (itm) newItem = itm[1].trim();
+  const itemRe = /\[ПРЕДМЕТ:\s*([^\]]+)\]/gi;
+  let im: RegExpExecArray | null;
+  while ((im = itemRe.exec(text)) !== null) {
+    const name = im[1].trim();
+    if (name) {
+      newItems.push(name);
+      if (newItem === null) newItem = name;
+    }
+  }
+
+  const upgradeRe = /\[УЛУЧШЕНИЕ:\s*([^\]]+?)\s*->\s*([^\]]+?)\]/gi;
+  let um: RegExpExecArray | null;
+  while ((um = upgradeRe.exec(text)) !== null) {
+    upgrades.push({ from: um[1].trim(), to: um[2].trim() });
+  }
 
   const enemyRe = /\[ВРАГ:\s*([^,\]]+),\s*HP:(\d+)\]/gi;
   let em: RegExpExecArray | null;
@@ -182,7 +214,7 @@ function parseDMResponse(text: string) {
     narrativeLines.push(line);
   }
 
-  return { narrative: narrativeLines.join("\n").trim(), choices, attackRequest, rollRequest, damage, newItem, newEnemies, enemyDamages, initiativeTrigger, combatEnd };
+  return { narrative: narrativeLines.join("\n").trim(), choices, attackRequest, rollRequest, damage, newItem, newItems, upgrades, newEnemies, enemyDamages, initiativeTrigger, combatEnd };
 }
 
 function rollDice(sides: number) { return Math.floor(Math.random() * sides) + 1; }
@@ -575,7 +607,31 @@ export default function SoloDnD() {
     let newEnemies = [...currentEnemies];
 
     if (parsed.damage) { newHp = Math.max(0, newHp - parsed.damage); setHp(newHp); }
-    if (parsed.newItem) { newInv = [...newInv, parsed.newItem]; setInventory(newInv); }
+
+    if (parsed.newItems?.length) {
+      newInv = [...newInv, ...parsed.newItems];
+      setInventory(newInv);
+    } else if (parsed.newItem) {
+      newInv = [...newInv, parsed.newItem];
+      setInventory(newInv);
+    }
+
+    if (parsed.upgrades?.length) {
+      let changed = false;
+      for (const up of parsed.upgrades) {
+        const fromLc = up.from.toLowerCase();
+        const idx = newInv.findIndex(it => it.toLowerCase() === fromLc || it.toLowerCase().includes(fromLc));
+        if (idx >= 0) {
+          newInv = [...newInv.slice(0, idx), up.to, ...newInv.slice(idx + 1)];
+          changed = true;
+        } else {
+          // если старого нет — просто добавим новый
+          newInv = [...newInv, up.to];
+          changed = true;
+        }
+      }
+      if (changed) setInventory(newInv);
+    }
 
     if (parsed.newEnemies?.length) {
       const wasInCombat = currentEnemies.length > 0;
