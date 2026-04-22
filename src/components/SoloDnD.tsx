@@ -121,7 +121,7 @@ type Parsed = ReturnType<typeof parseDMResponse>;
 function parseDMResponse(text: string) {
   const choices: { num: string; text: string }[] = [];
   const narrativeLines: string[] = [];
-  let attackRequest: { weapon: string; dice: string; mod: number; dc: number } | null = null;
+  let attackRequest: { weapon: string; dice: string; mod: number; ac: number } | null = null;
   let rollRequest: { stat: string; dc: number } | null = null;
   let damage: number | null = null;
   let newItem: string | null = null;
@@ -132,8 +132,8 @@ function parseDMResponse(text: string) {
 
   const TAG = /\[(АТАКА|БРОСОК|УРОН|ПРЕДМЕТ|ВРАГ|ВРАГ_УРОН|ИНИЦИАТИВА|КОНЕЦ_БОЯ)[^\]]*\]/gi;
 
-  const atk = text.match(/\[АТАКА:\s*([^,\]]+),\s*([^,\]]+),\s*([^,\]]+),\s*DC(\d+)\]/i);
-  if (atk) attackRequest = { weapon: atk[1].trim(), dice: atk[2].trim(), mod: parseInt(atk[3]) || 0, dc: parseInt(atk[4]) };
+  const atk = text.match(/\[АТАКА:\s*([^,\]]+),\s*([^,\]]+),\s*([^,\]]+),\s*AC(\d+)\]/i);
+  if (atk) attackRequest = { weapon: atk[1].trim(), dice: atk[2].trim(), mod: parseInt(atk[3]) || 0, ac: parseInt(atk[4]) };
 
   const rol = text.match(/\[БРОСОК:\s*([^,\]]+)(?:,\s*DC(\d+))?\]/i);
   if (rol) rollRequest = { stat: rol[1].trim(), dc: parseInt(rol[2] || "15") };
