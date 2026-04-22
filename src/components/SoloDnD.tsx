@@ -197,18 +197,19 @@ function EnemyHP({ name, hp, maxHp }: { name: string; hp: number; maxHp: number 
   );
 }
 
-function InitiativeBlock({ onResult }: { onResult: (r: { player: number; enemy: number; playerWins: boolean }) => void }) {
+function InitiativeBlock({ dexMod, onResult }: { dexMod: number; onResult: (r: { player: number; enemy: number; playerWins: boolean }) => void }) {
   const [done, setDone] = useState(false);
-  const [res, setRes] = useState<{ player: number; enemy: number; playerWins: boolean } | null>(null);
+  const [res, setRes] = useState<{ playerRaw: number; player: number; enemy: number; playerWins: boolean } | null>(null);
 
   function roll() {
-    const player = rollDice(20);
+    const playerRaw = rollDice(20);
+    const player = playerRaw + dexMod;
     const enemy = rollDice(20);
     const playerWins = player >= enemy;
-    setRes({ player, enemy, playerWins });
+    setRes({ playerRaw, player, enemy, playerWins });
   }
 
-  function confirm() { if (res) { setDone(true); onResult(res); } }
+  function confirm() { if (res) { setDone(true); onResult({ player: res.player, enemy: res.enemy, playerWins: res.playerWins }); } }
 
   if (done && res) return (
     <div className="rounded-xl border border-stone-800 bg-stone-950/80 px-4 py-2 text-xs text-stone-500">
@@ -216,9 +217,11 @@ function InitiativeBlock({ onResult }: { onResult: (r: { player: number; enemy: 
     </div>
   );
 
+  const dexLabel = dexMod >= 0 ? `+${dexMod}` : `${dexMod}`;
+
   return (
     <div className="rounded-xl border border-amber-900/50 bg-stone-950/80 px-4 py-3 my-2">
-      <div className="text-amber-500 text-xs uppercase tracking-widest mb-2">⚡ Инициатива — кто ходит первым?</div>
+      <div className="text-amber-500 text-xs uppercase tracking-widest mb-2">⚡ Инициатива (d20 {dexLabel} ЛОВ)</div>
       {!res ? (
         <button onClick={roll} className="w-full py-2.5 rounded-lg text-sm font-bold text-stone-900 active:scale-95 transition-transform"
           style={{ background: "linear-gradient(135deg,#d97706,#92400e)", fontFamily: "serif" }}>
@@ -229,7 +232,7 @@ function InitiativeBlock({ onResult }: { onResult: (r: { player: number; enemy: 
           <div className="flex justify-around mb-3 text-center">
             <div>
               <div className="text-2xl font-bold" style={{ fontFamily: "serif", color: res.playerWins ? "#4ade80" : "#f87171" }}>{res.player}</div>
-              <div className="text-xs text-stone-500">Ты</div>
+              <div className="text-xs text-stone-500">Ты ({res.playerRaw}{dexMod !== 0 ? ` ${dexLabel}` : ""})</div>
             </div>
             <div className="text-stone-600 self-center text-lg">vs</div>
             <div>
