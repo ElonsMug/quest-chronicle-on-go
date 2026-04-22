@@ -76,6 +76,13 @@ function buildSystemPrompt(character: Character, hp: number, inventory: string[]
 - 3–5 предложений нарратива от второго лица
 - Ровно 3 пронумерованных варианта в конце: "1. ...\n2. ...\n3. ..."
 - 4-й вариант НЕ ПИШИ — в UI есть кнопка "Свой вариант"
+- ⚠️ КРИТИЧНО: варианты ВСЕГДА в формате чистых номеров без markdown:
+    1. Текст варианта
+    2. Текст варианта
+    3. Текст варианта
+  НИКОГДА не используй **1. Текст**, *1. Текст*, бэктики, ### заголовки или
+  любое другое форматирование вокруг номеров и текста вариантов. Только чистые
+  строки вида "N. Текст" — иначе парсер UI не распознает варианты.
 
 МЕХАНИКА ТЕГОВ (всегда на отдельной строке):
 [БРОСОК: Характеристика, DC число] — любая небоевая проверка навыка
@@ -168,8 +175,8 @@ function parseDMResponse(text: string) {
   if (/\[КОНЕЦ_БОЯ\]/i.test(text)) combatEnd = true;
 
   for (const line of text.trim().split("\n")) {
-    const choiceMatch = line.match(/^(\d+)\.\s+(.+)/);
-    if (choiceMatch) { choices.push({ num: choiceMatch[1], text: choiceMatch[2] }); continue; }
+    const choiceMatch = line.trim().match(/^\*{0,2}(\d+)\.\s+(.+?)\*{0,2}$/);
+    if (choiceMatch) { choices.push({ num: choiceMatch[1], text: choiceMatch[2].trim() }); continue; }
     if (TAG.test(line)) { TAG.lastIndex = 0; continue; }
     TAG.lastIndex = 0;
     narrativeLines.push(line);
