@@ -1060,18 +1060,58 @@ export default function SoloDnD() {
     return { newHp, newInv, newEff: finalEffects, newEnemies };
   }
 
+  // Авто-бросок атаки: считает d20+mod+prof vs AC, формирует системное сообщение для DM,
+  // отправляет его через handleChoice. Никакого RollBlock — всё мгновенно.
+  async function executeAttackRoll(req: { weapon: string; dice: string; mod: number; ac: number }) {
+    const hitRoll = rollDice(20);
+    const prof = PROFICIENCY_BONUS;
+    const total = hitRoll + req.mod + prof;
+    const crit = hitRoll === 20;
+    const autoMiss = hitRoll === 1;
+    const hit = !autoMiss && (crit || total >= req.ac);
+    let damage = 0;
+    if (hit) {
+      const dmgDice = parseDiceSides(req.dice || "d6");
+      damage = crit
+        ? rollDice(dmgDice) + rollDice(dmgDice) + req.mod
+        : rollDice(dmgDice) + req.mod;
+      if (damage < 1) damage = 1;
+    }
+    let msg: string;
+    if (autoMiss) {
+      msg = `[Атака: ${req.weapon} — d20(1) АВТОПРОМАХ vs AC${req.ac}]`;
+    } else if (crit) {
+      msg = `[Атака: ${req.weapon} — d20(20) КРИТ vs AC${req.ac} → Урон врагу: ${damage}. Опиши удар и напиши [ВРАГ_УРОН: Имя, ${damage}].]`;
+    } else if (hit) {
+      msg = `[Атака: ${req.weapon} — d20(${hitRoll})+mod(${req.mod})+prof(${prof})=${total} vs AC${req.ac} ПОПАЛ → Урон врагу: ${damage}. Опиши удар и напиши [ВРАГ_УРОН: Имя, ${damage}].]`;
+    } else {
+      msg = `[Атака: ${req.weapon} — d20(${hitRoll})+mod(${req.mod})+prof(${prof})=${total} vs AC${req.ac} МИМО]`;
+    }
+    await handleChoice(msg);
+  }
+
   async function processAndSetMessages(char: Character, currentHp: number, currentInv: string[], currentEff: string[], currentEnemies: Enemy[], reply: string, prevMessages: ChatMessage[]) {
     const parsed = parseDMResponse(reply);
     const newMsgs: ChatMessage[] = [...prevMessages, { role: "assistant", content: reply, parsed }];
     const { newHp, newInv, newEff } = applyParsed(parsed, currentHp, currentInv, currentEff, currentEnemies);
     setMessages(newMsgs);
 
+    // Сохраняем снапшот в начале каждого боя — для кнопки "Начать заново"
+    if (parsed.initiativeTrigger) {
+      const snapEnemies = (parsed.newEnemies?.length ? parsed.newEnemies : stateRef.current.enemies).map(e => ({ ...e }));
+      combatStartSnapshotRef.current = { hp: newHp, enemies: snapEnemies };
+    }
+
+    let autoAttackReq: { weapon: string; dice: string; mod: number; ac: number } | null = null;
+
     if (parsed.initiativeTrigger) {
       setPendingInitiative(true);
       setPendingRoll(null);
     } else if (parsed.attackRequest) {
+      // БАГ 1: атаки идут АВТОМАТИЧЕСКИ — без RollBlock
       const mod = char.stats[char.weapon.stat] || 0;
-      setPendingRoll({ type: "attack", request: { ...parsed.attackRequest, mod } });
+      autoAttackReq = { ...parsed.attackRequest, mod };
+      setPendingRoll(null);
       setPendingInitiative(false);
     } else if (parsed.rollRequest) {
       const lower = parsed.rollRequest.stat.toLowerCase();
@@ -1090,6 +1130,12 @@ export default function SoloDnD() {
       messageNumber: newMsgs.length,
       inCombat: stateRef.current.enemies.length > 0,
     });
+
+    if (autoAttackReq) {
+      // Запускаем авто-бросок асинхронно после возврата текущего тика, чтобы стейт успел примениться
+      setTimeout(() => { void executeAttackRoll(autoAttackReq!); }, 0);
+    }
+
     return newMsgs;
   }
 
