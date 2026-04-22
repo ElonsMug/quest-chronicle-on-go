@@ -55,7 +55,7 @@ export const Route = createFileRoute("/api/dm")({
               "anthropic-version": "2023-06-01",
             },
             body: JSON.stringify({
-              model: "claude-sonnet-4-20250514",
+              model: "claude-3-5-sonnet-20241022",
               max_tokens: 1000,
               system,
               messages: safeMessages,
@@ -66,7 +66,7 @@ export const Route = createFileRoute("/api/dm")({
             const errText = await res.text();
             console.error("Anthropic error:", res.status, errText);
             return new Response(
-              JSON.stringify({ error: "Upstream error", status: res.status }),
+              JSON.stringify({ error: "Upstream error", status: res.status, details: errText }),
               { status: 502, headers: { "Content-Type": "application/json" } },
             );
           }
