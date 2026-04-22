@@ -1234,6 +1234,46 @@ export default function SoloDnD() {
       content: `Зелье выпито. +${heal} HP. (${newHp}/${c.maxHp})`,
       parsed: parseDMResponse(`✦ Ты выпиваешь зелье лечения. Тёплая волна прокатывается по телу. +${heal} HP. (${newHp}/${c.maxHp})`)
     }]);
+    // БАГ 4: в бою зелье — бонусное действие. Не закрываем бой, не вызываем DM.
+    // Боевые кнопки покажутся автоматически (inCombat=true, нет pendingRoll/Initiative).
+  }
+
+  // Использование зелья на экране поражения — лечит и продолжает бой
+  function handleDefeatedUsePotion() {
+    const { inventory: inv, character: c } = stateRef.current;
+    if (!c) return;
+    const potionIdx = inv.findIndex(i => i.toLowerCase().includes("зелье"));
+    if (potionIdx < 0) return;
+    const heal = rollDice(6) + 2;
+    setHp(Math.min(c.maxHp, heal));
+    setInventory(prev => prev.filter((_, i) => i !== potionIdx));
+    setShowDefeated(false);
+    setMessages(prev => [...prev, {
+      role: "assistant",
+      content: `🧪 Последним усилием ты выпиваешь зелье. +${heal} HP. Ты снова в строю.`,
+      parsed: parseDMResponse(`🧪 Последним усилием ты выпиваешь зелье. +${heal} HP. Ты снова в строю.`),
+    }]);
+  }
+
+  // Начать бой заново — восстанавливаем снапшот
+  function handleDefeatedRetry() {
+    const snap = combatStartSnapshotRef.current;
+    const { character: c } = stateRef.current;
+    if (!snap || !c) {
+      setShowDefeated(false);
+      return;
+    }
+    setHp(snap.hp);
+    setEnemies(snap.enemies.map(e => ({ ...e, hp: e.maxHp })));
+    setInCombat(true);
+    setShowDefeated(false);
+    setBerserkChargesLeft(0);
+    setBerserkUsedThisCombat(false);
+    setDidDodgeLastTurn(false);
+    setDefensiveStance(false);
+    setPendingRoll(null);
+    setPendingInitiative(false);
+    void handleChoice(`[Игрок начинает бой заново — то же столкновение, исходные HP и враги]`);
   }
 
   function handleShortRest() {
