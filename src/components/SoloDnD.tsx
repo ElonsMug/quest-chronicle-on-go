@@ -729,7 +729,7 @@ export default function SoloDnD() {
 
   // ── API: запрос к серверной функции /api/dm ───────────────────
   async function callAPI(char: Character, currentHp: number, currentInv: string[], currentEff: string[], history: ChatMessage[], userMessage: string) {
-    const slotsForPrompt = char.id === "mage" ? (spellSlots ?? { current: 0, max: 0 }) : null;
+    const slotsForPrompt = char.id === "mage" ? (stateRef.current.spellSlots ?? { current: 0, max: 0 }) : null;
     const res = await fetch("/api/dm", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
