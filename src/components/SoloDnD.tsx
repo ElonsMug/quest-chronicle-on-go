@@ -1271,19 +1271,17 @@ export default function SoloDnD() {
     if (!ch) return;
     setDidDodgeLastTurn(false);
     let mod = ch.stats[ch.weapon.stat] || 0;
-    let bonusNote = "";
     if (bcl > 0) {
       mod += 2;
       setBerserkChargesLeft(prev => Math.max(0, prev - 1));
-      bonusNote = " [Берсерк +2 урон]";
     }
     if (stateRef.current.defensiveStance) {
       setDefensiveStance(false);
     }
     const target = en.find(e => e.hp > 0);
-    const ac = target?.name ? 12 : 12;
-    const modStr = (mod >= 0 ? "+" : "") + mod;
-    await handleChoice(`[АТАКА: ${ch.weapon.name}, ${ch.weapon.dice}, ${modStr}, AC${ac}]${bonusNote}`);
+    const ac = target ? 12 : 12;
+    // БАГ 1: бросок происходит АВТОМАТИЧЕСКИ — без RollBlock и кнопки "Бросить d20"
+    await executeAttackRoll({ weapon: ch.weapon.name, dice: ch.weapon.dice, mod, ac });
   }
 
   async function handleBerserk() {
