@@ -929,7 +929,11 @@ export default function SoloDnD() {
     const newEff = [...currentEff];
     let newEnemies = [...currentEnemies];
 
-    if (parsed.damage) { newHp = Math.max(0, newHp - parsed.damage); setHp(newHp); }
+    if (parsed.damage) {
+      newHp = Math.max(0, newHp - parsed.damage);
+      setHp(newHp);
+      if (newHp <= 0) setShowDefeated(true);
+    }
 
     if (parsed.newItems?.length) {
       newInv = [...newInv, ...parsed.newItems];
