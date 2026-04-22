@@ -1,7 +1,7 @@
 import posthog from "posthog-js";
 
 // ⚠️ Замени на свой PostHog Project API Key (начинается с phc_)
-const POSTHOG_KEY = "phc_YOUR_KEY_HERE";
+const POSTHOG_KEY = "phc_mYgFZnxYooWPSy6K5dm7wZJJ7XxqThLTY7zRtovNH8zk";
 const POSTHOG_HOST = "https://app.posthog.com";
 
 let initialized = false;
