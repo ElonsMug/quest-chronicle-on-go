@@ -1020,6 +1020,8 @@ export default function SoloDnD() {
     if (!c || inCombat) return;
     setHp(c.maxHp);
     if (c.spellSlots) setSpellSlots({ current: c.spellSlots.max, max: c.spellSlots.max });
+    setBerserkChargesLeft(0);
+    setBerserkUsedThisCombat(false);
     setShowInventory(false);
     setMessages(prev => [...prev, {
       role: "assistant",
@@ -1028,32 +1030,82 @@ export default function SoloDnD() {
     }]);
   }
 
-  async function handleCantrip(c: Cantrip) {
-    const { character: ch } = stateRef.current;
+  // ── Боевые действия ───────────────────────────────────────────
+  async function handleAttack() {
+    const { character: ch, enemies: en, berserkChargesLeft: bcl } = stateRef.current;
     if (!ch) return;
-    setShowSpells(false);
-    const mod = ch.stats[c.stat] || 0;
+    setDidDodgeLastTurn(false);
+    let mod = ch.stats[ch.weapon.stat] || 0;
+    let bonusNote = "";
+    if (bcl > 0) {
+      mod += 2;
+      setBerserkChargesLeft(prev => Math.max(0, prev - 1));
+      bonusNote = " [Берсерк +2 урон]";
+    }
+    if (stateRef.current.defensiveStance) {
+      setDefensiveStance(false);
+    }
+    const target = en.find(e => e.hp > 0);
+    const ac = target?.name ? 12 : 12;
     const modStr = (mod >= 0 ? "+" : "") + mod;
-    const slowEff = c.name === "Луч холода" ? " [ЭФФЕКТ: Враг_замедлен, 1 раунд]" : "";
-    const msg = `[АТАКА: ${c.name}, ${c.dice}, ${modStr}, AC врага]${slowEff}`;
-    await handleChoice(msg);
+    await handleChoice(`[АТАКА: ${ch.weapon.name}, ${ch.weapon.dice}, ${modStr}, AC${ac}]${bonusNote}`);
+  }
+
+  async function handleBerserk() {
+    setBerserkChargesLeft(2);
+    setBerserkUsedThisCombat(true);
+    setDefensiveStance(false);
+    setDidDodgeLastTurn(false);
+    setEffects(prev => [...prev, "Берсерк: +2 урон / -2 AC (2 хода)"]);
+    await handleChoice(`[Активирован Берсерк: +2 к урону и -2 AC на 2 хода]`);
+  }
+
+  async function handleDefend() {
+    setDefensiveStance(true);
+    setDidDodgeLastTurn(false);
+    await handleChoice(`[Занята оборона: +2 AC до следующего хода]`);
+  }
+
+  async function handleDodge() {
+    setDidDodgeLastTurn(true);
+    await handleChoice(`[Уклонение: враг атакует с помехой (два броска, меньший результат)]`);
   }
 
   async function handleSpell(s: Spell) {
-    if (!spellSlots || spellSlots.current <= 0) return;
+    const slots = stateRef.current.spellSlots;
+    if (!slots || slots.current <= 0) return;
+    const { character: ch, enemies: en } = stateRef.current;
+    if (!ch) return;
     setShowSpells(false);
-    setSpellSlots({ current: spellSlots.current - 1, max: spellSlots.max });
-    let msg: string;
-    if (s.name === "Магическая стрела") {
-      msg = `[Применено: Магическая стрела — 3×d4+1 гарантированный урон]`;
-    } else if (s.name === "Усыпление") {
-      msg = `[Применено: Усыпление]`;
-    } else if (s.name === "Щит") {
-      msg = `[Применено: Щит — +5 AC до следующего хода]`;
-    } else {
-      msg = `[Применено: ${s.name}]`;
+    setShowSpellMini(false);
+    setSpellSlots({ current: slots.current - 1, max: slots.max });
+    setDidDodgeLastTurn(false);
+
+    if (s.type === "attack") {
+      // Огненный болт — атака со слотом
+      const statKey: Stat = s.stat ?? "int";
+      const mod = ch.stats[statKey] || 0;
+      const target = en.find(e => e.hp > 0);
+      setPendingRoll({
+        type: "attack",
+        request: { weapon: s.name, dice: s.dice ?? "d10", mod, ac: target ? 12 : 12 },
+      });
+      return;
     }
-    await handleChoice(msg);
+    if (s.name === "Магическая стрела") {
+      const dmg = rollDice(4) + rollDice(4) + rollDice(4) + 3;
+      await handleChoice(`[Магическая стрела: ${dmg} гарантированного урона → напиши [ВРАГ_УРОН: Имя, ${dmg}]]`);
+      return;
+    }
+    if (s.type === "defense") {
+      await handleChoice(`[Применён Щит: +5 AC до следующего хода]`);
+      return;
+    }
+    if (s.type === "control") {
+      await handleChoice(`[Применено Усыпление — если HP врага ≤ 10 напиши [ЭФФЕКТ: Враг_засыпает, 2 раунда]]`);
+      return;
+    }
+    await handleChoice(`[Применено: ${s.name}]`);
   }
 
   function exitToMenu() {
