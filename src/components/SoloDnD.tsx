@@ -837,6 +837,11 @@ export default function SoloDnD() {
       const wasInCombat = currentEnemies.length > 0 || stateRef.current.enemies.length > 0;
       setInCombat(false);
       setEnemies([]);
+      // Сброс боевых состояний при окончании боя
+      setBerserkChargesLeft(0);
+      setBerserkUsedThisCombat(false);
+      setDidDodgeLastTurn(false);
+      setDefensiveStance(false);
       if (wasInCombat) {
         trackEvent("combat_ended", {
           characterId: stateRef.current.character?.id,
@@ -846,15 +851,29 @@ export default function SoloDnD() {
       }
     }
 
+    let finalEffects = newEff;
     if (parsed.newEffects?.length) {
       const labels = parsed.newEffects.map(e => e.duration ? `${e.name} (${e.duration})` : e.name);
-      const merged = [...newEff, ...labels];
-      newEff.length = 0;
-      newEff.push(...merged);
-      setEffects(merged);
+      finalEffects = [...newEff, ...labels];
+      setEffects(finalEffects);
     }
 
-    return { newHp, newInv, newEff, newEnemies };
+    // При окончании боя — убрать эффект Берсерка из списка
+    if (parsed.combatEnd || (newEnemies.length > 0 && newEnemies.every(e => e.hp <= 0))) {
+      const cleaned = finalEffects.filter(e => !/берсерк/i.test(e));
+      if (cleaned.length !== finalEffects.length) {
+        finalEffects = cleaned;
+        setEffects(cleaned);
+      }
+    }
+
+    // При начале нового боя — сбросить уклонение и оборону
+    if (parsed.initiativeTrigger) {
+      setDidDodgeLastTurn(false);
+      setDefensiveStance(false);
+    }
+
+    return { newHp, newInv, newEff: finalEffects, newEnemies };
   }
 
   async function processAndSetMessages(char: Character, currentHp: number, currentInv: string[], currentEff: string[], currentEnemies: Enemy[], reply: string, prevMessages: ChatMessage[]) {
