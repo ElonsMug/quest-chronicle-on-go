@@ -479,7 +479,18 @@ function RollBlock({ type, request, onResult }: { type: "attack" | "roll"; reque
   );
 }
 
-function InventoryPanel({ inventory, effects, onUseItem, onClose }: { inventory: string[]; effects: string[]; onUseItem: (item: string, idx: number) => void; onClose: () => void }) {
+function InventoryPanel({
+  inventory, effects, onUseItem, onShortRest, onLongRest, inCombat, onClose,
+}: {
+  inventory: string[];
+  effects: string[];
+  onUseItem: (item: string, idx: number) => void;
+  onShortRest: () => void;
+  onLongRest: () => void;
+  inCombat: boolean;
+  onClose: () => void;
+}) {
+  const restTitle = inCombat ? "Нельзя отдыхать в бою" : "";
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.75)" }} onClick={onClose}>
       <div className="w-full max-w-md bg-stone-900 border border-stone-700 rounded-t-3xl p-6 pb-10" onClick={e => e.stopPropagation()}>
@@ -515,6 +526,100 @@ function InventoryPanel({ inventory, effects, onUseItem, onClose }: { inventory:
             {effects.map((e, i) => (
               <div key={i} className="text-amber-300 text-sm bg-stone-800 rounded-lg px-3 py-2 mb-1">{e}</div>
             ))}
+          </div>
+        )}
+        <div className="mt-4 pt-4 border-t border-stone-800">
+          <div className="text-stone-500 text-xs uppercase tracking-widest mb-2">Отдых</div>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={onShortRest}
+              disabled={inCombat}
+              title={restTitle}
+              className="py-2.5 rounded-xl border border-stone-700 bg-stone-800 text-amber-100 text-sm font-bold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed hover:border-amber-700/50"
+              style={{ fontFamily: "serif" }}>
+              ☕ Короткий
+            </button>
+            <button
+              onClick={onLongRest}
+              disabled={inCombat}
+              title={restTitle}
+              className="py-2.5 rounded-xl text-stone-900 text-sm font-bold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ background: inCombat ? "#292524" : "linear-gradient(135deg,#d97706,#92400e)", color: inCombat ? "#57534e" : "#0c0a09", fontFamily: "serif" }}>
+              🌙 Длинный
+            </button>
+          </div>
+          {inCombat && <div className="text-stone-600 text-xs mt-2 text-center">Нельзя отдыхать в бою</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SpellPanel({
+  character, spellSlots, onCantrip, onSpell, onClose,
+}: {
+  character: Character;
+  spellSlots: { current: number; max: number };
+  onCantrip: (c: Cantrip) => void;
+  onSpell: (s: Spell) => void;
+  onClose: () => void;
+}) {
+  const slots = Array.from({ length: spellSlots.max }, (_, i) => i < spellSlots.current);
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.75)" }} onClick={onClose}>
+      <div className="w-full max-w-md bg-stone-900 border border-stone-700 rounded-t-3xl p-6 pb-10 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-amber-400 font-bold" style={{ fontFamily: "serif" }}>✦ Заклинания</div>
+          <button onClick={onClose} className="text-stone-500 text-xl leading-none">✕</button>
+        </div>
+        <div className="text-center text-2xl mb-4 tracking-widest" style={{ color: "#60a5fa" }}>
+          {slots.map((on, i) => (<span key={i}>{on ? "✦" : "◇"}</span>))}
+          <span className="text-stone-500 text-sm ml-2 align-middle">{spellSlots.current}/{spellSlots.max}</span>
+        </div>
+        {character.cantrips && character.cantrips.length > 0 && (
+          <div className="mb-4">
+            <div className="text-stone-500 text-xs uppercase tracking-widest mb-2">Кантрипы (бесплатно)</div>
+            <div className="space-y-2">
+              {character.cantrips.map((c, i) => (
+                <div key={i} className="bg-stone-800 rounded-xl px-4 py-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-amber-100 text-sm font-bold" style={{ fontFamily: "serif" }}>{c.name}</span>
+                    <button
+                      onClick={() => onCantrip(c)}
+                      className="text-xs px-3 py-1 rounded-lg font-bold text-stone-900 flex-shrink-0"
+                      style={{ background: "linear-gradient(135deg,#d97706,#92400e)" }}>
+                      Атаковать
+                    </button>
+                  </div>
+                  <div className="text-stone-400 text-xs">{c.description} · {c.dice}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {character.spells && character.spells.length > 0 && (
+          <div>
+            <div className="text-stone-500 text-xs uppercase tracking-widest mb-2">Заклинания (1 слот)</div>
+            <div className="space-y-2">
+              {character.spells.map((s, i) => {
+                const hasSlots = spellSlots.current > 0;
+                return (
+                  <div key={i} className="bg-stone-800 rounded-xl px-4 py-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-amber-100 text-sm font-bold" style={{ fontFamily: "serif" }}>{s.name}</span>
+                      <button
+                        onClick={() => hasSlots && onSpell(s)}
+                        disabled={!hasSlots}
+                        className="text-xs px-3 py-1 rounded-lg font-bold flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+                        style={{ background: hasSlots ? "linear-gradient(135deg,#3b82f6,#1e40af)" : "#292524", color: hasSlots ? "#0c0a09" : "#57534e" }}>
+                        {hasSlots ? "Применить" : "Нет слотов"}
+                      </button>
+                    </div>
+                    <div className="text-stone-400 text-xs">{s.description}</div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
