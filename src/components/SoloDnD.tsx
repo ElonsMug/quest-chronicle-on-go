@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { initAnalytics, trackEvent } from "@/lib/analytics";
 
 // ─────────────────────────────────────────────────────────────────
 // ДАННЫЕ
@@ -524,6 +525,7 @@ export default function SoloDnD() {
   }>({ character: null, hp: 0, inventory: [], effects: [], enemies: [], messages: [] });
   stateRef.current = { character, hp, inventory, effects, enemies, messages };
 
+  useEffect(() => { initAnalytics(); }, []);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, loading, pendingRoll, pendingInitiative]);
 
   // ── Сейв (localStorage, безопасно к SSR) ──────────────────────
@@ -540,6 +542,7 @@ export default function SoloDnD() {
       messageCount: msgs.length,
     };
     try { window.localStorage.setItem("dnd_save_v3", JSON.stringify(save)); } catch { /* noop */ }
+    trackEvent("session_saved", { characterId: char.id, messageNumber: msgs.length });
   }
 
   // ── API: запрос к серверной функции /api/dm ───────────────────
