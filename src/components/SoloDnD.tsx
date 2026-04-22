@@ -816,7 +816,7 @@ export default function SoloDnD() {
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3" style={{ paddingBottom: "220px" }}>
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3" style={{ paddingBottom: "280px" }}>
         {messages.map((msg, i) => {
           if (msg.role === "user") {
             const isSystem = msg.content.startsWith("[");
@@ -836,8 +836,8 @@ export default function SoloDnD() {
           const isLast = i === messages.length - 1;
           return (
             <div key={i} className="space-y-2">
-              <div className="bg-stone-900/60 rounded-2xl rounded-tl-sm px-4 py-4 border border-stone-800/40">
-                <p className="text-amber-100/90 text-sm leading-relaxed whitespace-pre-line" style={{ fontFamily: "serif" }}>
+              <div className="bg-stone-900/60 rounded-2xl rounded-tl-sm px-4 py-4 border border-stone-800/40 max-w-full overflow-hidden">
+                <p className="text-amber-100/90 text-sm leading-relaxed whitespace-pre-line" style={{ fontFamily: "serif", overflowWrap: "break-word", wordBreak: "break-word" }}>
                   {p.narrative}
                 </p>
                 {p.newItem && <div className="mt-2 text-xs text-amber-500">✦ Получен: {p.newItem}</div>}
@@ -868,10 +868,12 @@ export default function SoloDnD() {
         <div className="px-4 pb-6 pt-3 max-w-md mx-auto space-y-2">
           {showChoices && parsed && (
             <>
-              {parsed.choices.map((choice, i) => (
+              {parsed.choices
+                .filter(choice => !/свой\s*вариант/i.test(choice.text))
+                .map((choice, i) => (
                 <button key={i} onClick={() => handleChoice(choice.text)}
                   className="w-full text-left px-4 py-3 rounded-xl border border-stone-700 bg-stone-900/95 text-amber-100 text-sm leading-snug transition-all active:scale-[0.98] hover:border-amber-700/50 hover:bg-stone-800"
-                  style={{ fontFamily: "serif" }}>
+                  style={{ fontFamily: "serif", overflowWrap: "break-word", wordBreak: "break-word" }}>
                   <span className="text-amber-600 font-bold mr-2">{choice.num}.</span>{choice.text}
                 </button>
               ))}
