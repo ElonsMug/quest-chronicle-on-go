@@ -963,11 +963,12 @@ export default function SoloDnD() {
 
     if (parsed.enemyDamages?.length) {
       for (const ed of parsed.enemyDamages) {
-        newEnemies = newEnemies.map(e =>
-          e.name.toLowerCase() === ed.name.toLowerCase()
-            ? { ...e, hp: Math.max(0, e.hp - ed.damage) }
-            : e
-        );
+        const targetIdx = newEnemies.findIndex(e => e.hp > 0 && e.name.toLowerCase() === ed.name.toLowerCase());
+        if (targetIdx >= 0) {
+          newEnemies = newEnemies.map((e, i) =>
+            i === targetIdx ? { ...e, hp: Math.max(0, e.hp - ed.damage) } : e
+          );
+        }
       }
       setEnemies(newEnemies);
     }
