@@ -843,7 +843,7 @@ export default function SoloDnD() {
                 {p.newItem && <div className="mt-2 text-xs text-amber-500">✦ Получен: {p.newItem}</div>}
                 {p.damage && <div className="mt-2 text-xs text-red-400">⚡ Урон: -{p.damage} HP</div>}
               </div>
-              {isLast && pendingInitiative && <InitiativeBlock onResult={handleInitiativeResult} />}
+              {isLast && pendingInitiative && <InitiativeBlock dexMod={character?.stats.dex ?? 0} onResult={handleInitiativeResult} />}
               {isLast && pendingRoll && !pendingInitiative && (
                 <RollBlock type={pendingRoll.type} request={pendingRoll.request} onResult={handleRollResult} />
               )}
