@@ -596,22 +596,24 @@ function InventoryPanel({
         )}
         <div className="mt-4 pt-4 border-t border-stone-800">
           <div className="text-stone-500 text-xs uppercase tracking-widest mb-2">Отдых</div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-2">
             <button
               onClick={onShortRest}
               disabled={inCombat}
               title={restTitle}
-              className="py-2.5 rounded-xl border border-stone-700 bg-stone-800 text-amber-100 text-sm font-bold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed hover:border-amber-700/50"
+              className="w-full text-left px-4 py-3 rounded-xl border border-stone-700 bg-stone-800 text-amber-100 text-sm font-bold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed hover:border-amber-700/50"
               style={{ fontFamily: "serif" }}>
-              ☕ Короткий
+              ☕ Короткий отдых
+              <span className="text-xs font-normal text-stone-500 block mt-0.5">Восстановить d6 HP · Слоты не вернутся</span>
             </button>
             <button
               onClick={onLongRest}
               disabled={inCombat}
               title={restTitle}
-              className="py-2.5 rounded-xl text-stone-900 text-sm font-bold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ background: inCombat ? "#292524" : "linear-gradient(135deg,#d97706,#92400e)", color: inCombat ? "#57534e" : "#0c0a09", fontFamily: "serif" }}>
-              🌙 Длинный
+              🌙 Длинный отдых
+              <span className="text-xs font-normal opacity-75 block mt-0.5">Полное HP · Все слоты заклинаний</span>
             </button>
           </div>
           {inCombat && <div className="text-stone-600 text-xs mt-2 text-center">Нельзя отдыхать в бою</div>}
@@ -1225,8 +1227,16 @@ export default function SoloDnD() {
     const newMsgs: ChatMessage[] = [...msgs, { role: "user", content: choiceText }];
     setMessages(newMsgs);
     setLoading(true);
+    // В бою после КАЖДОГО действия игрока — добавляем системное правило
+    // чтобы враги ОБЯЗАТЕЛЬНО атаковали в этом же ответе DM.
+    // Исключение: само сообщение "[Инициатива выиграна: ...]" — там враги ещё не ходят,
+    // ждём первого действия игрока.
+    const isInitiativeWin = /Инициатива выиграна/i.test(choiceText);
+    const apiMessage = (inCombat || en.length > 0) && !isInitiativeWin
+      ? `${choiceText}\n\n[СИСТЕМНОЕ ПРАВИЛО: После описания результата действия игрока — враги ОБЯЗАНЫ атаковать в этом же ответе. Каждый живой враг делает одну атаку. Используй [УРОН: X] для каждого попадания. Не жди следующего хода игрока. Не предлагай варианты 1-2-3.]`
+      : choiceText;
     try {
-      const reply = await callAPI(c, h, inv, eff, msgs, choiceText);
+      const reply = await callAPI(c, h, inv, eff, msgs, apiMessage);
       await processAndSetMessages(c, h, inv, eff, en, reply, newMsgs);
     } catch {
       setMessages([...newMsgs, { role: "assistant", content: "Связь прервалась.", parsed: parseDMResponse("Связь прервалась.") }]);
@@ -1272,13 +1282,17 @@ export default function SoloDnD() {
     setHp(newHp);
     setInventory(prev => prev.filter((_, i) => i !== idx));
     setShowInventory(false);
+    if (inCombat) {
+      // В бою зелье = бонусное действие. Сообщаем DM о бонусном действии,
+      // он опишет его и продолжит ход (но НЕ должен быть его основным действием).
+      void handleChoice(`[Бонусное действие: выпито зелье лечения, +${heal} HP (${newHp}/${c.maxHp}). Теперь основное действие игрока — враги ждут его хода. НЕ атакуй в этом ответе, только опиши глоток зелья 1 предложением, потом жди.]`);
+      return;
+    }
     setMessages(prev => [...prev, {
       role: "assistant",
       content: `Зелье выпито. +${heal} HP. (${newHp}/${c.maxHp})`,
       parsed: parseDMResponse(`✦ Ты выпиваешь зелье лечения. Тёплая волна прокатывается по телу. +${heal} HP. (${newHp}/${c.maxHp})`)
     }]);
-    // БАГ 4: в бою зелье — бонусное действие. Не закрываем бой, не вызываем DM.
-    // Боевые кнопки покажутся автоматически (inCombat=true, нет pendingRoll/Initiative).
   }
 
   // Использование зелья на экране поражения — лечит и продолжает бой
@@ -1414,8 +1428,14 @@ export default function SoloDnD() {
       await handleChoice(`[Применён Щит: +5 AC до следующего хода]`);
       return;
     }
+    if (s.type === "control" && s.name === "Усыпление") {
+      // Механика пула: 5d8. DM сам распределяет на врагов от слабого к сильному.
+      const pool = rollDice(8) + rollDice(8) + rollDice(8) + rollDice(8) + rollDice(8);
+      await handleChoice(`[Усыпление: пул ${pool} HP. Засыпают живые враги начиная с наименьшего HP пока пул не иссякнет (вычитай HP уснувшего из пула). Нежить, конструкты и демоны иммунны. Для каждого уснувшего напиши [ЭФФЕКТ: <Имя_врага>_спит, 2 раунда]. Спящие беспомощны но живы — спроси игрока что делать с каждым (добить, связать, допросить, обыскать) — это уже не активный бой со спящими, дай 3 варианта.]`);
+      return;
+    }
     if (s.type === "control") {
-      await handleChoice(`[Применено Усыпление — если HP врага ≤ 10 напиши [ЭФФЕКТ: Враг_засыпает, 2 раунда]]`);
+      await handleChoice(`[Применено заклинание контроля: ${s.name}. Spell Save DC 14.]`);
       return;
     }
     await handleChoice(`[Применено: ${s.name}]`);
@@ -1602,8 +1622,14 @@ export default function SoloDnD() {
                   {p.narrative}
                 </p>
                 {p.newItem && <div className="mt-2 text-xs text-amber-500">✦ Получен: {p.newItem}</div>}
-                {p.damage && <div className="mt-2 text-xs text-red-400">⚡ Урон: -{p.damage} HP</div>}
               </div>
+              {p.damage ? (
+                <div className="flex justify-end">
+                  <div className="rounded-xl border border-red-900/40 bg-stone-950/80 px-3 py-1.5 text-xs text-red-400 font-mono">
+                    ⚡ Урон игроку: −{p.damage} HP
+                  </div>
+                </div>
+              ) : null}
               {isLast && pendingInitiative && <InitiativeBlock dexMod={character?.stats.dex ?? 0} onResult={handleInitiativeResult} />}
               {isLast && pendingRoll && !pendingInitiative && (
                 <RollBlock type={pendingRoll.type} request={pendingRoll.request} onResult={handleRollResult} />
