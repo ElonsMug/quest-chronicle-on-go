@@ -1186,7 +1186,8 @@ export default function SoloDnD() {
   // ─────────────────────────────────────────────────────────────
   const lastMsg = messages[messages.length - 1];
   const parsed = lastMsg?.parsed;
-  const showChoices = !loading && !freeInput && !pendingRoll && !pendingInitiative && (parsed?.choices?.length ?? 0) > 0;
+  const showCombatButtons = !loading && !freeInput && !pendingRoll && !pendingInitiative && inCombat && !!character;
+  const showChoices = !loading && !freeInput && !pendingRoll && !pendingInitiative && !inCombat && (parsed?.choices?.length ?? 0) > 0;
   const showFreeArea = freeInput && !loading;
 
   return (
