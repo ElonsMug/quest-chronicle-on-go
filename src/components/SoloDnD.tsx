@@ -1495,11 +1495,12 @@ export default function SoloDnD() {
     setDidDodgeLastTurn(false);
 
     if (s.type === "attack") {
-      // Огненный болт — атака со слотом, БАГ 1: тоже автоматически без RollBlock
+      // Огненный болт — атака со слотом, авто-бросок
       const statKey: Stat = s.stat ?? "int";
       const mod = ch.stats[statKey] || 0;
       const target = en.find(e => e.hp > 0);
-      await executeAttackRoll({ weapon: s.name, dice: s.dice ?? "d10", mod, ac: target ? 12 : 12 });
+      const ac = target?.ac ?? 12;
+      await executeAttackRoll({ weapon: s.name, dice: s.dice ?? "d10", mod, ac, targetName: target?.name });
       return;
     }
     if (s.name === "Магическая стрела") {
