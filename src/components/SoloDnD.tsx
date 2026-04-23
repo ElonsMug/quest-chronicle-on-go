@@ -1187,7 +1187,8 @@ export default function SoloDnD() {
     // Сохраняем снапшот в начале каждого боя — для кнопки "Начать заново"
     if (parsed.initiativeTrigger) {
       const snapEnemies = (parsed.newEnemies?.length ? parsed.newEnemies : stateRef.current.enemies).map(e => ({ ...e }));
-      combatStartSnapshotRef.current = { hp: newHp, enemies: snapEnemies };
+      const snapAllies = stateRef.current.allies.map(a => ({ ...a }));
+      combatStartSnapshotRef.current = { hp: newHp, enemies: snapEnemies, allies: snapAllies };
     }
 
     let autoAttackReq: { weapon: string; dice: string; mod: number; ac: number } | null = null;
