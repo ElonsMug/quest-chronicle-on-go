@@ -594,7 +594,7 @@ function RollBlock({ type, request, onResult }: { type: "attack" | "roll"; reque
 }
 
 function InventoryPanel({
-  inventory, effects, onUseItem, onShortRest, onLongRest, inCombat, onClose,
+  inventory, effects, onUseItem, onShortRest, onLongRest, inCombat, canUsePotion, onClose,
 }: {
   inventory: string[];
   effects: string[];
@@ -602,9 +602,11 @@ function InventoryPanel({
   onShortRest: () => void;
   onLongRest: () => void;
   inCombat: boolean;
+  canUsePotion: boolean;
   onClose: () => void;
 }) {
   const restTitle = inCombat ? "Нельзя отдыхать в бою" : "";
+  const potionDisabledTitle = inCombat && !canUsePotion ? "Зелье можно выпить только в свой ход — перед основным действием" : "";
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.75)" }} onClick={onClose}>
       <div className="w-full max-w-md bg-stone-900 border border-stone-700 rounded-t-3xl p-6 pb-10" onClick={e => e.stopPropagation()}>
