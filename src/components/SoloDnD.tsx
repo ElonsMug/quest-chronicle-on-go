@@ -626,8 +626,10 @@ function InventoryPanel({
                   {isPotion && (
                     <button
                       onClick={() => onUseItem(item, i)}
-                      className="text-xs px-3 py-1 rounded-lg font-bold text-stone-900 ml-2 flex-shrink-0"
-                      style={{ background: "linear-gradient(135deg,#d97706,#92400e)" }}>
+                      disabled={inCombat && !canUsePotion}
+                      title={potionDisabledTitle}
+                      className="text-xs px-3 py-1 rounded-lg font-bold text-stone-900 ml-2 flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+                      style={{ background: inCombat && !canUsePotion ? "#57534e" : "linear-gradient(135deg,#d97706,#92400e)" }}>
                       Использовать
                     </button>
                   )}
