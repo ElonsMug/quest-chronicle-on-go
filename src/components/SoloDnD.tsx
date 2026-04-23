@@ -1073,7 +1073,7 @@ export default function SoloDnD() {
           const key = `${name.toLowerCase()}|${maxHp}`;
           if (name && maxHp > 0 && !seen.has(key)) {
             seen.add(key);
-            inferred.push({ name, hp, maxHp });
+            inferred.push({ name, hp, maxHp, ac: 12, damage: "d4+1" });
           }
         }
         if (inferred.length) {
