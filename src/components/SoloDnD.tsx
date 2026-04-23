@@ -1938,7 +1938,7 @@ export default function SoloDnD() {
           {showFreeArea && (
             <>
               <textarea autoFocus value={freeText} onChange={e => setFreeText(e.target.value)}
-                placeholder="Опиши своё действие..."
+                placeholder={freeInputPlaceholder}
                 rows={3}
                 className="w-full px-4 py-3 rounded-xl border border-stone-600 bg-stone-900 text-amber-100 text-sm leading-relaxed resize-none outline-none focus:border-amber-700 transition-colors"
                 style={{ fontFamily: "serif" }} />
