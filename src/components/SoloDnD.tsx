@@ -1073,6 +1073,8 @@ export default function SoloDnD() {
   const [showDev, setShowDev] = useState(false);
   const [showDefeated, setShowDefeated] = useState(false);
   const combatStartSnapshotRef = useRef<{ hp: number; enemies: Enemy[]; allies: Ally[] } | null>(null);
+  // Бонусное действие "выпито зелье" — копится здесь и приклеивается к следующему основному действию игрока.
+  const pendingPotionInfoRef = useRef<string | null>(null);
   const devTaps = useRef(0);
   const bottomRef = useRef<HTMLDivElement>(null);
   const stateRef = useRef<{
