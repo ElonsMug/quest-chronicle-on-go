@@ -1105,10 +1105,22 @@ export default function SoloDnD() {
       setEnemies(newEnemies);
     }
 
-    if (parsed.combatEnd || (newEnemies.length > 0 && newEnemies.every(e => e.hp <= 0))) {
-      const wasInCombat = currentEnemies.length > 0 || stateRef.current.enemies.length > 0;
-      setInCombat(false);
-      setEnemies([]);
+    // Союзники: добавление и урон
+    if (parsed.newAllies?.length) {
+      setAllies(prev => [...prev, ...parsed.newAllies.map(a => ({ ...a }))]);
+    }
+    if (parsed.allyDamages?.length) {
+      setAllies(prev => {
+        let next = [...prev];
+        for (const ad of parsed.allyDamages) {
+          const idx = next.findIndex(a => a.hp > 0 && a.name.toLowerCase() === ad.name.toLowerCase());
+          if (idx >= 0) {
+            next = next.map((a, i) => i === idx ? { ...a, hp: Math.max(0, a.hp - ad.damage) } : a);
+          }
+        }
+        return next;
+      });
+    }
       // Сброс боевых состояний при окончании боя
       setBerserkChargesLeft(0);
       setBerserkUsedThisCombat(false);
