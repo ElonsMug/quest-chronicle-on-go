@@ -1057,6 +1057,7 @@ export default function SoloDnD() {
   const [defensiveStance, setDefensiveStance] = useState(false);
   const [showSpellMini, setShowSpellMini] = useState(false);
   const [selectingTarget, setSelectingTarget] = useState(false);
+  const [freeInputPlaceholder] = useState(() => FREE_INPUT_PLACEHOLDERS[Math.floor(Math.random() * FREE_INPUT_PLACEHOLDERS.length)]);
   const [showDev, setShowDev] = useState(false);
   const [showDefeated, setShowDefeated] = useState(false);
   const combatStartSnapshotRef = useRef<{ hp: number; enemies: Enemy[]; allies: Ally[] } | null>(null);
