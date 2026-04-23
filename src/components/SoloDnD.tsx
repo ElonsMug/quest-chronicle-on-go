@@ -594,7 +594,7 @@ function RollBlock({ type, request, onResult }: { type: "attack" | "roll"; reque
 }
 
 function InventoryPanel({
-  inventory, effects, onUseItem, onShortRest, onLongRest, inCombat, onClose,
+  inventory, effects, onUseItem, onShortRest, onLongRest, inCombat, canUsePotion, onClose,
 }: {
   inventory: string[];
   effects: string[];
@@ -602,9 +602,11 @@ function InventoryPanel({
   onShortRest: () => void;
   onLongRest: () => void;
   inCombat: boolean;
+  canUsePotion: boolean;
   onClose: () => void;
 }) {
   const restTitle = inCombat ? "Нельзя отдыхать в бою" : "";
+  const potionDisabledTitle = inCombat && !canUsePotion ? "Зелье можно выпить только в свой ход — перед основным действием" : "";
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.75)" }} onClick={onClose}>
       <div className="w-full max-w-md bg-stone-900 border border-stone-700 rounded-t-3xl p-6 pb-10" onClick={e => e.stopPropagation()}>
@@ -624,8 +626,10 @@ function InventoryPanel({
                   {isPotion && (
                     <button
                       onClick={() => onUseItem(item, i)}
-                      className="text-xs px-3 py-1 rounded-lg font-bold text-stone-900 ml-2 flex-shrink-0"
-                      style={{ background: "linear-gradient(135deg,#d97706,#92400e)" }}>
+                      disabled={inCombat && !canUsePotion}
+                      title={potionDisabledTitle}
+                      className="text-xs px-3 py-1 rounded-lg font-bold text-stone-900 ml-2 flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+                      style={{ background: inCombat && !canUsePotion ? "#57534e" : "linear-gradient(135deg,#d97706,#92400e)" }}>
                       Использовать
                     </button>
                   )}
@@ -1069,6 +1073,8 @@ export default function SoloDnD() {
   const [showDev, setShowDev] = useState(false);
   const [showDefeated, setShowDefeated] = useState(false);
   const combatStartSnapshotRef = useRef<{ hp: number; enemies: Enemy[]; allies: Ally[] } | null>(null);
+  // Бонусное действие "выпито зелье" — копится здесь и приклеивается к следующему основному действию игрока.
+  const pendingPotionInfoRef = useRef<string | null>(null);
   const devTaps = useRef(0);
   const bottomRef = useRef<HTMLDivElement>(null);
   const stateRef = useRef<{
@@ -1246,6 +1252,7 @@ export default function SoloDnD() {
       setDefensiveStance(false);
       setSelectingTarget(false);
       setShowSpellMini(false);
+      pendingPotionInfoRef.current = null;
       if (wasInCombat) {
         trackEvent("combat_ended", {
           characterId: stateRef.current.character?.id,
@@ -1419,9 +1426,15 @@ export default function SoloDnD() {
     // Исключение: само сообщение "[Инициатива выиграна: ...]" — там враги ещё не ходят,
     // ждём первого действия игрока.
     const isInitiativeWin = /Инициатива выиграна/i.test(choiceText);
+    // Если до этого было выпито зелье как бонусное действие — приклеиваем его к
+    // основному действию ОДНИМ запросом, чтобы DM описал и зелье, и атаку,
+    // и только ПОСЛЕ этого враги отвечали.
+    const potionInfo = pendingPotionInfoRef.current;
+    pendingPotionInfoRef.current = null;
+    const choiceWithPotion = potionInfo ? `${potionInfo}\n${choiceText}` : choiceText;
     const apiMessage = (inCombat || en.length > 0) && !isInitiativeWin
-      ? `${choiceText}\n\n[СИСТЕМНОЕ ПРАВИЛО: После описания результата действия игрока — враги ОБЯЗАНЫ атаковать в этом же ответе. Каждый живой враг делает одну атаку. Используй [УРОН: X] для каждого попадания. Не жди следующего хода игрока. Не предлагай варианты 1-2-3.]`
-      : choiceText;
+      ? `${choiceWithPotion}\n\n[СИСТЕМНОЕ ПРАВИЛО: После описания результата действия игрока — враги ОБЯЗАНЫ атаковать в этом же ответе. Каждый живой враг делает одну атаку. Используй [УРОН: X] для каждого попадания. Не жди следующего хода игрока. Не предлагай варианты 1-2-3.]`
+      : choiceWithPotion;
     try {
       const reply = await callAPI(c, h, inv, eff, msgs, apiMessage);
       await processAndSetMessages(c, h, inv, eff, en, reply, newMsgs);
@@ -1464,15 +1477,26 @@ export default function SoloDnD() {
   function handleUseItem(_item: string, idx: number) {
     const { hp: h, character: c } = stateRef.current;
     if (!c) return;
+    // В бою зелье можно пить ТОЛЬКО в свой ход и ТОЛЬКО перед основным действием.
+    // Условия "свой ход": не идёт запрос (loading), не висит бросок и не идёт инициатива.
+    if (inCombat && (loading || pendingRoll || pendingInitiative)) return;
+    // Нельзя выпить второе зелье поверх ещё не использованного бонусного действия.
+    if (inCombat && pendingPotionInfoRef.current) return;
     const heal = rollDice(6) + 2;
     const newHp = Math.min(c.maxHp, h + heal);
     setHp(newHp);
     setInventory(prev => prev.filter((_, i) => i !== idx));
     setShowInventory(false);
     if (inCombat) {
-      // В бою зелье = бонусное действие. Сообщаем DM о бонусном действии,
-      // он опишет его и продолжит ход (но НЕ должен быть его основным действием).
-      void handleChoice(`[Бонусное действие: выпито зелье лечения, +${heal} HP (${newHp}/${c.maxHp}). Теперь основное действие игрока — враги ждут его хода. НЕ атакуй в этом ответе, только опиши глоток зелья 1 предложением, потом жди.]`);
+      // Бонусное действие: НЕ обращаемся к DM сейчас, иначе враги атакуют после описания зелья.
+      // Применяем эффект локально, показываем серое системное сообщение, а информация
+      // о зелье будет приклеена к следующему основному действию игрока (атака/уклонение/спецспособность).
+      pendingPotionInfoRef.current = `[Бонусное действие перед основной атакой: игрок выпил зелье лечения, +${heal} HP (${newHp}/${c.maxHp}). Опиши глоток зелья ОДНИМ предложением, затем сразу опиши основное действие игрока, описанное ниже.]`;
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        content: `🧪 Ты выпиваешь зелье. +${heal} HP. (${newHp}/${c.maxHp}) — теперь выбери основное действие.`,
+        parsed: parseDMResponse(`✦ Бонусное действие: ты выпиваешь зелье лечения. +${heal} HP. (${newHp}/${c.maxHp}). Теперь выбери основное действие.`)
+      }]);
       return;
     }
     setMessages(prev => [...prev, {
@@ -1734,6 +1758,7 @@ export default function SoloDnD() {
           onShortRest={handleShortRest}
           onLongRest={handleLongRest}
           inCombat={inCombat}
+          canUsePotion={showCombatButtons && !pendingPotionInfoRef.current}
           onClose={() => setShowInventory(false)}
         />
       )}
