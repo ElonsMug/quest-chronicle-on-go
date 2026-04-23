@@ -1858,34 +1858,54 @@ export default function SoloDnD() {
         <div className="px-4 pb-6 pt-3 max-w-md mx-auto space-y-2">
           {showCombatButtons && character && (
             <>
-              {character.id === "warrior" && (
-                <CombatButtonsWarrior
-                  berserkUsed={berserkUsedThisCombat}
-                  onAttack={handleAttack}
-                  onBerserk={handleBerserk}
-                  onDefend={handleDefend}
-                  onFree={() => { trackEvent("free_input_used", { characterId: character.id, messageNumber: messages.length, inCombat: true }); setFreeInput(true); }}
-                />
-              )}
-              {character.id === "rogue" && (
-                <CombatButtonsRogue
-                  canSneak={didDodgeLastTurn}
-                  onAttack={handleAttack}
-                  onDodge={handleDodge}
-                  onFree={() => { trackEvent("free_input_used", { characterId: character.id, messageNumber: messages.length, inCombat: true }); setFreeInput(true); }}
-                />
-              )}
-              {character.id === "mage" && spellSlots && (
-                <CombatButtonsMage
-                  spellSlots={spellSlots}
-                  showMini={showSpellMini}
-                  spells={character.spells || []}
-                  onAttack={handleAttack}
-                  onToggleSpells={() => setShowSpellMini(v => !v)}
-                  onCastSpell={handleSpell}
-                  onDodge={handleDodge}
-                  onFree={() => { trackEvent("free_input_used", { characterId: character.id, messageNumber: messages.length, inCombat: true }); setFreeInput(true); }}
-                />
+              <CombatPanel
+                character={character}
+                berserkUsedThisCombat={berserkUsedThisCombat}
+                didDodgeLastTurn={didDodgeLastTurn}
+                spellSlots={spellSlots}
+                showSpellMini={showSpellMini}
+                spells={character.spells}
+                onAttackClick={() => {
+                  const liveEnemies = stateRef.current.enemies.filter(e => e.hp > 0);
+                  if (liveEnemies.length > 1) {
+                    setSelectingTarget(true);
+                  } else {
+                    void handleAttack();
+                  }
+                }}
+                onSpecial={() => {
+                  if (character.id === "warrior") void handleBerserk();
+                  else if (character.id === "rogue") void handleAttack(); // скрытая = атака после уклонения
+                  else if (character.id === "mage") setShowSpellMini(v => !v);
+                }}
+                onDefend={() => {
+                  if (character.id === "warrior") void handleDefend();
+                  else void handleDodge();
+                }}
+                onToggleSpells={() => setShowSpellMini(v => !v)}
+                onCastSpell={handleSpell}
+                onFreeInput={() => {
+                  trackEvent("free_input_used", { characterId: character.id, messageNumber: messages.length, inCombat: true });
+                  setFreeInput(true);
+                }}
+              />
+              {selectingTarget && (
+                <div className="space-y-1 pl-2 border-l-2 border-amber-900/60">
+                  <div className="text-xs text-stone-500 px-2">Выбери цель:</div>
+                  {enemies.filter(e => e.hp > 0).map((en, i) => (
+                    <button key={i}
+                      onClick={() => { setSelectingTarget(false); void handleAttack(en.name); }}
+                      className="w-full text-left px-3 py-2 rounded-lg bg-stone-900 border border-stone-700 hover:border-amber-700 text-amber-100 text-sm transition-colors"
+                      style={{ fontFamily: "serif" }}>
+                      {en.name}
+                      <span className="text-stone-500 text-xs ml-2">{en.hp}/{en.maxHp} HP</span>
+                    </button>
+                  ))}
+                  <button onClick={() => setSelectingTarget(false)}
+                    className="w-full text-center px-3 py-1.5 text-xs text-stone-500 hover:text-stone-300 transition-colors">
+                    Отмена
+                  </button>
+                </div>
               )}
             </>
           )}
