@@ -1271,10 +1271,12 @@ export default function SoloDnD() {
       }
     }
 
-    // При начале нового боя — сбросить уклонение и оборону
+    // При начале нового боя — сбросить уклонение, оборону и UI-флаги
     if (parsed.initiativeTrigger) {
       setDidDodgeLastTurn(false);
       setDefensiveStance(false);
+      setSelectingTarget(false);
+      setShowSpellMini(false);
     }
 
     return { newHp, newInv, newEff: finalEffects, newEnemies };
