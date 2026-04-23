@@ -261,13 +261,15 @@ function parseDMResponse(text: string) {
   let newItem: string | null = null;
   const newItems: string[] = [];
   const upgrades: { from: string; to: string }[] = [];
-  const newEnemies: { name: string; maxHp: number; hp: number }[] = [];
+  const newEnemies: { name: string; maxHp: number; hp: number; ac: number; damage: string; isUndead?: boolean }[] = [];
+  const newAllies: { name: string; maxHp: number; hp: number }[] = [];
+  const allyDamages: { name: string; damage: number }[] = [];
   const enemyDamages: { name: string; damage: number }[] = [];
   const newEffects: { name: string; duration: string }[] = [];
   let initiativeTrigger = false;
   let combatEnd = false;
 
-  const TAG = /\[(АТАКА|БРОСОК|УРОН|ПРЕДМЕТ|УЛУЧШЕНИЕ|ВРАГ|ВРАГ_УРОН|ЭФФЕКТ|ИНИЦИАТИВА|КОНЕЦ_БОЯ)[^\]]*\]/gi;
+  const TAG = /\[(АТАКА|БРОСОК|УРОН|ПРЕДМЕТ|УЛУЧШЕНИЕ|ВРАГ|ВРАГ_УРОН|СОЮЗНИК|СОЮЗНИК_УРОН|ЭФФЕКТ|ИНИЦИАТИВА|КОНЕЦ_БОЯ)[^\]]*\]/gi;
 
   const atk = text.match(/\[АТАКА:\s*([^,\]]+),\s*([^,\]]+),\s*([^,\]]+),\s*AC(\d+)\]/i);
   if (atk) attackRequest = { weapon: atk[1].trim(), dice: atk[2].trim(), mod: parseInt(atk[3]) || 0, ac: parseInt(atk[4]) };
@@ -275,8 +277,14 @@ function parseDMResponse(text: string) {
   const rol = text.match(/\[БРОСОК:\s*([^,\]]+)(?:,\s*DC(\d+))?\]/i);
   if (rol) rollRequest = { stat: rol[1].trim(), dc: parseInt(rol[2] || "15") };
 
-  const dmg = text.match(/\[УРОН:\s*(\d+)\]/i);
-  if (dmg) damage = parseInt(dmg[1]);
+  // Суммируем все [УРОН: X] за ход
+  const dmgRe = /\[УРОН:\s*(\d+)\]/gi;
+  let totalDamage = 0;
+  let dmgMatch: RegExpExecArray | null;
+  while ((dmgMatch = dmgRe.exec(text)) !== null) {
+    totalDamage += parseInt(dmgMatch[1]);
+  }
+  if (totalDamage > 0) damage = totalDamage;
 
   const itemRe = /\[ПРЕДМЕТ:\s*([^\]]+)\]/gi;
   let im: RegExpExecArray | null;
@@ -294,9 +302,33 @@ function parseDMResponse(text: string) {
     upgrades.push({ from: um[1].trim(), to: um[2].trim() });
   }
 
-  const enemyRe = /\[ВРАГ:\s*([^,\]]+),\s*HP:(\d+)\]/gi;
+  // Расширенный [ВРАГ: Имя, HP:N, AC:N, УРОН:dX+Y, НЕЖИТЬ]
+  const enemyRe = /\[ВРАГ:\s*([^,\]]+),\s*HP:(\d+)(?:,\s*AC:(\d+))?(?:,\s*УРОН:([^\],]+))?(?:,\s*(НЕЖИТЬ))?\]/gi;
   let em: RegExpExecArray | null;
-  while ((em = enemyRe.exec(text)) !== null) newEnemies.push({ name: em[1].trim(), maxHp: parseInt(em[2]), hp: parseInt(em[2]) });
+  while ((em = enemyRe.exec(text)) !== null) {
+    const hp = parseInt(em[2]);
+    newEnemies.push({
+      name: em[1].trim(),
+      maxHp: hp,
+      hp,
+      ac: em[3] ? parseInt(em[3]) : 12,
+      damage: em[4] ? em[4].trim() : "d4+1",
+      isUndead: !!em[5],
+    });
+  }
+
+  const allyRe = /\[СОЮЗНИК:\s*([^,\]]+),\s*HP:(\d+)\]/gi;
+  let am: RegExpExecArray | null;
+  while ((am = allyRe.exec(text)) !== null) {
+    const hp = parseInt(am[2]);
+    newAllies.push({ name: am[1].trim(), maxHp: hp, hp });
+  }
+
+  const allyDmgRe = /\[СОЮЗНИК_УРОН:\s*([^,\]]+),\s*(\d+)\]/gi;
+  let adm: RegExpExecArray | null;
+  while ((adm = allyDmgRe.exec(text)) !== null) {
+    allyDamages.push({ name: adm[1].trim(), damage: parseInt(adm[2]) });
+  }
 
   const edRe = /\[ВРАГ_УРОН:\s*([^,\]]+),\s*(\d+)\]/gi;
   let ed: RegExpExecArray | null;
@@ -321,7 +353,7 @@ function parseDMResponse(text: string) {
     narrativeLines.push(line);
   }
 
-  return { narrative: narrativeLines.join("\n").trim(), choices, attackRequest, rollRequest, damage, newItem, newItems, upgrades, newEnemies, enemyDamages, newEffects, initiativeTrigger, combatEnd };
+  return { narrative: narrativeLines.join("\n").trim(), choices, attackRequest, rollRequest, damage, newItem, newItems, upgrades, newEnemies, newAllies, allyDamages, enemyDamages, newEffects, initiativeTrigger, combatEnd };
 }
 
 function rollDice(sides: number) { return Math.floor(Math.random() * sides) + 1; }
