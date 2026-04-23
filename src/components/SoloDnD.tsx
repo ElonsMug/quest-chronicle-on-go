@@ -1784,6 +1784,19 @@ export default function SoloDnD() {
             ))}
           </div>
         )}
+        {inCombat && allies.filter(a => a.hp > 0).length > 0 && (
+          <div className="px-4 pb-2 space-y-1">
+            {allies.filter(a => a.hp > 0).map((ally, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <span className="text-green-400 text-xs truncate max-w-[100px]">⚔ {ally.name}</span>
+                <div className="flex-1 h-1.5 rounded-full bg-stone-800 overflow-hidden">
+                  <div className="h-full rounded-full" style={{ width: `${Math.round(ally.hp / ally.maxHp * 100)}%`, background: "#4ade80" }} />
+                </div>
+                <span className="text-xs text-green-400 font-bold">{ally.hp}/{ally.maxHp}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3" style={{ paddingBottom: "280px" }}>
