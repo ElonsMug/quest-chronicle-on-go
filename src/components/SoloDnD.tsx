@@ -1261,6 +1261,7 @@ export default function SoloDnD() {
     setInventory(startInv);
     setEffects([]);
     setEnemies([]);
+    setAllies([]);
     setInCombat(false);
     setPendingRoll(null);
     setPendingInitiative(false);
@@ -1270,6 +1271,7 @@ export default function SoloDnD() {
     setDidDodgeLastTurn(false);
     setDefensiveStance(false);
     setShowSpellMini(false);
+    setSelectingTarget(false);
     setMessages([]);
     setScreen("game");
     setLoading(true);
