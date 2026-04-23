@@ -1552,6 +1552,7 @@ export default function SoloDnD() {
     if (!c) return;
     setMessages([]);
     setEnemies([]);
+    setAllies([]);
     setInCombat(false);
     setPendingRoll(null);
     setPendingInitiative(false);
