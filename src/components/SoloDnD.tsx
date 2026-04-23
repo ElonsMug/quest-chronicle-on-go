@@ -1757,6 +1757,7 @@ export default function SoloDnD() {
           onShortRest={handleShortRest}
           onLongRest={handleLongRest}
           inCombat={inCombat}
+          canUsePotion={showCombatButtons && !pendingPotionInfoRef.current}
           onClose={() => setShowInventory(false)}
         />
       )}
