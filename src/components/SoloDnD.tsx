@@ -1170,7 +1170,7 @@ export default function SoloDnD() {
 
   // Авто-бросок атаки: считает d20+mod+prof vs AC, формирует системное сообщение для DM,
   // отправляет его через handleChoice. Никакого RollBlock — всё мгновенно.
-  async function executeAttackRoll(req: { weapon: string; dice: string; mod: number; ac: number }) {
+  async function executeAttackRoll(req: { weapon: string; dice: string; mod: number; ac: number; targetName?: string }) {
     const hitRoll = rollDice(20);
     const prof = PROFICIENCY_BONUS;
     const total = hitRoll + req.mod + prof;
@@ -1185,15 +1185,17 @@ export default function SoloDnD() {
         : rollDice(dmgDice) + req.mod;
       if (damage < 1) damage = 1;
     }
+    const tname = req.targetName ? `, цель: ${req.targetName}` : "";
+    const tagName = req.targetName ?? "Имя";
     let msg: string;
     if (autoMiss) {
-      msg = `[Атака: ${req.weapon} — d20(1) АВТОПРОМАХ vs AC${req.ac}]`;
+      msg = `[Атака: ${req.weapon}${tname} — d20(1) АВТОПРОМАХ vs AC${req.ac}]`;
     } else if (crit) {
-      msg = `[Атака: ${req.weapon} — d20(20) КРИТ vs AC${req.ac} → Урон врагу: ${damage}. Опиши удар и напиши [ВРАГ_УРОН: Имя, ${damage}].]`;
+      msg = `[Атака: ${req.weapon}${tname} — d20(20) КРИТ vs AC${req.ac} → Урон врагу: ${damage}. Опиши удар и напиши [ВРАГ_УРОН: ${tagName}, ${damage}].]`;
     } else if (hit) {
-      msg = `[Атака: ${req.weapon} — d20(${hitRoll})+mod(${req.mod})+prof(${prof})=${total} vs AC${req.ac} ПОПАЛ → Урон врагу: ${damage}. Опиши удар и напиши [ВРАГ_УРОН: Имя, ${damage}].]`;
+      msg = `[Атака: ${req.weapon}${tname} — d20(${hitRoll})+mod(${req.mod})+prof(${prof})=${total} vs AC${req.ac} ПОПАЛ → Урон врагу: ${damage}. Опиши удар и напиши [ВРАГ_УРОН: ${tagName}, ${damage}].]`;
     } else {
-      msg = `[Атака: ${req.weapon} — d20(${hitRoll})+mod(${req.mod})+prof(${prof})=${total} vs AC${req.ac} МИМО]`;
+      msg = `[Атака: ${req.weapon}${tname} — d20(${hitRoll})+mod(${req.mod})+prof(${prof})=${total} vs AC${req.ac} МИМО]`;
     }
     await handleChoice(msg);
   }
