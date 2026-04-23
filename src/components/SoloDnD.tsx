@@ -1442,9 +1442,10 @@ export default function SoloDnD() {
   }
 
   // ── Боевые действия ───────────────────────────────────────────
-  async function handleAttack() {
+  async function handleAttack(targetName?: string) {
     const { character: ch, enemies: en, berserkChargesLeft: bcl } = stateRef.current;
     if (!ch) return;
+    setSelectingTarget(false);
     setDidDodgeLastTurn(false);
     let mod = ch.stats[ch.weapon.stat] || 0;
     if (bcl > 0) {
@@ -1454,10 +1455,11 @@ export default function SoloDnD() {
     if (stateRef.current.defensiveStance) {
       setDefensiveStance(false);
     }
-    const target = en.find(e => e.hp > 0);
-    const ac = target ? 12 : 12;
-    // БАГ 1: бросок происходит АВТОМАТИЧЕСКИ — без RollBlock и кнопки "Бросить d20"
-    await executeAttackRoll({ weapon: ch.weapon.name, dice: ch.weapon.dice, mod, ac });
+    const target = targetName
+      ? en.find(e => e.hp > 0 && e.name === targetName)
+      : en.find(e => e.hp > 0);
+    const ac = target?.ac ?? 12;
+    await executeAttackRoll({ weapon: ch.weapon.name, dice: ch.weapon.dice, mod, ac, targetName: target?.name });
   }
 
   async function handleBerserk() {
