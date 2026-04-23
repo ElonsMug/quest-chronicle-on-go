@@ -1531,6 +1531,7 @@ export default function SoloDnD() {
     setScreen("select");
     setMessages([]);
     setEnemies([]);
+    setAllies([]);
     setInCombat(false);
     setPendingRoll(null);
     setPendingInitiative(false);
