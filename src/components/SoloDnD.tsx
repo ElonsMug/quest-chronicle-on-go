@@ -1252,6 +1252,7 @@ export default function SoloDnD() {
       setDefensiveStance(false);
       setSelectingTarget(false);
       setShowSpellMini(false);
+      pendingPotionInfoRef.current = null;
       if (wasInCombat) {
         trackEvent("combat_ended", {
           characterId: stateRef.current.character?.id,
