@@ -1391,17 +1391,25 @@ export default function SoloDnD() {
       setShowDefeated(false);
       return;
     }
-    setHp(snap.hp);
-    setEnemies(snap.enemies.map(e => ({ ...e, hp: e.maxHp })));
-    setInCombat(true);
+    // Сначала очищаем (фикс: иначе двоятся враги/союзники), потом восстанавливаем в следующем тике
+    setEnemies([]);
+    setAllies([]);
     setShowDefeated(false);
     setBerserkChargesLeft(0);
     setBerserkUsedThisCombat(false);
     setDidDodgeLastTurn(false);
     setDefensiveStance(false);
+    setSelectingTarget(false);
+    setShowSpellMini(false);
     setPendingRoll(null);
     setPendingInitiative(false);
-    void handleChoice(`[Игрок начинает бой заново — то же столкновение, исходные HP и враги]`);
+    setTimeout(() => {
+      setHp(snap.hp);
+      setEnemies(snap.enemies.map(e => ({ ...e, hp: e.maxHp })));
+      setAllies(snap.allies ? snap.allies.map(a => ({ ...a })) : []);
+      setInCombat(true);
+      void handleChoice(`[Игрок начинает бой заново — то же столкновение, исходные HP]`);
+    }, 0);
   }
 
   function handleShortRest() {
