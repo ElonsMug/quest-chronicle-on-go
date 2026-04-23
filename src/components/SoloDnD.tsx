@@ -164,8 +164,16 @@ ${spellsBlock}Инвентарь: ${inv} | Эффекты: ${eff}
      [УЛУЧШЕНИЕ: Кинжал -> Заточенный кинжал]
      [УЛУЧШЕНИЕ: Меч -> Меч +1]
      [УЛУЧШЕНИЕ: Сломанный щит -> Починенный щит]
-[ВРАГ: Имя, HP:число] — объявить врага (в начале боя или при появлении нового)
-[ВРАГ_УРОН: Имя, число] — нанести урон врагу (система отслеживает HP врагов)
+[ВРАГ: Имя, HP:число, AC:число, УРОН:кубик] — объявить врага с атрибутами.
+   AC = Armor Class (типичные значения: бандит AC12, стражник AC14, рыцарь AC16, маг AC11).
+   УРОН = кубик урона врага (бандит d6+1, стражник d8+2, маг d4+3, гоблин d4).
+   Пример: [ВРАГ: Лысый бандит, HP:8, AC:12, УРОН:d6+1]
+   Для нежити добавь флаг: [ВРАГ: Скелет, HP:6, AC:13, УРОН:d6, НЕЖИТЬ]
+   Если не указать AC и УРОН — дефолт AC:12, УРОН:d4+1.
+[ВРАГ_УРОН: Имя, число] — нанести урон врагу (система отслеживает HP врагов).
+   Используй РОВНО то же уникальное имя что и в [ВРАГ:] — иначе урон не применится.
+[СОЮЗНИК: Имя, HP:число] — объявить союзника NPC (атакует автоматически в нарративе).
+[СОЮЗНИК_УРОН: Имя, число] — урон союзнику от врага.
 [ИНИЦИАТИВА] — в начале КАЖДОГО боя, система бросит d20 за обе стороны
 [КОНЕЦ_БОЯ] — когда все враги повержены
 
@@ -261,13 +269,15 @@ function parseDMResponse(text: string) {
   let newItem: string | null = null;
   const newItems: string[] = [];
   const upgrades: { from: string; to: string }[] = [];
-  const newEnemies: { name: string; maxHp: number; hp: number }[] = [];
+  const newEnemies: { name: string; maxHp: number; hp: number; ac: number; damage: string; isUndead?: boolean }[] = [];
+  const newAllies: { name: string; maxHp: number; hp: number }[] = [];
+  const allyDamages: { name: string; damage: number }[] = [];
   const enemyDamages: { name: string; damage: number }[] = [];
   const newEffects: { name: string; duration: string }[] = [];
   let initiativeTrigger = false;
   let combatEnd = false;
 
-  const TAG = /\[(АТАКА|БРОСОК|УРОН|ПРЕДМЕТ|УЛУЧШЕНИЕ|ВРАГ|ВРАГ_УРОН|ЭФФЕКТ|ИНИЦИАТИВА|КОНЕЦ_БОЯ)[^\]]*\]/gi;
+  const TAG = /\[(АТАКА|БРОСОК|УРОН|ПРЕДМЕТ|УЛУЧШЕНИЕ|ВРАГ|ВРАГ_УРОН|СОЮЗНИК|СОЮЗНИК_УРОН|ЭФФЕКТ|ИНИЦИАТИВА|КОНЕЦ_БОЯ)[^\]]*\]/gi;
 
   const atk = text.match(/\[АТАКА:\s*([^,\]]+),\s*([^,\]]+),\s*([^,\]]+),\s*AC(\d+)\]/i);
   if (atk) attackRequest = { weapon: atk[1].trim(), dice: atk[2].trim(), mod: parseInt(atk[3]) || 0, ac: parseInt(atk[4]) };
@@ -275,8 +285,14 @@ function parseDMResponse(text: string) {
   const rol = text.match(/\[БРОСОК:\s*([^,\]]+)(?:,\s*DC(\d+))?\]/i);
   if (rol) rollRequest = { stat: rol[1].trim(), dc: parseInt(rol[2] || "15") };
 
-  const dmg = text.match(/\[УРОН:\s*(\d+)\]/i);
-  if (dmg) damage = parseInt(dmg[1]);
+  // Суммируем все [УРОН: X] за ход
+  const dmgRe = /\[УРОН:\s*(\d+)\]/gi;
+  let totalDamage = 0;
+  let dmgMatch: RegExpExecArray | null;
+  while ((dmgMatch = dmgRe.exec(text)) !== null) {
+    totalDamage += parseInt(dmgMatch[1]);
+  }
+  if (totalDamage > 0) damage = totalDamage;
 
   const itemRe = /\[ПРЕДМЕТ:\s*([^\]]+)\]/gi;
   let im: RegExpExecArray | null;
@@ -294,9 +310,33 @@ function parseDMResponse(text: string) {
     upgrades.push({ from: um[1].trim(), to: um[2].trim() });
   }
 
-  const enemyRe = /\[ВРАГ:\s*([^,\]]+),\s*HP:(\d+)\]/gi;
+  // Расширенный [ВРАГ: Имя, HP:N, AC:N, УРОН:dX+Y, НЕЖИТЬ]
+  const enemyRe = /\[ВРАГ:\s*([^,\]]+),\s*HP:(\d+)(?:,\s*AC:(\d+))?(?:,\s*УРОН:([^\],]+))?(?:,\s*(НЕЖИТЬ))?\]/gi;
   let em: RegExpExecArray | null;
-  while ((em = enemyRe.exec(text)) !== null) newEnemies.push({ name: em[1].trim(), maxHp: parseInt(em[2]), hp: parseInt(em[2]) });
+  while ((em = enemyRe.exec(text)) !== null) {
+    const hp = parseInt(em[2]);
+    newEnemies.push({
+      name: em[1].trim(),
+      maxHp: hp,
+      hp,
+      ac: em[3] ? parseInt(em[3]) : 12,
+      damage: em[4] ? em[4].trim() : "d4+1",
+      isUndead: !!em[5],
+    });
+  }
+
+  const allyRe = /\[СОЮЗНИК:\s*([^,\]]+),\s*HP:(\d+)\]/gi;
+  let am: RegExpExecArray | null;
+  while ((am = allyRe.exec(text)) !== null) {
+    const hp = parseInt(am[2]);
+    newAllies.push({ name: am[1].trim(), maxHp: hp, hp });
+  }
+
+  const allyDmgRe = /\[СОЮЗНИК_УРОН:\s*([^,\]]+),\s*(\d+)\]/gi;
+  let adm: RegExpExecArray | null;
+  while ((adm = allyDmgRe.exec(text)) !== null) {
+    allyDamages.push({ name: adm[1].trim(), damage: parseInt(adm[2]) });
+  }
 
   const edRe = /\[ВРАГ_УРОН:\s*([^,\]]+),\s*(\d+)\]/gi;
   let ed: RegExpExecArray | null;
@@ -321,7 +361,7 @@ function parseDMResponse(text: string) {
     narrativeLines.push(line);
   }
 
-  return { narrative: narrativeLines.join("\n").trim(), choices, attackRequest, rollRequest, damage, newItem, newItems, upgrades, newEnemies, enemyDamages, newEffects, initiativeTrigger, combatEnd };
+  return { narrative: narrativeLines.join("\n").trim(), choices, attackRequest, rollRequest, damage, newItem, newItems, upgrades, newEnemies, newAllies, allyDamages, enemyDamages, newEffects, initiativeTrigger, combatEnd };
 }
 
 function rollDice(sides: number) { return Math.floor(Math.random() * sides) + 1; }
@@ -333,7 +373,15 @@ type ChatMessage = {
   parsed?: Parsed;
 };
 
-type Enemy = { name: string; hp: number; maxHp: number };
+type Enemy = {
+  name: string;
+  hp: number;
+  maxHp: number;
+  ac: number;
+  damage: string;
+  isUndead?: boolean;
+};
+type Ally = { name: string; hp: number; maxHp: number };
 type RollRequest = { stat?: string; weapon?: string; dice?: string; mod: number; dc?: number; ac?: number };
 type PendingRoll = { type: "attack" | "roll"; request: RollRequest };
 
@@ -886,6 +934,109 @@ function CharacterCard({ char, selected, onSelect }: { char: Character; selected
   );
 }
 
+const FREE_INPUT_PLACEHOLDERS = [
+  "Прыгнуть со стола на врага...",
+  "Схватить факел и поджечь занавески...",
+  "Попытаться договориться с главарём...",
+  "Кинуть горсть пыли в глаза...",
+  "Опрокинуть стол как щит...",
+  "Крикнуть чтобы отвлечь внимание...",
+];
+
+function CombatPanel({
+  character, berserkUsedThisCombat, didDodgeLastTurn, spellSlots,
+  showSpellMini, spells, onAttackClick, onSpecial, onDefend, onToggleSpells, onCastSpell, onFreeInput,
+}: {
+  character: Character;
+  berserkUsedThisCombat: boolean;
+  didDodgeLastTurn: boolean;
+  spellSlots: { current: number; max: number } | null;
+  showSpellMini: boolean;
+  spells: Spell[] | undefined;
+  onAttackClick: () => void;
+  onSpecial: () => void;
+  onDefend: () => void;
+  onToggleSpells: () => void;
+  onCastSpell: (s: Spell) => void;
+  onFreeInput: () => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-4 gap-2">
+        <button onClick={onAttackClick}
+          className="flex flex-col items-center py-3 rounded-xl text-stone-900 font-bold active:scale-95 transition-transform"
+          style={{ background: "linear-gradient(135deg,#d97706,#92400e)", fontFamily: "serif" }}>
+          <span className="text-xl">⚔️</span>
+          <span className="text-xs mt-0.5">Атака</span>
+        </button>
+
+        {character.id === "warrior" && (
+          <button onClick={berserkUsedThisCombat ? undefined : onSpecial}
+            disabled={berserkUsedThisCombat}
+            className="flex flex-col items-center py-3 rounded-xl font-bold active:scale-95 transition-transform disabled:opacity-40"
+            style={{
+              background: berserkUsedThisCombat ? "#292524" : "linear-gradient(135deg,#dc2626,#7f1d1d)",
+              color: berserkUsedThisCombat ? "#57534e" : "#0c0a09",
+              fontFamily: "serif",
+            }}>
+            <span className="text-xl">🔥</span>
+            <span className="text-xs mt-0.5">Берсерк</span>
+          </button>
+        )}
+        {character.id === "rogue" && (
+          <button onClick={didDodgeLastTurn ? onSpecial : undefined}
+            disabled={!didDodgeLastTurn}
+            className="flex flex-col items-center py-3 rounded-xl font-bold active:scale-95 transition-transform disabled:opacity-40"
+            style={{
+              background: didDodgeLastTurn ? "linear-gradient(135deg,#dc2626,#7f1d1d)" : "#292524",
+              color: didDodgeLastTurn ? "#0c0a09" : "#57534e",
+              fontFamily: "serif",
+            }}>
+            <span className="text-xl">🎯</span>
+            <span className="text-xs mt-0.5">Скрытая</span>
+          </button>
+        )}
+        {character.id === "mage" && spellSlots && (
+          <button onClick={spellSlots.current > 0 ? onToggleSpells : undefined}
+            disabled={spellSlots.current === 0}
+            className="flex flex-col items-center py-3 rounded-xl font-bold active:scale-95 transition-transform disabled:opacity-40"
+            style={{
+              background: spellSlots.current > 0 ? "linear-gradient(135deg,#3b82f6,#1e40af)" : "#292524",
+              color: spellSlots.current > 0 ? "#0c0a09" : "#57534e",
+              fontFamily: "serif",
+            }}>
+            <span className="text-xl">✦</span>
+            <span className="text-xs mt-0.5">{spellSlots.current}/{spellSlots.max}</span>
+          </button>
+        )}
+
+        <button onClick={onDefend}
+          className="flex flex-col items-center py-3 rounded-xl border border-stone-700 bg-stone-900 font-bold active:scale-95 transition-transform"
+          style={{ color: "#fde68a", fontFamily: "serif" }}>
+          <span className="text-xl">{character.id === "warrior" ? "🛡" : "💨"}</span>
+          <span className="text-xs mt-0.5">{character.id === "warrior" ? "Оборона" : "Уклон"}</span>
+        </button>
+
+        <button onClick={onFreeInput}
+          className="flex flex-col items-center py-3 rounded-xl border border-stone-600 bg-stone-950 font-bold active:scale-95 transition-transform"
+          style={{ color: "#78716c", fontFamily: "serif" }}>
+          <span className="text-xl">✍</span>
+          <span className="text-xs mt-0.5">Своё...</span>
+        </button>
+      </div>
+
+      {showSpellMini && spells && spells.map((s, i) => (
+        <button key={i} onClick={() => onCastSpell(s)}
+          className="w-full text-left px-3 py-2 rounded-lg bg-stone-900 border border-blue-900/60 hover:border-blue-700 transition-colors"
+          style={{ fontFamily: "serif" }}>
+          <div className="text-amber-100 text-sm font-bold">{s.name}</div>
+          <div className="text-stone-500 text-xs">{s.description}</div>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────
 // ГЛАВНЫЙ КОМПОНЕНТ
 // ─────────────────────────────────────────────────────────────────
@@ -899,6 +1050,7 @@ export default function SoloDnD() {
   const [inventory, setInventory] = useState<string[]>([]);
   const [effects, setEffects] = useState<string[]>([]);
   const [enemies, setEnemies] = useState<Enemy[]>([]);
+  const [allies, setAllies] = useState<Ally[]>([]);
   const [inCombat, setInCombat] = useState(false);
   const [pendingRoll, setPendingRoll] = useState<PendingRoll | null>(null);
   const [pendingInitiative, setPendingInitiative] = useState(false);
@@ -912,9 +1064,11 @@ export default function SoloDnD() {
   const [didDodgeLastTurn, setDidDodgeLastTurn] = useState(false);
   const [defensiveStance, setDefensiveStance] = useState(false);
   const [showSpellMini, setShowSpellMini] = useState(false);
+  const [selectingTarget, setSelectingTarget] = useState(false);
+  const [freeInputPlaceholder] = useState(() => FREE_INPUT_PLACEHOLDERS[Math.floor(Math.random() * FREE_INPUT_PLACEHOLDERS.length)]);
   const [showDev, setShowDev] = useState(false);
   const [showDefeated, setShowDefeated] = useState(false);
-  const combatStartSnapshotRef = useRef<{ hp: number; enemies: Enemy[] } | null>(null);
+  const combatStartSnapshotRef = useRef<{ hp: number; enemies: Enemy[]; allies: Ally[] } | null>(null);
   const devTaps = useRef(0);
   const bottomRef = useRef<HTMLDivElement>(null);
   const stateRef = useRef<{
@@ -923,13 +1077,14 @@ export default function SoloDnD() {
     inventory: string[];
     effects: string[];
     enemies: Enemy[];
+    allies: Ally[];
     messages: ChatMessage[];
     spellSlots: { current: number; max: number } | null;
     berserkChargesLeft: number;
     didDodgeLastTurn: boolean;
     defensiveStance: boolean;
-  }>({ character: null, hp: 0, inventory: [], effects: [], enemies: [], messages: [], spellSlots: null, berserkChargesLeft: 0, didDodgeLastTurn: false, defensiveStance: false });
-  stateRef.current = { character, hp, inventory, effects, enemies, messages, spellSlots, berserkChargesLeft, didDodgeLastTurn, defensiveStance };
+  }>({ character: null, hp: 0, inventory: [], effects: [], enemies: [], allies: [], messages: [], spellSlots: null, berserkChargesLeft: 0, didDodgeLastTurn: false, defensiveStance: false });
+  stateRef.current = { character, hp, inventory, effects, enemies, allies, messages, spellSlots, berserkChargesLeft, didDodgeLastTurn, defensiveStance };
 
   useEffect(() => { initAnalytics(); }, []);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, loading, pendingRoll, pendingInitiative]);
@@ -1033,7 +1188,7 @@ export default function SoloDnD() {
           const key = `${name.toLowerCase()}|${maxHp}`;
           if (name && maxHp > 0 && !seen.has(key)) {
             seen.add(key);
-            inferred.push({ name, hp, maxHp });
+            inferred.push({ name, hp, maxHp, ac: 12, damage: "d4+1" });
           }
         }
         if (inferred.length) {
@@ -1062,15 +1217,35 @@ export default function SoloDnD() {
       setEnemies(newEnemies);
     }
 
+    // Союзники: добавление и урон
+    if (parsed.newAllies?.length) {
+      setAllies(prev => [...prev, ...parsed.newAllies.map(a => ({ ...a }))]);
+    }
+    if (parsed.allyDamages?.length) {
+      setAllies(prev => {
+        let next = [...prev];
+        for (const ad of parsed.allyDamages) {
+          const idx = next.findIndex(a => a.hp > 0 && a.name.toLowerCase() === ad.name.toLowerCase());
+          if (idx >= 0) {
+            next = next.map((a, i) => i === idx ? { ...a, hp: Math.max(0, a.hp - ad.damage) } : a);
+          }
+        }
+        return next;
+      });
+    }
+
     if (parsed.combatEnd || (newEnemies.length > 0 && newEnemies.every(e => e.hp <= 0))) {
       const wasInCombat = currentEnemies.length > 0 || stateRef.current.enemies.length > 0;
       setInCombat(false);
       setEnemies([]);
+      setAllies([]);
       // Сброс боевых состояний при окончании боя
       setBerserkChargesLeft(0);
       setBerserkUsedThisCombat(false);
       setDidDodgeLastTurn(false);
       setDefensiveStance(false);
+      setSelectingTarget(false);
+      setShowSpellMini(false);
       if (wasInCombat) {
         trackEvent("combat_ended", {
           characterId: stateRef.current.character?.id,
@@ -1096,10 +1271,12 @@ export default function SoloDnD() {
       }
     }
 
-    // При начале нового боя — сбросить уклонение и оборону
+    // При начале нового боя — сбросить уклонение, оборону и UI-флаги
     if (parsed.initiativeTrigger) {
       setDidDodgeLastTurn(false);
       setDefensiveStance(false);
+      setSelectingTarget(false);
+      setShowSpellMini(false);
     }
 
     return { newHp, newInv, newEff: finalEffects, newEnemies };
@@ -1107,7 +1284,7 @@ export default function SoloDnD() {
 
   // Авто-бросок атаки: считает d20+mod+prof vs AC, формирует системное сообщение для DM,
   // отправляет его через handleChoice. Никакого RollBlock — всё мгновенно.
-  async function executeAttackRoll(req: { weapon: string; dice: string; mod: number; ac: number }) {
+  async function executeAttackRoll(req: { weapon: string; dice: string; mod: number; ac: number; targetName?: string }) {
     const hitRoll = rollDice(20);
     const prof = PROFICIENCY_BONUS;
     const total = hitRoll + req.mod + prof;
@@ -1122,15 +1299,17 @@ export default function SoloDnD() {
         : rollDice(dmgDice) + req.mod;
       if (damage < 1) damage = 1;
     }
+    const tname = req.targetName ? `, цель: ${req.targetName}` : "";
+    const tagName = req.targetName ?? "Имя";
     let msg: string;
     if (autoMiss) {
-      msg = `[Атака: ${req.weapon} — d20(1) АВТОПРОМАХ vs AC${req.ac}]`;
+      msg = `[Атака: ${req.weapon}${tname} — d20(1) АВТОПРОМАХ vs AC${req.ac}]`;
     } else if (crit) {
-      msg = `[Атака: ${req.weapon} — d20(20) КРИТ vs AC${req.ac} → Урон врагу: ${damage}. Опиши удар и напиши [ВРАГ_УРОН: Имя, ${damage}].]`;
+      msg = `[Атака: ${req.weapon}${tname} — d20(20) КРИТ vs AC${req.ac} → Урон врагу: ${damage}. Опиши удар и напиши [ВРАГ_УРОН: ${tagName}, ${damage}].]`;
     } else if (hit) {
-      msg = `[Атака: ${req.weapon} — d20(${hitRoll})+mod(${req.mod})+prof(${prof})=${total} vs AC${req.ac} ПОПАЛ → Урон врагу: ${damage}. Опиши удар и напиши [ВРАГ_УРОН: Имя, ${damage}].]`;
+      msg = `[Атака: ${req.weapon}${tname} — d20(${hitRoll})+mod(${req.mod})+prof(${prof})=${total} vs AC${req.ac} ПОПАЛ → Урон врагу: ${damage}. Опиши удар и напиши [ВРАГ_УРОН: ${tagName}, ${damage}].]`;
     } else {
-      msg = `[Атака: ${req.weapon} — d20(${hitRoll})+mod(${req.mod})+prof(${prof})=${total} vs AC${req.ac} МИМО]`;
+      msg = `[Атака: ${req.weapon}${tname} — d20(${hitRoll})+mod(${req.mod})+prof(${prof})=${total} vs AC${req.ac} МИМО]`;
     }
     await handleChoice(msg);
   }
@@ -1144,7 +1323,8 @@ export default function SoloDnD() {
     // Сохраняем снапшот в начале каждого боя — для кнопки "Начать заново"
     if (parsed.initiativeTrigger) {
       const snapEnemies = (parsed.newEnemies?.length ? parsed.newEnemies : stateRef.current.enemies).map(e => ({ ...e }));
-      combatStartSnapshotRef.current = { hp: newHp, enemies: snapEnemies };
+      const snapAllies = stateRef.current.allies.map(a => ({ ...a }));
+      combatStartSnapshotRef.current = { hp: newHp, enemies: snapEnemies, allies: snapAllies };
     }
 
     let autoAttackReq: { weapon: string; dice: string; mod: number; ac: number } | null = null;
@@ -1197,6 +1377,7 @@ export default function SoloDnD() {
     setInventory(startInv);
     setEffects([]);
     setEnemies([]);
+    setAllies([]);
     setInCombat(false);
     setPendingRoll(null);
     setPendingInitiative(false);
@@ -1206,6 +1387,7 @@ export default function SoloDnD() {
     setDidDodgeLastTurn(false);
     setDefensiveStance(false);
     setShowSpellMini(false);
+    setSelectingTarget(false);
     setMessages([]);
     setScreen("game");
     setLoading(true);
@@ -1325,17 +1507,25 @@ export default function SoloDnD() {
       setShowDefeated(false);
       return;
     }
-    setHp(snap.hp);
-    setEnemies(snap.enemies.map(e => ({ ...e, hp: e.maxHp })));
-    setInCombat(true);
+    // Сначала очищаем (фикс: иначе двоятся враги/союзники), потом восстанавливаем в следующем тике
+    setEnemies([]);
+    setAllies([]);
     setShowDefeated(false);
     setBerserkChargesLeft(0);
     setBerserkUsedThisCombat(false);
     setDidDodgeLastTurn(false);
     setDefensiveStance(false);
+    setSelectingTarget(false);
+    setShowSpellMini(false);
     setPendingRoll(null);
     setPendingInitiative(false);
-    void handleChoice(`[Игрок начинает бой заново — то же столкновение, исходные HP и враги]`);
+    setTimeout(() => {
+      setHp(snap.hp);
+      setEnemies(snap.enemies.map(e => ({ ...e, hp: e.maxHp })));
+      setAllies(snap.allies ? snap.allies.map(a => ({ ...a })) : []);
+      setInCombat(true);
+      void handleChoice(`[Игрок начинает бой заново — то же столкновение, исходные HP]`);
+    }, 0);
   }
 
   function handleShortRest() {
@@ -1368,9 +1558,10 @@ export default function SoloDnD() {
   }
 
   // ── Боевые действия ───────────────────────────────────────────
-  async function handleAttack() {
+  async function handleAttack(targetName?: string) {
     const { character: ch, enemies: en, berserkChargesLeft: bcl } = stateRef.current;
     if (!ch) return;
+    setSelectingTarget(false);
     setDidDodgeLastTurn(false);
     let mod = ch.stats[ch.weapon.stat] || 0;
     if (bcl > 0) {
@@ -1380,10 +1571,11 @@ export default function SoloDnD() {
     if (stateRef.current.defensiveStance) {
       setDefensiveStance(false);
     }
-    const target = en.find(e => e.hp > 0);
-    const ac = target ? 12 : 12;
-    // БАГ 1: бросок происходит АВТОМАТИЧЕСКИ — без RollBlock и кнопки "Бросить d20"
-    await executeAttackRoll({ weapon: ch.weapon.name, dice: ch.weapon.dice, mod, ac });
+    const target = targetName
+      ? en.find(e => e.hp > 0 && e.name === targetName)
+      : en.find(e => e.hp > 0);
+    const ac = target?.ac ?? 12;
+    await executeAttackRoll({ weapon: ch.weapon.name, dice: ch.weapon.dice, mod, ac, targetName: target?.name });
   }
 
   async function handleBerserk() {
@@ -1417,11 +1609,12 @@ export default function SoloDnD() {
     setDidDodgeLastTurn(false);
 
     if (s.type === "attack") {
-      // Огненный болт — атака со слотом, БАГ 1: тоже автоматически без RollBlock
+      // Огненный болт — атака со слотом, авто-бросок
       const statKey: Stat = s.stat ?? "int";
       const mod = ch.stats[statKey] || 0;
       const target = en.find(e => e.hp > 0);
-      await executeAttackRoll({ weapon: s.name, dice: s.dice ?? "d10", mod, ac: target ? 12 : 12 });
+      const ac = target?.ac ?? 12;
+      await executeAttackRoll({ weapon: s.name, dice: s.dice ?? "d10", mod, ac, targetName: target?.name });
       return;
     }
     if (s.name === "Магическая стрела") {
@@ -1452,6 +1645,7 @@ export default function SoloDnD() {
     setScreen("select");
     setMessages([]);
     setEnemies([]);
+    setAllies([]);
     setInCombat(false);
     setPendingRoll(null);
     setPendingInitiative(false);
@@ -1472,6 +1666,7 @@ export default function SoloDnD() {
     if (!c) return;
     setMessages([]);
     setEnemies([]);
+    setAllies([]);
     setInCombat(false);
     setPendingRoll(null);
     setPendingInitiative(false);
@@ -1600,6 +1795,19 @@ export default function SoloDnD() {
             ))}
           </div>
         )}
+        {inCombat && allies.filter(a => a.hp > 0).length > 0 && (
+          <div className="px-4 pb-2 space-y-1">
+            {allies.filter(a => a.hp > 0).map((ally, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <span className="text-green-400 text-xs truncate max-w-[100px]">⚔ {ally.name}</span>
+                <div className="flex-1 h-1.5 rounded-full bg-stone-800 overflow-hidden">
+                  <div className="h-full rounded-full" style={{ width: `${Math.round(ally.hp / ally.maxHp * 100)}%`, background: "#4ade80" }} />
+                </div>
+                <span className="text-xs text-green-400 font-bold">{ally.hp}/{ally.maxHp}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3" style={{ paddingBottom: "280px" }}>
@@ -1660,34 +1868,54 @@ export default function SoloDnD() {
         <div className="px-4 pb-6 pt-3 max-w-md mx-auto space-y-2">
           {showCombatButtons && character && (
             <>
-              {character.id === "warrior" && (
-                <CombatButtonsWarrior
-                  berserkUsed={berserkUsedThisCombat}
-                  onAttack={handleAttack}
-                  onBerserk={handleBerserk}
-                  onDefend={handleDefend}
-                  onFree={() => { trackEvent("free_input_used", { characterId: character.id, messageNumber: messages.length, inCombat: true }); setFreeInput(true); }}
-                />
-              )}
-              {character.id === "rogue" && (
-                <CombatButtonsRogue
-                  canSneak={didDodgeLastTurn}
-                  onAttack={handleAttack}
-                  onDodge={handleDodge}
-                  onFree={() => { trackEvent("free_input_used", { characterId: character.id, messageNumber: messages.length, inCombat: true }); setFreeInput(true); }}
-                />
-              )}
-              {character.id === "mage" && spellSlots && (
-                <CombatButtonsMage
-                  spellSlots={spellSlots}
-                  showMini={showSpellMini}
-                  spells={character.spells || []}
-                  onAttack={handleAttack}
-                  onToggleSpells={() => setShowSpellMini(v => !v)}
-                  onCastSpell={handleSpell}
-                  onDodge={handleDodge}
-                  onFree={() => { trackEvent("free_input_used", { characterId: character.id, messageNumber: messages.length, inCombat: true }); setFreeInput(true); }}
-                />
+              <CombatPanel
+                character={character}
+                berserkUsedThisCombat={berserkUsedThisCombat}
+                didDodgeLastTurn={didDodgeLastTurn}
+                spellSlots={spellSlots}
+                showSpellMini={showSpellMini}
+                spells={character.spells}
+                onAttackClick={() => {
+                  const liveEnemies = stateRef.current.enemies.filter(e => e.hp > 0);
+                  if (liveEnemies.length > 1) {
+                    setSelectingTarget(true);
+                  } else {
+                    void handleAttack();
+                  }
+                }}
+                onSpecial={() => {
+                  if (character.id === "warrior") void handleBerserk();
+                  else if (character.id === "rogue") void handleAttack(); // скрытая = атака после уклонения
+                  else if (character.id === "mage") setShowSpellMini(v => !v);
+                }}
+                onDefend={() => {
+                  if (character.id === "warrior") void handleDefend();
+                  else void handleDodge();
+                }}
+                onToggleSpells={() => setShowSpellMini(v => !v)}
+                onCastSpell={handleSpell}
+                onFreeInput={() => {
+                  trackEvent("free_input_used", { characterId: character.id, messageNumber: messages.length, inCombat: true });
+                  setFreeInput(true);
+                }}
+              />
+              {selectingTarget && (
+                <div className="space-y-1 pl-2 border-l-2 border-amber-900/60">
+                  <div className="text-xs text-stone-500 px-2">Выбери цель:</div>
+                  {enemies.filter(e => e.hp > 0).map((en, i) => (
+                    <button key={i}
+                      onClick={() => { setSelectingTarget(false); void handleAttack(en.name); }}
+                      className="w-full text-left px-3 py-2 rounded-lg bg-stone-900 border border-stone-700 hover:border-amber-700 text-amber-100 text-sm transition-colors"
+                      style={{ fontFamily: "serif" }}>
+                      {en.name}
+                      <span className="text-stone-500 text-xs ml-2">{en.hp}/{en.maxHp} HP</span>
+                    </button>
+                  ))}
+                  <button onClick={() => setSelectingTarget(false)}
+                    className="w-full text-center px-3 py-1.5 text-xs text-stone-500 hover:text-stone-300 transition-colors">
+                    Отмена
+                  </button>
+                </div>
               )}
             </>
           )}
@@ -1720,7 +1948,7 @@ export default function SoloDnD() {
           {showFreeArea && (
             <>
               <textarea autoFocus value={freeText} onChange={e => setFreeText(e.target.value)}
-                placeholder="Опиши своё действие..."
+                placeholder={freeInputPlaceholder}
                 rows={3}
                 className="w-full px-4 py-3 rounded-xl border border-stone-600 bg-stone-900 text-amber-100 text-sm leading-relaxed resize-none outline-none focus:border-amber-700 transition-colors"
                 style={{ fontFamily: "serif" }} />
