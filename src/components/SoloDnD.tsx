@@ -1476,15 +1476,26 @@ export default function SoloDnD() {
   function handleUseItem(_item: string, idx: number) {
     const { hp: h, character: c } = stateRef.current;
     if (!c) return;
+    // В бою зелье можно пить ТОЛЬКО в свой ход и ТОЛЬКО перед основным действием.
+    // Условия "свой ход": не идёт запрос (loading), не висит бросок и не идёт инициатива.
+    if (inCombat && (loading || pendingRoll || pendingInitiative)) return;
+    // Нельзя выпить второе зелье поверх ещё не использованного бонусного действия.
+    if (inCombat && pendingPotionInfoRef.current) return;
     const heal = rollDice(6) + 2;
     const newHp = Math.min(c.maxHp, h + heal);
     setHp(newHp);
     setInventory(prev => prev.filter((_, i) => i !== idx));
     setShowInventory(false);
     if (inCombat) {
-      // В бою зелье = бонусное действие. Сообщаем DM о бонусном действии,
-      // он опишет его и продолжит ход (но НЕ должен быть его основным действием).
-      void handleChoice(`[Бонусное действие: выпито зелье лечения, +${heal} HP (${newHp}/${c.maxHp}). Теперь основное действие игрока — враги ждут его хода. НЕ атакуй в этом ответе, только опиши глоток зелья 1 предложением, потом жди.]`);
+      // Бонусное действие: НЕ обращаемся к DM сейчас, иначе враги атакуют после описания зелья.
+      // Применяем эффект локально, показываем серое системное сообщение, а информация
+      // о зелье будет приклеена к следующему основному действию игрока (атака/уклонение/спецспособность).
+      pendingPotionInfoRef.current = `[Бонусное действие перед основной атакой: игрок выпил зелье лечения, +${heal} HP (${newHp}/${c.maxHp}). Опиши глоток зелья ОДНИМ предложением, затем сразу опиши основное действие игрока, описанное ниже.]`;
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        content: `🧪 Ты выпиваешь зелье. +${heal} HP. (${newHp}/${c.maxHp}) — теперь выбери основное действие.`,
+        parsed: parseDMResponse(`✦ Бонусное действие: ты выпиваешь зелье лечения. +${heal} HP. (${newHp}/${c.maxHp}). Теперь выбери основное действие.`)
+      }]);
       return;
     }
     setMessages(prev => [...prev, {
