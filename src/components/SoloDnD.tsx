@@ -939,6 +939,7 @@ export default function SoloDnD() {
   const [inventory, setInventory] = useState<string[]>([]);
   const [effects, setEffects] = useState<string[]>([]);
   const [enemies, setEnemies] = useState<Enemy[]>([]);
+  const [allies, setAllies] = useState<Ally[]>([]);
   const [inCombat, setInCombat] = useState(false);
   const [pendingRoll, setPendingRoll] = useState<PendingRoll | null>(null);
   const [pendingInitiative, setPendingInitiative] = useState(false);
@@ -952,9 +953,10 @@ export default function SoloDnD() {
   const [didDodgeLastTurn, setDidDodgeLastTurn] = useState(false);
   const [defensiveStance, setDefensiveStance] = useState(false);
   const [showSpellMini, setShowSpellMini] = useState(false);
+  const [selectingTarget, setSelectingTarget] = useState(false);
   const [showDev, setShowDev] = useState(false);
   const [showDefeated, setShowDefeated] = useState(false);
-  const combatStartSnapshotRef = useRef<{ hp: number; enemies: Enemy[] } | null>(null);
+  const combatStartSnapshotRef = useRef<{ hp: number; enemies: Enemy[]; allies: Ally[] } | null>(null);
   const devTaps = useRef(0);
   const bottomRef = useRef<HTMLDivElement>(null);
   const stateRef = useRef<{
@@ -963,13 +965,14 @@ export default function SoloDnD() {
     inventory: string[];
     effects: string[];
     enemies: Enemy[];
+    allies: Ally[];
     messages: ChatMessage[];
     spellSlots: { current: number; max: number } | null;
     berserkChargesLeft: number;
     didDodgeLastTurn: boolean;
     defensiveStance: boolean;
-  }>({ character: null, hp: 0, inventory: [], effects: [], enemies: [], messages: [], spellSlots: null, berserkChargesLeft: 0, didDodgeLastTurn: false, defensiveStance: false });
-  stateRef.current = { character, hp, inventory, effects, enemies, messages, spellSlots, berserkChargesLeft, didDodgeLastTurn, defensiveStance };
+  }>({ character: null, hp: 0, inventory: [], effects: [], enemies: [], allies: [], messages: [], spellSlots: null, berserkChargesLeft: 0, didDodgeLastTurn: false, defensiveStance: false });
+  stateRef.current = { character, hp, inventory, effects, enemies, allies, messages, spellSlots, berserkChargesLeft, didDodgeLastTurn, defensiveStance };
 
   useEffect(() => { initAnalytics(); }, []);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, loading, pendingRoll, pendingInitiative]);
