@@ -1121,11 +1121,19 @@ export default function SoloDnD() {
         return next;
       });
     }
+
+    if (parsed.combatEnd || (newEnemies.length > 0 && newEnemies.every(e => e.hp <= 0))) {
+      const wasInCombat = currentEnemies.length > 0 || stateRef.current.enemies.length > 0;
+      setInCombat(false);
+      setEnemies([]);
+      setAllies([]);
       // Сброс боевых состояний при окончании боя
       setBerserkChargesLeft(0);
       setBerserkUsedThisCombat(false);
       setDidDodgeLastTurn(false);
       setDefensiveStance(false);
+      setSelectingTarget(false);
+      setShowSpellMini(false);
       if (wasInCombat) {
         trackEvent("combat_ended", {
           characterId: stateRef.current.character?.id,
