@@ -1425,9 +1425,15 @@ export default function SoloDnD() {
     // Исключение: само сообщение "[Инициатива выиграна: ...]" — там враги ещё не ходят,
     // ждём первого действия игрока.
     const isInitiativeWin = /Инициатива выиграна/i.test(choiceText);
+    // Если до этого было выпито зелье как бонусное действие — приклеиваем его к
+    // основному действию ОДНИМ запросом, чтобы DM описал и зелье, и атаку,
+    // и только ПОСЛЕ этого враги отвечали.
+    const potionInfo = pendingPotionInfoRef.current;
+    pendingPotionInfoRef.current = null;
+    const choiceWithPotion = potionInfo ? `${potionInfo}\n${choiceText}` : choiceText;
     const apiMessage = (inCombat || en.length > 0) && !isInitiativeWin
-      ? `${choiceText}\n\n[СИСТЕМНОЕ ПРАВИЛО: После описания результата действия игрока — враги ОБЯЗАНЫ атаковать в этом же ответе. Каждый живой враг делает одну атаку. Используй [УРОН: X] для каждого попадания. Не жди следующего хода игрока. Не предлагай варианты 1-2-3.]`
-      : choiceText;
+      ? `${choiceWithPotion}\n\n[СИСТЕМНОЕ ПРАВИЛО: После описания результата действия игрока — враги ОБЯЗАНЫ атаковать в этом же ответе. Каждый живой враг делает одну атаку. Используй [УРОН: X] для каждого попадания. Не жди следующего хода игрока. Не предлагай варианты 1-2-3.]`
+      : choiceWithPotion;
     try {
       const reply = await callAPI(c, h, inv, eff, msgs, apiMessage);
       await processAndSetMessages(c, h, inv, eff, en, reply, newMsgs);
