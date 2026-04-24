@@ -3,9 +3,11 @@ import { createFileRoute } from "@tanstack/react-router";
 // Прокси к Anthropic Messages API.
 // Принимает { system: string, messages: [{role, content}] }, возвращает { text: string }.
 export const Route = createFileRoute("/api/dm")({
+  // @ts-expect-error - `server` API is supported at runtime by @tanstack/react-start
+  // but the route type generated for this version doesn't include it yet.
   server: {
     handlers: {
-      POST: async ({ request }) => {
+      POST: async ({ request }: { request: Request }) => {
         const apiKey = process.env.ANTHROPIC_API_KEY;
         if (!apiKey) {
           return new Response(
