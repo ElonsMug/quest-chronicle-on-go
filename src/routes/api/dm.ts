@@ -5,7 +5,7 @@ import { createFileRoute } from "@tanstack/react-router";
 export const Route = createFileRoute("/api/dm")({
   server: {
     handlers: {
-      POST: async ({ request }) => {
+      POST: async ({ request }: { request: Request }) => {
         const apiKey = process.env.ANTHROPIC_API_KEY;
         if (!apiKey) {
           return new Response(
