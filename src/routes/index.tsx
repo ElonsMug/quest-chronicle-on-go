@@ -5,8 +5,8 @@ export const Route = createFileRoute("/")({
   component: Index,
   head: () => ({
     meta: [
-      { title: "Тени & Легенды — Соло D&D" },
-      { name: "description", content: "Соло текстовая RPG в мире Серого Берега. Один игрок, один мастер-ИИ, бесконечные истории." },
+      { title: "Shadows & Legends — Solo D&D" },
+      { name: "description", content: "A solo text RPG set in the world of Grey Shore. One player, one AI Dungeon Master, endless stories." },
     ],
   }),
 });
