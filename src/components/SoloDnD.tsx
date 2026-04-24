@@ -2045,7 +2045,7 @@ export default function SoloDnD() {
                 style={{ fontFamily: "serif" }}>
                 ⚔️ {t("defeated.retry")}
               </button>
-              <button onClick={() => { setDefeatPending(false); exitToMenu(); }}
+              <button onClick={() => { setDefeatPending(false); setDefeatDismissed(false); exitToMenu(); }}
                 className="w-full py-3 rounded-xl border border-stone-700 bg-stone-900 text-stone-400 text-sm"
                 style={{ fontFamily: "serif" }}>
                 ← {t("defeated.returnToMenu")}
