@@ -1094,6 +1094,9 @@ export default function SoloDnD() {
   // message before showing the screen. After the screen closes this flag
   // stays true — it controls showing "Retry / Menu" instead of combat buttons.
   const [defeatPending, setDefeatPending] = useState(false);
+  // True once the player explicitly closed the defeat screen — prevents it
+  // from reappearing on subsequent DM messages while defeatPending is still on.
+  const [defeatDismissed, setDefeatDismissed] = useState(false);
   // Language-switch confirmation dialog (only shown if a session is active).
   const [pendingLanguageSwitch, setPendingLanguageSwitch] = useState<{
     next: "en" | "ru";
@@ -1138,10 +1141,10 @@ export default function SoloDnD() {
   // (loading=false), and give the player ~2.2s to read the last message,
   // only then show the "You are defeated" screen.
   useEffect(() => {
-    if (!defeatPending || loading || showDefeated) return;
+    if (!defeatPending || loading || showDefeated || defeatDismissed) return;
     const timer = setTimeout(() => setShowDefeated(true), 2200);
     return () => clearTimeout(timer);
-  }, [defeatPending, loading, showDefeated, messages]);
+  }, [defeatPending, loading, showDefeated, defeatDismissed, messages]);
 
   // ── Save (localStorage, SSR-safe) ─────────────────────────────
   function doSave(char: Character, currentHp: number, currentInv: string[], currentEff: string[], msgs: ChatMessage[]) {
@@ -1190,7 +1193,7 @@ export default function SoloDnD() {
       // Don't show the defeat screen immediately — let the DM finish narrating.
       // We just mark the defeat as "pending"; the effect above will pick up
       // the flag and open the screen with a delay once the DM is done.
-      if (newHp <= 0) setDefeatPending(true);
+      if (newHp <= 0) { setDefeatPending(true); setDefeatDismissed(false); }
     }
 
     if (parsed.newItems?.length) {
@@ -1588,6 +1591,7 @@ export default function SoloDnD() {
     setInventory(prev => prev.filter((_, i) => i !== potionIdx));
     setShowDefeated(false);
     setDefeatPending(false);
+    setDefeatDismissed(false);
     const text = t("combat.defeatedRescue", { heal });
     setMessages(prev => [...prev, {
       role: "assistant",
@@ -1603,6 +1607,7 @@ export default function SoloDnD() {
     if (!snap || !c) {
       setShowDefeated(false);
       setDefeatPending(false);
+      setDefeatDismissed(false);
       return;
     }
     // Clear first (fix: otherwise enemies/allies double up), then restore in the next tick
@@ -1610,6 +1615,7 @@ export default function SoloDnD() {
     setAllies([]);
     setShowDefeated(false);
     setDefeatPending(false);
+    setDefeatDismissed(false);
     setBerserkChargesLeft(0);
     setBerserkUsedThisCombat(false);
     setDidDodgeLastTurn(false);
@@ -1874,8 +1880,8 @@ export default function SoloDnD() {
           hasPotion={inventory.some(isPotion)}
           onUsePotion={handleDefeatedUsePotion}
           onRetry={handleDefeatedRetry}
-          onMenu={() => { setShowDefeated(false); setDefeatPending(false); exitToMenu(); }}
-          onClose={() => setShowDefeated(false)}
+          onMenu={() => { setShowDefeated(false); setDefeatPending(false); setDefeatDismissed(false); exitToMenu(); }}
+          onClose={() => { setShowDefeated(false); setDefeatDismissed(true); }}
         />
       )}
 
@@ -2039,7 +2045,7 @@ export default function SoloDnD() {
                 style={{ fontFamily: "serif" }}>
                 ⚔️ {t("defeated.retry")}
               </button>
-              <button onClick={() => { setDefeatPending(false); exitToMenu(); }}
+              <button onClick={() => { setDefeatPending(false); setDefeatDismissed(false); exitToMenu(); }}
                 className="w-full py-3 rounded-xl border border-stone-700 bg-stone-900 text-stone-400 text-sm"
                 style={{ fontFamily: "serif" }}>
                 ← {t("defeated.returnToMenu")}
