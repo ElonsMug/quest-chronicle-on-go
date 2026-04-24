@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { initAnalytics, trackEvent } from "@/lib/analytics";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 // ─────────────────────────────────────────────────────────────────
 // ДАННЫЕ
@@ -1057,6 +1059,7 @@ function CombatPanel({
 export default function SoloDnD() {
   const [screen, setScreen] = useState<"select" | "game">("select");
   const [selectedChar, setSelectedChar] = useState<Character | null>(null);
+  const { t } = useTranslation();
   const [character, setCharacter] = useState<Character | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -1738,15 +1741,18 @@ export default function SoloDnD() {
   // ─────────────────────────────────────────────────────────────
   if (screen === "select") {
     return (
-      <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(180deg,#0c0a09 0%,#1c1917 100%)", fontFamily: "serif" }}>
+      <div className="min-h-screen flex flex-col relative" style={{ background: "linear-gradient(180deg,#0c0a09 0%,#1c1917 100%)", fontFamily: "serif" }}>
+        <div className="absolute top-3 right-3 z-10">
+          <LanguageSwitcher />
+        </div>
         <div className="text-center pt-12 pb-6 px-6">
-          <div className="text-amber-600 text-xs tracking-[0.4em] uppercase mb-2">Серый Берег</div>
-          <h1 className="text-4xl font-bold text-amber-100 leading-tight mb-2">Тени &<br />Легенды</h1>
-          <p className="text-stone-500 text-sm">Соло приключение · D&amp;D 5e</p>
+          <div className="text-amber-600 text-xs tracking-[0.4em] uppercase mb-2">{t("menu.tagline")}</div>
+          <h1 className="text-4xl font-bold text-amber-100 leading-tight mb-2 whitespace-pre-line">{t("menu.title")}</h1>
+          <p className="text-stone-500 text-sm">{t("menu.subtitle")}</p>
           <div className="mt-4 w-16 h-px bg-amber-700/50 mx-auto" />
         </div>
         <div className="px-4 pb-8 flex flex-col gap-3 max-w-md mx-auto w-full">
-          <p className="text-stone-500 text-xs text-center mb-1 tracking-wide uppercase">Выбери своего героя</p>
+          <p className="text-stone-500 text-xs text-center mb-1 tracking-wide uppercase">{t("menu.chooseHero")}</p>
           {CHARACTERS.map(char => (
             <CharacterCard key={char.id} char={char} selected={selectedChar?.id === char.id} onSelect={setSelectedChar} />
           ))}
@@ -1760,7 +1766,7 @@ export default function SoloDnD() {
               boxShadow: selectedChar ? "0 4px 24px rgba(217,119,6,0.3)" : "none",
               letterSpacing: "0.05em",
             }}>
-            {selectedChar ? `Начать за ${selectedChar.name}` : "Выбери персонажа"}
+            {selectedChar ? t("menu.startAs", { name: selectedChar.name }) : t("menu.selectCharacter")}
           </button>
         </div>
       </div>
@@ -1816,8 +1822,11 @@ export default function SoloDnD() {
       )}
 
       <div className="sticky top-0 z-20 border-b border-stone-800/60 backdrop-blur" style={{ background: "rgba(12,10,9,0.93)" }}>
-        <div className="flex items-center justify-between px-4 py-2.5">
-          <button onClick={exitToMenu} className="text-stone-500 text-sm hover:text-stone-300 transition-colors">← Меню</button>
+        <div className="flex items-center justify-between px-4 py-2.5 gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <button onClick={exitToMenu} className="text-stone-500 text-sm hover:text-stone-300 transition-colors whitespace-nowrap">← {t("common.menu")}</button>
+            <LanguageSwitcher />
+          </div>
 
           <div className="text-center cursor-pointer select-none" onClick={handleDevTap}>
             <div className="text-amber-200 text-sm font-bold">{character?.emoji} {character?.name}</div>

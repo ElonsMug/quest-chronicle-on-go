@@ -1,0 +1,32 @@
+{
+  "common": {
+    "menu": "Menu",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "close": "Close",
+    "continue": "Continue",
+    "back": "Back",
+    "loading": "Loading...",
+    "error": "Error"
+  },
+  "language": {
+    "label": "Language",
+    "english": "English",
+    "russian": "Русский",
+    "switchTitle": "Change language",
+    "switchDuringGame": {
+      "title": "Switch language?",
+      "body": "The menu, inventory and new events will appear in the new language. Messages already written by the Dungeon Master will stay in the current language.",
+      "confirm": "Switch",
+      "cancel": "Keep current"
+    }
+  },
+  "menu": {
+    "title": "Shadows &\nLegends",
+    "subtitle": "Solo Adventure · D&D 5e",
+    "tagline": "Grey Shore",
+    "chooseHero": "Choose your hero",
+    "startAs": "Begin as {{name}}",
+    "selectCharacter": "Select a character"
+  }
+}
