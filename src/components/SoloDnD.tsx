@@ -1094,6 +1094,9 @@ export default function SoloDnD() {
   // message before showing the screen. After the screen closes this flag
   // stays true — it controls showing "Retry / Menu" instead of combat buttons.
   const [defeatPending, setDefeatPending] = useState(false);
+  // True once the player explicitly closed the defeat screen — prevents it
+  // from reappearing on subsequent DM messages while defeatPending is still on.
+  const [defeatDismissed, setDefeatDismissed] = useState(false);
   // Language-switch confirmation dialog (only shown if a session is active).
   const [pendingLanguageSwitch, setPendingLanguageSwitch] = useState<{
     next: "en" | "ru";
