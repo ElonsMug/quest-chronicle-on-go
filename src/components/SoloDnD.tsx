@@ -1142,7 +1142,10 @@ export default function SoloDnD() {
     if (parsed.damage) {
       newHp = Math.max(0, newHp - parsed.damage);
       setHp(newHp);
-      if (newHp <= 0) setShowDefeated(true);
+      // НЕ показываем плашку поражения сразу — даём мастеру дорассказать.
+      // Просто помечаем поражение как «ожидающее»; эффект ниже подхватит
+      // флаг и откроет плашку с задержкой, когда мастер закончит говорить.
+      if (newHp <= 0) setDefeatPending(true);
     }
 
     if (parsed.newItems?.length) {
