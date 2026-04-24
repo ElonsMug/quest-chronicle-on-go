@@ -1099,6 +1099,15 @@ export default function SoloDnD() {
   useEffect(() => { initAnalytics(); }, []);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, loading, pendingRoll, pendingInitiative]);
 
+  // Когда поражение «отложено» — ждём, пока мастер закончит говорить
+  // (loading=false), и даём игроку ~2.2с на чтение последнего сообщения,
+  // только после этого показываем плашку «Ты повержен».
+  useEffect(() => {
+    if (!defeatPending || loading || showDefeated) return;
+    const t = setTimeout(() => setShowDefeated(true), 2200);
+    return () => clearTimeout(t);
+  }, [defeatPending, loading, showDefeated, messages]);
+
   // ── Сейв (localStorage, безопасно к SSR) ──────────────────────
   function doSave(char: Character, currentHp: number, currentInv: string[], currentEff: string[], msgs: ChatMessage[]) {
     if (typeof window === "undefined") return;
