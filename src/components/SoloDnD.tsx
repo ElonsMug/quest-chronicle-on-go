@@ -1,17 +1,31 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { initAnalytics, trackEvent } from "@/lib/analytics";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import i18n from "@/i18n";
 
 // ─────────────────────────────────────────────────────────────────
-// ДАННЫЕ
+// DATA
 // ─────────────────────────────────────────────────────────────────
 type Stat = "str" | "dex" | "int";
 type SpellType = "attack" | "defense" | "control";
-type Spell = { name: string; cost: number; type: SpellType; dice?: string; stat?: Stat; description: string };
+type SpellId = "fireBolt" | "shield" | "sleep";
+type CharacterId = "warrior" | "rogue" | "mage";
+
+type Spell = {
+  id: SpellId;
+  name: string;
+  cost: number;
+  type: SpellType;
+  dice?: string;
+  stat?: Stat;
+  description: string;
+};
+
 type ClassAbility = { name: string; type: "berserk" | "sneak" };
+
 type Character = {
-  id: string;
+  id: CharacterId;
   name: string;
   emoji: string;
   subtitle: string;
@@ -30,235 +44,323 @@ type Character = {
   classAbility?: ClassAbility;
 };
 
-const CHARACTERS: Character[] = [
-  {
-    id: "warrior", name: "Воин", emoji: "⚔️", subtitle: "Закалённый боец",
-    hp: 14, maxHp: 14, stats: { str: 3, dex: 1, int: -1 },
-    ability: "Берсерк", abilityDesc: "Раз в бой: +2 урон / -2 AC на 2 хода",
-    weapon: { name: "Меч", dice: "d8", stat: "str" }, color: "#C0392B",
-    backstory: "Бывший наёмник из Серого Берега. Ты видел войны и предательства, но меч не бросил.",
-    startItems: ["Короткий меч", "Кожаный доспех", "Зелье лечения (d6+2 HP)"],
-    classAbility: { name: "Берсерк", type: "berserk" },
-  },
-  {
-    id: "rogue", name: "Плут", emoji: "🗡️", subtitle: "Теневой клинок",
-    hp: 10, maxHp: 10, stats: { str: 0, dex: 3, int: 1 },
-    ability: "Скрытая атака", abilityDesc: "+d6 урона после уклонения",
-    weapon: { name: "Кинжал", dice: "d6", stat: "dex" }, color: "#8E44AD",
-    backstory: "Сирота с городских улиц. Ты вырос в переулках и знаешь каждую тень портового квартала.",
-    startItems: ["Кинжал", "Отмычки", "Зелье лечения (d6+2 HP)"],
-    classAbility: { name: "Скрытая атака", type: "sneak" },
-  },
-  {
-    id: "mage", name: "Маг", emoji: "🔮", subtitle: "Изгнанник Академии",
-    hp: 8, maxHp: 8, stats: { str: -1, dex: 0, int: 4 },
-    ability: "Заклинания", abilityDesc: "3 слота в день",
-    weapon: { name: "Посох", dice: "d6", stat: "int" }, color: "#2980B9",
-    backstory: "Отчисленный студент Академии Серых Магов. Тебе запретили практиковать — ты практикуешь.",
-    startItems: ["Посох", "Зелье лечения (d6+2 HP)", "Свиток Огненного Болта"],
-    spellSlots: { current: 3, max: 3 },
-    spellSaveDC: 14,
-    spells: [
-      { name: "Огненный болт", cost: 1, dice: "d10", stat: "int", type: "attack", description: "d10+INT урон" },
-      { name: "Щит", cost: 1, type: "defense", description: "+5 AC до следующего хода" },
-      { name: "Усыпление", cost: 1, type: "control", description: "Бросаем 5d8 пул HP. Засыпают враги от слабых к сильным пока пул не иссякнет. Нежить — иммунны." },
-    ],
-  },
-];
-
-const DEV_SCENES = [
-  { id: "tavern",  label: "🍺 Таверна",         prompt: "Начни сцену: игрок в таверне «Сломанный якорь». Незнакомец предлагает задание. 3 варианта." },
-  { id: "combat",  label: "⚔️ Бой",             prompt: "Начни боевую сцену: на игрока нападают 2 бандита в переулке. Используй [ВРАГ: Бандит, HP:8] для каждого. Объяви инициативу [ИНИЦИАТИВА]. Дай варианты: атаковать, уклониться, свой." },
-  { id: "social",  label: "🗣️ Допрос NPC",      prompt: "Начни допрос: игрок допрашивает пойманного вора. NPC скрывает что-то важное. 3 варианта." },
-  { id: "mystery", label: "🔍 Тайна",           prompt: "Начни сцену: игрок обнаруживает труп в порту. Улики вокруг. 3 варианта." },
-  { id: "magic",   label: "✨ Магический ивент", prompt: "Начни сцену: над городом вспыхивает магическая аномалия. 3 варианта реакции." },
-  { id: "boss",    label: "💀 Финальный босс",   prompt: "Начни финальную сцену: игрок встречает Архимага Сейдра. Используй [ВРАГ: Архимаг Сейдр, HP:24]. Напряжённый момент. 3 варианта." },
-];
-
 // ─────────────────────────────────────────────────────────────────
-// СИСТЕМНЫЙ ПРОМПТ
+// CHARACTER FACTORY
 // ─────────────────────────────────────────────────────────────────
-function buildSystemPrompt(character: Character, hp: number, inventory: string[], effects: string[], spellSlots: { current: number; max: number } | null) {
-  const inv = inventory.length ? inventory.join(", ") : "пусто";
-  const eff = effects.length ? effects.join(", ") : "нет";
-  const s = (n: number) => (n >= 0 ? "+" : "") + n;
-  const spellsBlock = character.id === "mage" && spellSlots
-    ? `Слоты заклинаний: ${spellSlots.current}/${spellSlots.max}\n`
-    : "";
-  const mageRules = character.id === "mage" ? `
+// Stable IDs are decoupled from display names. All player-visible strings
+// (name/subtitle/ability/weapon/items/spells) are pulled from i18n at the
+// moment a character is built, so language switches before "Begin as ..."
+// pick the right localized labels.
+// ─────────────────────────────────────────────────────────────────
+function buildCharacters(t: (k: string) => string): Character[] {
+  return [
+    {
+      id: "warrior",
+      name: t("characters.warrior.name"),
+      emoji: "⚔️",
+      subtitle: t("characters.warrior.subtitle"),
+      hp: 14,
+      maxHp: 14,
+      stats: { str: 3, dex: 1, int: -1 },
+      ability: t("characters.warrior.ability"),
+      abilityDesc: t("characters.warrior.abilityDesc"),
+      weapon: { name: t("characters.warrior.weapon"), dice: "d8", stat: "str" },
+      color: "#C0392B",
+      backstory: t("characters.warrior.backstory"),
+      startItems: [
+        t("characters.warrior.items.shortSword"),
+        t("characters.warrior.items.leatherArmor"),
+        t("characters.warrior.items.healingPotion"),
+      ],
+      classAbility: { name: t("characters.warrior.ability"), type: "berserk" },
+    },
+    {
+      id: "rogue",
+      name: t("characters.rogue.name"),
+      emoji: "🗡️",
+      subtitle: t("characters.rogue.subtitle"),
+      hp: 10,
+      maxHp: 10,
+      stats: { str: 0, dex: 3, int: 1 },
+      ability: t("characters.rogue.ability"),
+      abilityDesc: t("characters.rogue.abilityDesc"),
+      weapon: { name: t("characters.rogue.weapon"), dice: "d6", stat: "dex" },
+      color: "#8E44AD",
+      backstory: t("characters.rogue.backstory"),
+      startItems: [
+        t("characters.rogue.items.dagger"),
+        t("characters.rogue.items.lockpicks"),
+        t("characters.rogue.items.healingPotion"),
+      ],
+      classAbility: { name: t("characters.rogue.ability"), type: "sneak" },
+    },
+    {
+      id: "mage",
+      name: t("characters.mage.name"),
+      emoji: "🔮",
+      subtitle: t("characters.mage.subtitle"),
+      hp: 8,
+      maxHp: 8,
+      stats: { str: -1, dex: 0, int: 4 },
+      ability: t("characters.mage.ability"),
+      abilityDesc: t("characters.mage.abilityDesc"),
+      weapon: { name: t("characters.mage.weapon"), dice: "d6", stat: "int" },
+      color: "#2980B9",
+      backstory: t("characters.mage.backstory"),
+      startItems: [
+        t("characters.mage.items.staff"),
+        t("characters.mage.items.healingPotion"),
+        t("characters.mage.items.fireBoltScroll"),
+      ],
+      spellSlots: { current: 3, max: 3 },
+      spellSaveDC: 14,
+      spells: [
+        {
+          id: "fireBolt",
+          name: t("characters.mage.spells.fireBolt.name"),
+          cost: 1,
+          dice: "d10",
+          stat: "int",
+          type: "attack",
+          description: t("characters.mage.spells.fireBolt.description"),
+        },
+        {
+          id: "shield",
+          name: t("characters.mage.spells.shield.name"),
+          cost: 1,
+          type: "defense",
+          description: t("characters.mage.spells.shield.description"),
+        },
+        {
+          id: "sleep",
+          name: t("characters.mage.spells.sleep.name"),
+          cost: 1,
+          type: "control",
+          description: t("characters.mage.spells.sleep.description"),
+        },
+      ],
+    },
+  ];
+}
 
-ЗАКЛИНАНИЯ МАГА:
-- Заклинания (Огненный болт, Щит, Усыпление) — стоят 1 слот
-- Текущие слоты: ${spellSlots?.current ?? 0}/${spellSlots?.max ?? 0}
-- Когда игрок применяет заклинание через UI — система УЖЕ списала слот, не списывай повторно
-- DM описывает эффект заклинания в нарративе ярко и сочно
-- Огненный болт — система сама бросает d10+INT vs AC, DM описывает попадание/промах
-- При Щите: добавь эффект игроку [ЭФФЕКТ: Щит, 1 раунд]
-
-SPELL SAVE DC МАГА: 14 (= 8 + proficiency(2) + INT(4)).
-Когда враг сопротивляется заклинанию контроля — он бросает Wisdom saving throw против DC 14.
-Модификаторы Wisdom типичных врагов:
-  - Обычный бандит / разбойник: WIS +0 (сложно устоять)
-  - Гвардеец / стражник: WIS +2
-  - Культист / фанатик: WIS +1
-  - Нежить / конструкт / демон: иммунны к Усыплению (не засыпают)
-
-УСЫПЛЕНИЕ — МЕХАНИКА ПУЛА HP:
-Когда игрок применяет Усыпление — система пишет "[Усыпление: пул X HP. ...]" с уже посчитанным пулом.
-ТЫ ОБЯЗАН:
-1. Отсортировать живых врагов по возрастанию HP.
-2. Идти от врага с наименьшим HP. Если его текущий HP ≤ оставшемуся пулу — он засыпает, вычитаешь его HP из пула, переходишь к следующему. Иначе — стоп.
-3. Нежить, конструкты, демоны — НЕ засыпают (пропускаешь, но HP пула не тратишь).
-4. Для каждого уснувшего пиши: [ЭФФЕКТ: <Имя_врага>_спит, 2 раунда]
-5. Спящий враг НЕ считается побеждённым — он без сознания, лежит беспомощный.
-6. После описания — спроси игрока что делать со спящими: добить, связать, допросить, обыскать.
-   Дай это как варианты 1-2-3 (не боевые кнопки — это уже не активный бой со спящими).
-7. Если после Усыпления остались бодрствующие враги — продолжаешь бой как обычно с ними.
-8. [КОНЕЦ_БОЯ] ставится только когда все враги либо мертвы, либо выведены из строя необратимо
-   (связаны, добиты). Спящие сами по себе бой не заканчивают.
-` : "";
-  return `Ты — Мастер Подземелий в соло текстовой RPG (D&D 5e упрощённая). Один игрок.
-
-ПЕРСОНАЖ:
-Класс: ${character.name} | HP: ${hp}/${character.maxHp}
-Сила ${s(character.stats.str)} | Ловкость ${s(character.stats.dex)} | Интеллект ${s(character.stats.int)}
-Оружие: ${character.weapon.name} (${character.weapon.dice}+${s(character.stats[character.weapon.stat])})
-${spellsBlock}Инвентарь: ${inv} | Эффекты: ${eff}
-
-ФОРМАТ ОТВЕТА:
-- 3–5 предложений нарратива от второго лица
-- Ровно 3 пронумерованных варианта в конце: "1. ...\n2. ...\n3. ..."
-- 4-й вариант НЕ ПИШИ — в UI есть кнопка "Свой вариант"
-- ⚠️ КРИТИЧНО: варианты ВСЕГДА в формате чистых номеров без markdown:
-    1. Текст варианта
-    2. Текст варианта
-    3. Текст варианта
-  НИКОГДА не используй **1. Текст**, *1. Текст*, бэктики, ### заголовки или
-  любое другое форматирование вокруг номеров и текста вариантов. Только чистые
-  строки вида "N. Текст" — иначе парсер UI не распознает варианты.
-
-МЕХАНИКА ТЕГОВ (всегда на отдельной строке):
-[БРОСОК: Характеристика, DC число] — любая небоевая проверка навыка
-[АТАКА: Оружие, кубик_урона, модификатор, AC число] — атака игрока в бою.
-   AC = Armor Class врага (НЕ DC!).
-   Система САМА бросает d20 + модификатор + proficiency vs AC.
-   DM НЕ пишет результат попадания в тексте — система вернёт исход.
-   После получения результата DM описывает исход.
-   При попадании DM пишет [ВРАГ_УРОН: Имя, число] с уроном, который посчитала система.
-   Пример: [АТАКА: Меч, d8, +3, AC13]
-[УРОН: число] — урон игроку от врага. ТОЛЬКО числом, без комментариев в нарративе.
-   DM НИКОГДА не пишет "Твой HP: X/Y" в тексте — UI показывает HP сам.
-[ПРЕДМЕТ: название] — добавить предмет в инвентарь.
-   ⚠️ КРИТИЧНО: КАЖДЫЙ РАЗ когда игрок получает предмет любым способом
-   (находит, покупает, крадёт, получает в награду, берёт у NPC, поднимает с трупа,
-   получает золото/монеты) — ты ОБЯЗАН написать тег [ПРЕДМЕТ: название] на отдельной
-   строке. Без исключений.
-   Примеры:
-     Купил зелье → [ПРЕДМЕТ: Зелье лечения (d6+2 HP)]
-     Нашёл верёвку → [ПРЕДМЕТ: Верёвка]
-     Получил награду → [ПРЕДМЕТ: 10 золотых]
-     Снял с врага → [ПРЕДМЕТ: Кинжал бандита]
-   Несколько предметов = несколько тегов, каждый на своей строке.
-[УЛУЧШЕНИЕ: старое_название -> новое_название] — когда игрок улучшает, чинит,
-   зачаровывает или модифицирует существующий предмет. Система найдёт предмет со
-   старым названием в инвентаре и заменит на новое.
-   Примеры:
-     [УЛУЧШЕНИЕ: Кинжал -> Заточенный кинжал]
-     [УЛУЧШЕНИЕ: Меч -> Меч +1]
-     [УЛУЧШЕНИЕ: Сломанный щит -> Починенный щит]
-[ВРАГ: Имя, HP:число, AC:число, УРОН:кубик] — объявить врага с атрибутами.
-   AC = Armor Class (типичные значения: бандит AC12, стражник AC14, рыцарь AC16, маг AC11).
-   УРОН = кубик урона врага (бандит d6+1, стражник d8+2, маг d4+3, гоблин d4).
-   Пример: [ВРАГ: Лысый бандит, HP:8, AC:12, УРОН:d6+1]
-   Для нежити добавь флаг: [ВРАГ: Скелет, HP:6, AC:13, УРОН:d6, НЕЖИТЬ]
-   Если не указать AC и УРОН — дефолт AC:12, УРОН:d4+1.
-[ВРАГ_УРОН: Имя, число] — нанести урон врагу (система отслеживает HP врагов).
-   Используй РОВНО то же уникальное имя что и в [ВРАГ:] — иначе урон не применится.
-[СОЮЗНИК: Имя, HP:число] — объявить союзника NPC (атакует автоматически в нарративе).
-[СОЮЗНИК_УРОН: Имя, число] — урон союзнику от врага.
-[ИНИЦИАТИВА] — в начале КАЖДОГО боя, система бросит d20 за обе стороны
-[КОНЕЦ_БОЯ] — когда все враги повержены
-
-СВОБОДА ДЕЙСТВИЙ (КРИТИЧНО):
-- Если игрок выбирает "Свой вариант" и описывает нестандартное действие — ВСЕГДА назначай бросок.
-  * Угрожает? → [БРОСОК: Харизма/Запугивание, DC13]
-  * Горсть пыли в лицо? → [БРОСОК: Ловкость, DC12], при успехе враг ослеплён 1 раунд
-  * Пытается договориться? → [БРОСОК: Убеждение, DC14]
-  * Физическое действие? → [БРОСОК: Сила, DC12]
-  Никогда не отказывай. Всегда найди механику.
-
-[ЭФФЕКТ: название, длительность] — добавить временный эффект (например, [ЭФФЕКТ: Враг_замедлен, 1 раунд], [ЭФФЕКТ: Щит, 1 раунд]).
-
-БОЙ:
-- ⚠️ КРИТИЧНО: В ПЕРВОМ сообщении любой боевой сцены ты ОБЯЗАН объявить ВСЕХ врагов
-  тегами [ВРАГ: Имя, HP:число] — каждый на отдельной строке — ДО любого описания атак,
-  ДО нарратива про удары, ДО [ИНИЦИАТИВА]. Без этих тегов система НЕ показывает полоски HP врагов.
-  Пример правильного начала боя:
-    [ВРАГ: Культист, HP:6]
-    [ВРАГ: Культист, HP:6]
-    [ВРАГ: Культист, HP:6]
-    [ИНИЦИАТИВА]
-    (затем нарратив без вариантов — система покажет боевые кнопки)
-- Если ты забыл объявить врагов в первом сообщении боя — СДЕЛАЙ ЭТО В СЛЕДУЮЩЕМ ЖЕ сообщении,
-  до любых других действий и тегов.
-- Порядок: сначала [ВРАГ: ...] для всех врагов, затем [ИНИЦИАТИВА], потом чередование ходов.
-- Показывай HP врага в скобках после имени: "Бандит (HP: 5/8)"
-- Когда враг получает урон — обнови его HP тегом [ВРАГ_УРОН: Имя, число]
-- Урон от атаки при попадании — посчитай сам исходя из кубика и модификатора, напиши [ВРАГ_УРОН: Имя, урон]
-- При промахе — просто опиши промах, не используй [ВРАГ_УРОН]
-
-ПОРЯДОК БОЕВОГО ХОДА (КРИТИЧНО):
-- ⚠️ Когда система присылает "[Инициатива выиграна: ...]" — игрок действует первым.
-  ТЫ НЕ АТАКУЕШЬ В ЭТОМ ОТВЕТЕ. ТЫ НЕ ПИШЕШЬ [АТАКА:]. ТЫ НЕ ПИШЕШЬ [УРОН:].
-  Только короткое описание сцены (1-2 предложения) — кто где стоит, что в воздухе.
-  Затем жди — система покажет боевые кнопки игроку.
-- ⚠️ Когда система присылает "[Инициатива проиграна: ...]" — враги атакуют ПЕРВЫМИ.
-  ТЫ ОБЯЗАН в этом же ответе:
-  1. Описать атаку каждого живого врага.
-  2. Для каждого попадания написать [УРОН: число] на отдельной строке.
-  3. После этого — короткая пауза, жди ход игрока (система покажет кнопки).
-- После КАЖДОГО действия игрока в бою (атака, берсерк, оборона, уклонение, заклинание, свой вариант)
-  ты ОБЯЗАН в этом же ответе:
-  1. Описать результат действия игрока (1-2 предложения).
-  2. Описать атаку КАЖДОГО живого врага (1 предложение на врага).
-  3. Для каждого попадания написать [УРОН: число] на отдельной строке.
-  4. НЕ предлагать варианты 1-2-3 — система покажет боевые кнопки сама.
-- Враги не ждут. Враги не пропускают ход. Если игрок сделал что-то странное и не атаковал —
-  враги всё равно бьют его в этом же ответе.
-- Исключение: если игрок выбрал [Уклонение] — враги атакуют с помехой (см. ниже).
-- Исключение: если игрок выбрал [Применён Щит] — игрок имеет +5 AC до следующего хода,
-  атаки врагов с большой вероятностью промахиваются (учитывай это в d20 vs AC).
-
-БОЕВЫЕ КНОПКИ КЛАССА:
-В бою игрок использует фиксированные кнопки класса, НЕ варианты от DM.
-DM в бою НЕ предлагает варианты 1-2-3 — только описывает результат действия игрока и атаки врагов.
-Исключение: после окончания боя [КОНЕЦ_БОЯ] — снова предлагай 3 варианта.
-
-Берсерк: когда получаешь [Активирован Берсерк] — следующие 2 атаки игрока наносят +2 урона, враги бьют игрока с +2 урона (AC снижен).
-Уклонение (КРИТИЧНО): когда игрок выбрал [Уклонение] — каждый враг бросает d20 ДВАЖДЫ и использует МЕНЬШИЙ результат.
-   Это НЕ гарантирует промах — если оба броска высокие, враг всё равно попадёт. DM ОБЯЗАН явно показать ОБА броска в нарративе.
-   Примеры:
-     "Бандит замахивается — d20(14) и d20(7), берёт меньший: 7. Промах, ты уходишь под клинком."
-     "Культист ударяет — d20(15) и d20(18), берёт меньший: 15. Удар достигает цели. [УРОН: 4]"
-   Уклонение НЕ гарантирует избегание урона — это лишь снижает шанс попасть.
-Скрытая атака: когда получаешь атаку после уклонения — добавь +d6 к урону в описании.
-Магическая стрела: когда получаешь [Магическая стрела: X урона] — напиши [ВРАГ_УРОН: Имя, X] для первого живого врага.
-
-УНИКАЛЬНЫЕ ИМЕНА ВРАГОВ (КРИТИЧНО):
-Если в одном бою несколько врагов одного типа — ты ОБЯЗАН дать им уникальные описательные имена при объявлении через [ВРАГ:].
-Никогда не используй одинаковые имена для разных врагов в одном бою — система применит урон только к одному из них.
-Примеры правильных имён:
-   [ВРАГ: Лысый бандит, HP:8]
-   [ВРАГ: Тощий бандит, HP:8]
-   [ВРАГ: Бандит со шрамом, HP:8]
-Или порядковые: "Первый бандит", "Второй бандит", "Третий бандит".
-В тегах [ВРАГ_УРОН: Имя, X] используй ровно те же уникальные имена.
-
-СЮЖЕТ: тёмный фэнтезийный портовый город "Серый Берег". Краткость — мобильный, метро.${mageRules}`;
+// Dev scenes — labels and prompts come from i18n (DM speaks the user's language).
+function buildDevScenes(t: (k: string) => string) {
+  return [
+    { id: "tavern", label: t("dev.scenes.tavern"), prompt: t("dm.scenes.tavern") },
+    { id: "combat", label: t("dev.scenes.combat"), prompt: t("dm.scenes.combat") },
+    { id: "social", label: t("dev.scenes.social"), prompt: t("dm.scenes.social") },
+    { id: "mystery", label: t("dev.scenes.mystery"), prompt: t("dm.scenes.mystery") },
+    { id: "magic", label: t("dev.scenes.magic"), prompt: t("dm.scenes.magic") },
+    { id: "boss", label: t("dev.scenes.boss"), prompt: t("dm.scenes.boss") },
+  ];
 }
 
 // ─────────────────────────────────────────────────────────────────
-// ПАРСИНГ
+// SYSTEM PROMPT
+// ─────────────────────────────────────────────────────────────────
+// CRITICAL CONTRACT: Tags ([ENEMY:], [ATTACK:], [DAMAGE:], [ROLL:], [ITEM:],
+// [UPGRADE:], [ENEMY_DAMAGE:], [ALLY:], [ALLY_DAMAGE:], [EFFECT:],
+// [INITIATIVE], [END_COMBAT], [UNDEAD]) are ALWAYS English regardless of UI
+// language. The narrative is localized — ask the DM to write the story in the
+// active UI language (English by default, Russian when the user switches).
+// The parser only knows the English tags, so they must never be translated.
+// ─────────────────────────────────────────────────────────────────
+function buildSystemPrompt(
+  character: Character,
+  hp: number,
+  inventory: string[],
+  effects: string[],
+  spellSlots: { current: number; max: number } | null,
+  language: "en" | "ru",
+) {
+  const inv = inventory.length ? inventory.join(", ") : language === "ru" ? "пусто" : "empty";
+  const eff = effects.length ? effects.join(", ") : language === "ru" ? "нет" : "none";
+  const s = (n: number) => (n >= 0 ? "+" : "") + n;
+  const spellsBlock = character.id === "mage" && spellSlots
+    ? `Spell slots: ${spellSlots.current}/${spellSlots.max}\n`
+    : "";
+
+  const mageRules = character.id === "mage" ? `
+
+MAGE SPELLS:
+- Spells (Fire Bolt, Shield, Sleep) cost 1 slot each.
+- Current slots: ${spellSlots?.current ?? 0}/${spellSlots?.max ?? 0}
+- When the player casts a spell through the UI, the system has ALREADY deducted the slot — do not deduct again.
+- The DM describes the spell's effect vividly in the narrative.
+- Fire Bolt — the system rolls d10+INT vs AC; the DM describes hit or miss.
+- For Shield: add a player effect [EFFECT: Shield, 1 round].
+
+MAGE SPELL SAVE DC: 14 (= 8 + proficiency(2) + INT(4)).
+When an enemy resists a control spell, they roll a Wisdom saving throw vs DC 14.
+Typical enemy WIS modifiers:
+  - Common bandit / thug: WIS +0 (hard to resist)
+  - Guard / soldier: WIS +2
+  - Cultist / fanatic: WIS +1
+  - Undead / construct / demon: immune to Sleep (do not fall asleep)
+
+SLEEP — HP POOL MECHANIC:
+When the player casts Sleep, the system writes "[Sleep: pool X HP. ...]" with the pool already calculated.
+YOU MUST:
+1. Sort living enemies by ascending HP.
+2. Walk from the lowest-HP enemy. If their current HP ≤ remaining pool — they fall asleep, subtract their HP from the pool, move to the next. Otherwise — stop.
+3. Undead, constructs, demons — DO NOT fall asleep (skip them, do not spend pool HP).
+4. For each sleeping enemy write: [EFFECT: <Enemy_name>_asleep, 2 rounds]
+5. A sleeping enemy is NOT considered defeated — they are unconscious, lying helpless.
+6. After describing — ask the player what to do with the sleepers: finish, bind, interrogate, search.
+   Offer this as choices 1-2-3 (not combat buttons — this is no longer active combat with sleepers).
+7. If awake enemies remain after Sleep — continue the fight as usual with them.
+8. [END_COMBAT] is set only when ALL enemies are either dead or permanently neutralized
+   (bound, finished). Sleepers alone do not end combat.
+` : "";
+
+  const langInstruction = language === "ru"
+    ? "ЯЗЫК НАРРАТИВА: пиши весь нарратив, описания и варианты на русском языке. Теги в квадратных скобках ВСЕГДА на английском."
+    : "NARRATIVE LANGUAGE: write all narrative, descriptions and choices in English. Tags in square brackets are ALWAYS in English.";
+
+  return `You are the Dungeon Master of a solo text RPG (simplified D&D 5e). One player.
+
+${langInstruction}
+
+CHARACTER:
+Class: ${character.name} | HP: ${hp}/${character.maxHp}
+Strength ${s(character.stats.str)} | Dexterity ${s(character.stats.dex)} | Intelligence ${s(character.stats.int)}
+Weapon: ${character.weapon.name} (${character.weapon.dice}+${s(character.stats[character.weapon.stat])})
+${spellsBlock}Inventory: ${inv} | Effects: ${eff}
+
+RESPONSE FORMAT:
+- 3–5 sentences of second-person narrative.
+- Exactly 3 numbered choices at the end: "1. ...\n2. ...\n3. ..."
+- DO NOT write a 4th choice — the UI provides a "Free choice" button.
+- ⚠️ CRITICAL: choices ALWAYS in plain numbered format without markdown:
+    1. Choice text
+    2. Choice text
+    3. Choice text
+  NEVER use **1. Text**, *1. Text*, backticks, ### headers or any other
+  formatting around the numbers and choice text. Only plain "N. Text" lines —
+  otherwise the UI parser will not recognise the choices.
+
+TAG MECHANICS (always on a separate line):
+[ROLL: Stat, DC number] — any non-combat skill check.
+[ATTACK: Weapon, damage_die, modifier, AC number] — player attack in combat.
+   AC = enemy Armor Class (NOT DC!).
+   The system itself rolls d20 + modifier + proficiency vs AC.
+   The DM does NOT write the hit result in the text — the system returns the outcome.
+   After receiving the result, the DM describes the outcome.
+   On a hit, the DM writes [ENEMY_DAMAGE: Name, number] with the damage the system computed.
+   Example: [ATTACK: Sword, d8, +3, AC13]
+[DAMAGE: number] — damage to the player from an enemy. ONLY a number, no narrative inside.
+   The DM NEVER writes "Your HP: X/Y" in the text — the UI shows HP itself.
+[ITEM: name] — add an item to the inventory.
+   ⚠️ CRITICAL: EVERY TIME the player gains an item by any means
+   (finds, buys, steals, receives as reward, takes from an NPC, picks up from a corpse,
+   gains gold/coins) — you MUST write the tag [ITEM: name] on its own line.
+   No exceptions.
+   Examples:
+     Bought a potion → [ITEM: Healing Potion (d6+2 HP)]
+     Found a rope → [ITEM: Rope]
+     Reward → [ITEM: 10 gold]
+     Looted from enemy → [ITEM: Bandit's Dagger]
+   Several items = several tags, each on its own line.
+[UPGRADE: old_name -> new_name] — when the player upgrades, repairs,
+   enchants or modifies an existing item. The system finds the item with the
+   old name in the inventory and replaces it with the new one.
+   Examples:
+     [UPGRADE: Dagger -> Sharpened Dagger]
+     [UPGRADE: Sword -> Sword +1]
+     [UPGRADE: Broken Shield -> Repaired Shield]
+[ENEMY: Name, HP:number, AC:number, DMG:die] — declare an enemy with attributes.
+   AC = Armor Class (typical values: bandit AC12, guard AC14, knight AC16, mage AC11).
+   DMG = enemy damage die (bandit d6+1, guard d8+2, mage d4+3, goblin d4).
+   Example: [ENEMY: Bald Bandit, HP:8, AC:12, DMG:d6+1]
+   For undead add a flag: [ENEMY: Skeleton, HP:6, AC:13, DMG:d6, UNDEAD]
+   If you omit AC and DMG — defaults are AC:12, DMG:d4+1.
+[ENEMY_DAMAGE: Name, number] — deal damage to an enemy (the system tracks enemy HP).
+   Use EXACTLY the same unique name as in [ENEMY:] — otherwise the damage will not apply.
+[ALLY: Name, HP:number] — declare an ally NPC (attacks automatically in narrative).
+[ALLY_DAMAGE: Name, number] — damage to an ally from an enemy.
+[INITIATIVE] — at the start of EVERY combat; the system rolls d20 for both sides.
+[END_COMBAT] — when all enemies are defeated.
+
+FREEDOM OF ACTION (CRITICAL):
+- If the player picks "Free choice" and describes a non-standard action — ALWAYS assign a roll.
+  * Threatens? → [ROLL: Charisma/Intimidation, DC13]
+  * Throws dust in face? → [ROLL: Dexterity, DC12]; on success the enemy is blinded for 1 round.
+  * Tries to negotiate? → [ROLL: Persuasion, DC14]
+  * Physical action? → [ROLL: Strength, DC12]
+  Never refuse. Always find a mechanic.
+
+[EFFECT: name, duration] — add a temporary effect (e.g. [EFFECT: Enemy_slowed, 1 round], [EFFECT: Shield, 1 round]).
+
+COMBAT:
+- ⚠️ CRITICAL: In the FIRST message of any combat scene you MUST declare ALL enemies
+  with [ENEMY: Name, HP:number] tags — each on its own line — BEFORE any description of attacks,
+  BEFORE narrative about strikes, BEFORE [INITIATIVE]. Without these tags the system does NOT show enemy HP bars.
+  Example of a correct combat opening:
+    [ENEMY: Cultist, HP:6]
+    [ENEMY: Cultist, HP:6]
+    [ENEMY: Cultist, HP:6]
+    [INITIATIVE]
+    (then narrative without choices — the system will show combat buttons)
+- If you forgot to declare enemies in the first combat message — DO IT IN THE NEXT message,
+  before any other actions or tags.
+- Order: first [ENEMY: ...] for every enemy, then [INITIATIVE], then alternating turns.
+- Show enemy HP in parentheses after the name: "Bandit (HP: 5/8)"
+- When an enemy takes damage — update HP with [ENEMY_DAMAGE: Name, number].
+- Damage from an attack on hit — calculate it yourself from the die and modifier, write [ENEMY_DAMAGE: Name, damage].
+- On a miss — just describe the miss, do not use [ENEMY_DAMAGE].
+
+COMBAT TURN ORDER (CRITICAL):
+- ⚠️ When the system sends "[Initiative won: ...]" — the player acts first.
+  YOU DO NOT ATTACK IN THIS RESPONSE. YOU DO NOT WRITE [ATTACK:]. YOU DO NOT WRITE [DAMAGE:].
+  Only a brief scene description (1-2 sentences) — who stands where, what's in the air.
+  Then wait — the system will show combat buttons to the player.
+- ⚠️ When the system sends "[Initiative lost: ...]" — enemies attack FIRST.
+  YOU MUST in the same response:
+  1. Describe each living enemy's attack.
+  2. For each hit write [DAMAGE: number] on its own line.
+  3. Then a brief pause, wait for the player's turn (the system will show buttons).
+- After EVERY player action in combat (attack, berserk, defend, dodge, spell, free action)
+  you MUST in the same response:
+  1. Describe the result of the player's action (1-2 sentences).
+  2. Describe each living enemy's attack (1 sentence per enemy).
+  3. For each hit write [DAMAGE: number] on its own line.
+  4. DO NOT offer choices 1-2-3 — the system will show combat buttons itself.
+- Enemies do not wait. Enemies do not skip turns. If the player did something strange and didn't attack —
+  enemies still strike them in this same response.
+- Exception: if the player chose [Dodge] — enemies attack at disadvantage (see below).
+- Exception: if the player cast [Shield cast] — the player has +5 AC until next turn,
+  enemy attacks are very likely to miss (factor that into d20 vs AC).
+
+CLASS COMBAT BUTTONS:
+In combat the player uses fixed class buttons, NOT DM choices.
+The DM in combat does NOT offer choices 1-2-3 — only describes the result of the player's action and enemy attacks.
+Exception: after combat ends [END_COMBAT] — offer 3 choices again.
+
+Berserk: when you receive [Berserk activated] — the player's next 2 attacks deal +2 damage, enemies hit the player for +2 damage (lower AC).
+Dodge (CRITICAL): when the player chose [Dodge] — each enemy rolls d20 TWICE and uses the LOWER result.
+   This does NOT guarantee a miss — if both rolls are high, the enemy still hits. The DM MUST explicitly show BOTH rolls in the narrative.
+   Examples:
+     "The bandit swings — d20(14) and d20(7), takes the lower: 7. Miss, you slip under the blade."
+     "The cultist strikes — d20(15) and d20(18), takes the lower: 15. The blow lands. [DAMAGE: 4]"
+   Dodge does NOT guarantee avoiding damage — it only lowers the chance to be hit.
+Sneak Attack: when you receive an attack after a dodge — add +d6 to the damage in your description.
+Magic Missile: when you receive [Magic Missile: X damage] — write [ENEMY_DAMAGE: Name, X] for the first living enemy.
+
+UNIQUE ENEMY NAMES (CRITICAL):
+If a single fight has multiple enemies of the same type — you MUST give them unique descriptive names when declaring via [ENEMY:].
+Never use identical names for different enemies in the same fight — the system will only apply damage to one of them.
+Examples of good names:
+   [ENEMY: Bald Bandit, HP:8]
+   [ENEMY: Skinny Bandit, HP:8]
+   [ENEMY: Scarred Bandit, HP:8]
+Or ordinal: "First Bandit", "Second Bandit", "Third Bandit".
+In the [ENEMY_DAMAGE: Name, X] tags use exactly the same unique names.
+
+SETTING: a dark fantasy harbor city called "Grey Shore". Be concise — mobile, on the metro.${mageRules}`;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// PARSER
 // ─────────────────────────────────────────────────────────────────
 type Parsed = ReturnType<typeof parseDMResponse>;
 
@@ -279,16 +381,18 @@ function parseDMResponse(text: string) {
   let initiativeTrigger = false;
   let combatEnd = false;
 
-  const TAG = /\[(АТАКА|БРОСОК|УРОН|ПРЕДМЕТ|УЛУЧШЕНИЕ|ВРАГ|ВРАГ_УРОН|СОЮЗНИК|СОЮЗНИК_УРОН|ЭФФЕКТ|ИНИЦИАТИВА|КОНЕЦ_БОЯ)[^\]]*\]/gi;
+  // English-tag parser. Tags are part of an internal contract between the DM
+  // and the parser — they do not get translated when the UI language changes.
+  const TAG = /\[(ATTACK|ROLL|DAMAGE|ITEM|UPGRADE|ENEMY|ENEMY_DAMAGE|ALLY|ALLY_DAMAGE|EFFECT|INITIATIVE|END_COMBAT)[^\]]*\]/gi;
 
-  const atk = text.match(/\[АТАКА:\s*([^,\]]+),\s*([^,\]]+),\s*([^,\]]+),\s*AC(\d+)\]/i);
+  const atk = text.match(/\[ATTACK:\s*([^,\]]+),\s*([^,\]]+),\s*([^,\]]+),\s*AC(\d+)\]/i);
   if (atk) attackRequest = { weapon: atk[1].trim(), dice: atk[2].trim(), mod: parseInt(atk[3]) || 0, ac: parseInt(atk[4]) };
 
-  const rol = text.match(/\[БРОСОК:\s*([^,\]]+)(?:,\s*DC(\d+))?\]/i);
+  const rol = text.match(/\[ROLL:\s*([^,\]]+)(?:,\s*DC(\d+))?\]/i);
   if (rol) rollRequest = { stat: rol[1].trim(), dc: parseInt(rol[2] || "15") };
 
-  // Суммируем все [УРОН: X] за ход
-  const dmgRe = /\[УРОН:\s*(\d+)\]/gi;
+  // Sum every [DAMAGE: X] in the response
+  const dmgRe = /\[DAMAGE:\s*(\d+)\]/gi;
   let totalDamage = 0;
   let dmgMatch: RegExpExecArray | null;
   while ((dmgMatch = dmgRe.exec(text)) !== null) {
@@ -296,7 +400,7 @@ function parseDMResponse(text: string) {
   }
   if (totalDamage > 0) damage = totalDamage;
 
-  const itemRe = /\[ПРЕДМЕТ:\s*([^\]]+)\]/gi;
+  const itemRe = /\[ITEM:\s*([^\]]+)\]/gi;
   let im: RegExpExecArray | null;
   while ((im = itemRe.exec(text)) !== null) {
     const name = im[1].trim();
@@ -306,14 +410,14 @@ function parseDMResponse(text: string) {
     }
   }
 
-  const upgradeRe = /\[УЛУЧШЕНИЕ:\s*([^\]]+?)\s*->\s*([^\]]+?)\]/gi;
+  const upgradeRe = /\[UPGRADE:\s*([^\]]+?)\s*->\s*([^\]]+?)\]/gi;
   let um: RegExpExecArray | null;
   while ((um = upgradeRe.exec(text)) !== null) {
     upgrades.push({ from: um[1].trim(), to: um[2].trim() });
   }
 
-  // Расширенный [ВРАГ: Имя, HP:N, AC:N, УРОН:dX+Y, НЕЖИТЬ]
-  const enemyRe = /\[ВРАГ:\s*([^,\]]+),\s*HP:(\d+)(?:,\s*AC:(\d+))?(?:,\s*УРОН:([^\],]+))?(?:,\s*(НЕЖИТЬ))?\]/gi;
+  // Extended [ENEMY: Name, HP:N, AC:N, DMG:dX+Y, UNDEAD]
+  const enemyRe = /\[ENEMY:\s*([^,\]]+),\s*HP:(\d+)(?:,\s*AC:(\d+))?(?:,\s*DMG:([^\],]+))?(?:,\s*(UNDEAD))?\]/gi;
   let em: RegExpExecArray | null;
   while ((em = enemyRe.exec(text)) !== null) {
     const hp = parseInt(em[2]);
@@ -327,24 +431,24 @@ function parseDMResponse(text: string) {
     });
   }
 
-  const allyRe = /\[СОЮЗНИК:\s*([^,\]]+),\s*HP:(\d+)\]/gi;
+  const allyRe = /\[ALLY:\s*([^,\]]+),\s*HP:(\d+)\]/gi;
   let am: RegExpExecArray | null;
   while ((am = allyRe.exec(text)) !== null) {
     const hp = parseInt(am[2]);
     newAllies.push({ name: am[1].trim(), maxHp: hp, hp });
   }
 
-  const allyDmgRe = /\[СОЮЗНИК_УРОН:\s*([^,\]]+),\s*(\d+)\]/gi;
+  const allyDmgRe = /\[ALLY_DAMAGE:\s*([^,\]]+),\s*(\d+)\]/gi;
   let adm: RegExpExecArray | null;
   while ((adm = allyDmgRe.exec(text)) !== null) {
     allyDamages.push({ name: adm[1].trim(), damage: parseInt(adm[2]) });
   }
 
-  const edRe = /\[ВРАГ_УРОН:\s*([^,\]]+),\s*(\d+)\]/gi;
+  const edRe = /\[ENEMY_DAMAGE:\s*([^,\]]+),\s*(\d+)\]/gi;
   let ed: RegExpExecArray | null;
   while ((ed = edRe.exec(text)) !== null) enemyDamages.push({ name: ed[1].trim(), damage: parseInt(ed[2]) });
 
-  const effRe = /\[ЭФФЕКТ:\s*([^,\]]+)(?:,\s*([^\]]+))?\]/gi;
+  const effRe = /\[EFFECT:\s*([^,\]]+)(?:,\s*([^\]]+))?\]/gi;
   let efm: RegExpExecArray | null;
   while ((efm = effRe.exec(text)) !== null) {
     const name = efm[1].trim();
@@ -352,8 +456,8 @@ function parseDMResponse(text: string) {
     if (name) newEffects.push({ name, duration });
   }
 
-  if (/\[ИНИЦИАТИВА\]/i.test(text)) initiativeTrigger = true;
-  if (/\[КОНЕЦ_БОЯ\]/i.test(text)) combatEnd = true;
+  if (/\[INITIATIVE\]/i.test(text)) initiativeTrigger = true;
+  if (/\[END_COMBAT\]/i.test(text)) combatEnd = true;
 
   for (const line of text.trim().split("\n")) {
     const choiceMatch = line.trim().match(/^\*{0,2}(\d+)\.\s+(.+?)\*{0,2}$/);
@@ -388,7 +492,7 @@ type RollRequest = { stat?: string; weapon?: string; dice?: string; mod: number;
 type PendingRoll = { type: "attack" | "roll"; request: RollRequest };
 
 // ─────────────────────────────────────────────────────────────────
-// КОМПОНЕНТЫ
+// COMPONENTS
 // ─────────────────────────────────────────────────────────────────
 
 function EnemyHP({ name, hp, maxHp }: { name: string; hp: number; maxHp: number }) {
@@ -406,6 +510,7 @@ function EnemyHP({ name, hp, maxHp }: { name: string; hp: number; maxHp: number 
 }
 
 function InitiativeBlock({ dexMod, onResult }: { dexMod: number; onResult: (r: { player: number; enemy: number; playerWins: boolean }) => void }) {
+  const { t } = useTranslation();
   const [done, setDone] = useState(false);
   const [res, setRes] = useState<{ playerRaw: number; player: number; enemy: number; playerWins: boolean } | null>(null);
 
@@ -421,7 +526,11 @@ function InitiativeBlock({ dexMod, onResult }: { dexMod: number; onResult: (r: {
 
   if (done && res) return (
     <div className="rounded-xl border border-stone-800 bg-stone-950/80 px-4 py-2 text-xs text-stone-500">
-      ⚡ Инициатива: ты {res.player} / враг {res.enemy} → {res.playerWins ? "Ты первый" : "Враг первый"}
+      ⚡ {t("combat.initiativeFooter", {
+        player: res.player,
+        enemy: res.enemy,
+        result: res.playerWins ? t("combat.initiativeYouFirst") : t("combat.initiativeEnemyFirst"),
+      })}
     </div>
   );
 
@@ -429,30 +538,30 @@ function InitiativeBlock({ dexMod, onResult }: { dexMod: number; onResult: (r: {
 
   return (
     <div className="rounded-xl border border-amber-900/50 bg-stone-950/80 px-4 py-3 my-2">
-      <div className="text-amber-500 text-xs uppercase tracking-widest mb-2">⚡ Инициатива (d20 {dexLabel} ЛОВ)</div>
+      <div className="text-amber-500 text-xs uppercase tracking-widest mb-2">⚡ {t("combat.initiative")} (d20 {dexLabel} {t("stats.dex")})</div>
       {!res ? (
         <button onClick={roll} className="w-full py-2.5 rounded-lg text-sm font-bold text-stone-900 active:scale-95 transition-transform"
           style={{ background: "linear-gradient(135deg,#d97706,#92400e)", fontFamily: "serif" }}>
-          🎲 Бросить инициативу
+          🎲 {t("combat.rollInitiative")}
         </button>
       ) : (
         <div>
           <div className="flex justify-around mb-3 text-center">
             <div>
               <div className="text-2xl font-bold" style={{ fontFamily: "serif", color: res.playerWins ? "#4ade80" : "#f87171" }}>{res.player}</div>
-              <div className="text-xs text-stone-500">Ты ({res.playerRaw}{dexMod !== 0 ? ` ${dexLabel}` : ""})</div>
+              <div className="text-xs text-stone-500">{t("combat.you")} ({res.playerRaw}{dexMod !== 0 ? ` ${dexLabel}` : ""})</div>
             </div>
-            <div className="text-stone-600 self-center text-lg">vs</div>
+            <div className="text-stone-600 self-center text-lg">{t("combat.vs")}</div>
             <div>
               <div className="text-2xl font-bold" style={{ fontFamily: "serif", color: !res.playerWins ? "#4ade80" : "#f87171" }}>{res.enemy}</div>
-              <div className="text-xs text-stone-500">Враг</div>
+              <div className="text-xs text-stone-500">{t("combat.enemy")}</div>
             </div>
           </div>
           <div className={`text-center text-sm font-bold mb-3 ${res.playerWins ? "text-green-400" : "text-red-400"}`}>
-            {res.playerWins ? "✦ Ты действуешь первым!" : "✦ Враг атакует первым!"}
+            {res.playerWins ? t("combat.youAreFirst") : t("combat.enemyIsFirst")}
           </div>
           <button onClick={confirm} className="w-full py-2 rounded-lg text-sm font-bold bg-stone-700 hover:bg-stone-600 text-amber-100 transition-colors">
-            Продолжить
+            {t("common.continue")}
           </button>
         </div>
       )}
@@ -476,6 +585,7 @@ type RollResult = {
 const PROFICIENCY_BONUS = 2;
 
 function RollBlock({ type, request, onResult }: { type: "attack" | "roll"; request: RollRequest; onResult: (r: RollResult) => void }) {
+  const { t } = useTranslation();
   const [done, setDone] = useState(false);
   const [res, setRes] = useState<RollResult | null>(null);
 
@@ -526,16 +636,16 @@ function RollBlock({ type, request, onResult }: { type: "attack" | "roll"; reque
     let summary: string;
     if (type === "attack") {
       if (res.autoMiss) {
-        summary = `d20(1) ✦ АВТОПРОМАХ`;
+        summary = `d20(1) ✦ ${t("combat.autoMiss")}`;
       } else if (res.crit) {
-        summary = `d20(20) ✦ КРИТ → Урон: ${res.damage}`;
+        summary = `d20(20) ✦ ${t("combat.crit")} → ${t("combat.damage")}: ${res.damage}`;
       } else if (res.success) {
-        summary = `d20(${res.hitRoll}) + mod(${res.mod}) + prof(${res.prof}) = ${res.total} vs AC${res.ac} → ✦ Попал → Урон: ${res.damage}`;
+        summary = `d20(${res.hitRoll}) + mod(${res.mod}) + prof(${res.prof}) = ${res.total} vs AC${res.ac} → ✦ ${t("combat.hit")} → ${t("combat.damage")}: ${res.damage}`;
       } else {
-        summary = `d20(${res.hitRoll}) + mod(${res.mod}) + prof(${res.prof}) = ${res.total} vs AC${res.ac} → ✦ Мимо`;
+        summary = `d20(${res.hitRoll}) + mod(${res.mod}) + prof(${res.prof}) = ${res.total} vs AC${res.ac} → ✦ ${t("combat.miss")}`;
       }
     } else {
-      summary = `🎲 ${diceLabel}: ${res.hitRoll}${res.mod !== 0 ? ` ${modLabel}` : ""} = ${res.total} vs DC${res.dc} → ${res.success ? "✦ Успех" : "✦ Провал"}`;
+      summary = `🎲 ${diceLabel}: ${res.hitRoll}${res.mod !== 0 ? ` ${modLabel}` : ""} = ${res.total} vs DC${res.dc} → ${res.success ? `✦ ${t("combat.success")}` : `✦ ${t("combat.fail")}`}`;
     }
     return (
       <div className="rounded-xl border border-stone-800 bg-stone-950/80 px-4 py-2 text-xs text-stone-500">
@@ -547,13 +657,13 @@ function RollBlock({ type, request, onResult }: { type: "attack" | "roll"; reque
   return (
     <div className="rounded-xl border border-amber-900/40 bg-stone-950/80 px-4 py-3 my-2">
       <div className="text-amber-600 text-xs uppercase tracking-widest mb-2">
-        {type === "attack" ? "⚔️ Атака" : "🎲 Проверка"}: {diceLabel} {modLabel} vs {targetLabel}
+        {type === "attack" ? `⚔️ ${t("combat.attackLabel")}` : `🎲 ${t("combat.rollLabel")}`}: {diceLabel} {modLabel} vs {targetLabel}
       </div>
       {!res ? (
         <button onClick={execute}
           className="w-full py-2.5 rounded-lg text-sm font-bold text-stone-900 active:scale-95 transition-transform"
           style={{ background: "linear-gradient(135deg,#d97706,#92400e)", fontFamily: "serif" }}>
-          🎲 Бросить d20
+          🎲 {t("combat.rollDie")}
         </button>
       ) : (
         <div>
@@ -573,9 +683,9 @@ function RollBlock({ type, request, onResult }: { type: "attack" | "roll"; reque
                 </>
               )}
               <span className={`font-bold text-sm ${res.crit ? "text-amber-300" : res.autoMiss ? "text-red-400" : res.success ? "text-green-400" : "text-red-400"}`}>
-                {res.crit ? "✦ КРИТ" : res.autoMiss ? "✦ АВТОПРОМАХ" : res.success ? "✦ ПОПАЛ" : "✦ МИМО"}
+                {res.crit ? `✦ ${t("combat.crit")}` : res.autoMiss ? `✦ ${t("combat.autoMiss")}` : res.success ? `✦ ${t("combat.hit")}` : `✦ ${t("combat.miss")}`}
               </span>
-              {res.success && <span className="text-amber-200 text-sm">→ Урон: <b>{res.damage}</b></span>}
+              {res.success && <span className="text-amber-200 text-sm">→ {t("combat.damage")}: <b>{res.damage}</b></span>}
             </div>
           ) : (
             <div className="flex items-center gap-2 mb-2 flex-wrap">
@@ -583,16 +693,23 @@ function RollBlock({ type, request, onResult }: { type: "attack" | "roll"; reque
               {res.mod !== 0 && <><span className="text-stone-500 text-sm">{res.mod > 0 ? "+" : ""}{res.mod}</span><span className="text-stone-600">=</span></>}
               <span className="text-amber-200 font-bold text-lg" style={{ fontFamily: "serif" }}>{res.total}</span>
               <span className="text-stone-600 text-sm">vs DC{res.dc}</span>
-              <span className={`font-bold text-sm ${res.success ? "text-green-400" : "text-red-400"}`}>{res.success ? "✦ УСПЕХ" : "✦ ПРОВАЛ"}</span>
+              <span className={`font-bold text-sm ${res.success ? "text-green-400" : "text-red-400"}`}>{res.success ? `✦ ${t("combat.success")}` : `✦ ${t("combat.fail")}`}</span>
             </div>
           )}
           <button onClick={confirm} className="w-full py-2 rounded-lg text-xs font-bold bg-stone-700 hover:bg-stone-600 text-amber-100 transition-colors">
-            OK
+            {t("common.ok")}
           </button>
         </div>
       )}
     </div>
   );
+}
+
+// Heuristic: true if an inventory entry looks like a healing potion in any
+// supported language. Used to decide whether to show the "Use" button.
+function isPotion(item: string): boolean {
+  const lc = item.toLowerCase();
+  return lc.includes("potion") || lc.includes("зелье") || lc.includes("зелья");
 }
 
 function InventoryPanel({
@@ -607,32 +724,33 @@ function InventoryPanel({
   canUsePotion: boolean;
   onClose: () => void;
 }) {
-  const restTitle = inCombat ? "Нельзя отдыхать в бою" : "";
-  const potionDisabledTitle = inCombat && !canUsePotion ? "Зелье можно выпить только в свой ход — перед основным действием" : "";
+  const { t } = useTranslation();
+  const restTitle = inCombat ? t("inventory.noRestInCombat") : "";
+  const potionDisabledTitle = inCombat && !canUsePotion ? t("inventory.potionInCombatHint") : "";
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.75)" }} onClick={onClose}>
       <div className="w-full max-w-md bg-stone-900 border border-stone-700 rounded-t-3xl p-6 pb-10" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
-          <div className="text-amber-400 font-bold" style={{ fontFamily: "serif" }}>🎒 Инвентарь</div>
+          <div className="text-amber-400 font-bold" style={{ fontFamily: "serif" }}>🎒 {t("inventory.title")}</div>
           <button onClick={onClose} className="text-stone-500 text-xl leading-none">✕</button>
         </div>
         {inventory.length === 0 ? (
-          <div className="text-stone-600 text-sm text-center py-4">Пусто</div>
+          <div className="text-stone-600 text-sm text-center py-4">{t("inventory.empty")}</div>
         ) : (
           <div className="space-y-2">
             {inventory.map((item, i) => {
-              const isPotion = item.toLowerCase().includes("зелье");
+              const usable = isPotion(item);
               return (
                 <div key={i} className="flex items-center justify-between bg-stone-800 rounded-xl px-4 py-3">
                   <span className="text-amber-100 text-sm">{item}</span>
-                  {isPotion && (
+                  {usable && (
                     <button
                       onClick={() => onUseItem(item, i)}
                       disabled={inCombat && !canUsePotion}
                       title={potionDisabledTitle}
                       className="text-xs px-3 py-1 rounded-lg font-bold text-stone-900 ml-2 flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
                       style={{ background: inCombat && !canUsePotion ? "#57534e" : "linear-gradient(135deg,#d97706,#92400e)" }}>
-                      Использовать
+                      {t("common.use")}
                     </button>
                   )}
                 </div>
@@ -642,14 +760,14 @@ function InventoryPanel({
         )}
         {effects.length > 0 && (
           <div className="mt-4 pt-4 border-t border-stone-800">
-            <div className="text-stone-500 text-xs uppercase tracking-widest mb-2">Активные эффекты</div>
+            <div className="text-stone-500 text-xs uppercase tracking-widest mb-2">{t("inventory.activeEffects")}</div>
             {effects.map((e, i) => (
               <div key={i} className="text-amber-300 text-sm bg-stone-800 rounded-lg px-3 py-2 mb-1">{e}</div>
             ))}
           </div>
         )}
         <div className="mt-4 pt-4 border-t border-stone-800">
-          <div className="text-stone-500 text-xs uppercase tracking-widest mb-2">Отдых</div>
+          <div className="text-stone-500 text-xs uppercase tracking-widest mb-2">{t("inventory.rest")}</div>
           <div className="space-y-2">
             <button
               onClick={onShortRest}
@@ -657,8 +775,8 @@ function InventoryPanel({
               title={restTitle}
               className="w-full text-left px-4 py-3 rounded-xl border border-stone-700 bg-stone-800 text-amber-100 text-sm font-bold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed hover:border-amber-700/50"
               style={{ fontFamily: "serif" }}>
-              ☕ Короткий отдых
-              <span className="text-xs font-normal text-stone-500 block mt-0.5">Восстановить d6 HP · Слоты не вернутся</span>
+              ☕ {t("inventory.shortRest")}
+              <span className="text-xs font-normal text-stone-500 block mt-0.5">{t("inventory.shortRestSubtitle")}</span>
             </button>
             <button
               onClick={onLongRest}
@@ -666,11 +784,11 @@ function InventoryPanel({
               title={restTitle}
               className="w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ background: inCombat ? "#292524" : "linear-gradient(135deg,#d97706,#92400e)", color: inCombat ? "#57534e" : "#0c0a09", fontFamily: "serif" }}>
-              🌙 Длинный отдых
-              <span className="text-xs font-normal opacity-75 block mt-0.5">Полное HP · Все слоты заклинаний</span>
+              🌙 {t("inventory.longRest")}
+              <span className="text-xs font-normal opacity-75 block mt-0.5">{t("inventory.longRestSubtitle")}</span>
             </button>
           </div>
-          {inCombat && <div className="text-stone-600 text-xs mt-2 text-center">Нельзя отдыхать в бою</div>}
+          {inCombat && <div className="text-stone-600 text-xs mt-2 text-center">{t("inventory.noRestInCombat")}</div>}
         </div>
       </div>
     </div>
@@ -685,12 +803,13 @@ function SpellPanel({
   onSpell: (s: Spell) => void;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const slots = Array.from({ length: spellSlots.max }, (_, i) => i < spellSlots.current);
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.75)" }} onClick={onClose}>
       <div className="w-full max-w-md bg-stone-900 border border-stone-700 rounded-t-3xl p-6 pb-10 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
-          <div className="text-amber-400 font-bold" style={{ fontFamily: "serif" }}>✦ Заклинания</div>
+          <div className="text-amber-400 font-bold" style={{ fontFamily: "serif" }}>✦ {t("spells.title")}</div>
           <button onClick={onClose} className="text-stone-500 text-xl leading-none">✕</button>
         </div>
         <div className="text-center text-2xl mb-4 tracking-widest" style={{ color: "#60a5fa" }}>
@@ -699,7 +818,7 @@ function SpellPanel({
         </div>
         {character.spells && character.spells.length > 0 && (
           <div>
-            <div className="text-stone-500 text-xs uppercase tracking-widest mb-2">Заклинания (1 слот)</div>
+            <div className="text-stone-500 text-xs uppercase tracking-widest mb-2">{t("spells.subhead")}</div>
             <div className="space-y-2">
               {character.spells.map((s, i) => {
                 const hasSlots = spellSlots.current > 0;
@@ -712,7 +831,7 @@ function SpellPanel({
                         disabled={!hasSlots}
                         className="text-xs px-3 py-1 rounded-lg font-bold flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
                         style={{ background: hasSlots ? "linear-gradient(135deg,#3b82f6,#1e40af)" : "#292524", color: hasSlots ? "#0c0a09" : "#57534e" }}>
-                        {hasSlots ? "Применить" : "Нет слотов"}
+                        {hasSlots ? t("spells.cast") : t("spells.noSlots")}
                       </button>
                     </div>
                     <div className="text-stone-400 text-xs">{s.description}</div>
@@ -727,141 +846,22 @@ function SpellPanel({
   );
 }
 
-// ─────────────────────────────────────────────────────────────────
-// БОЕВЫЕ КНОПКИ ПО КЛАССАМ
-// ─────────────────────────────────────────────────────────────────
-function CombatBtn({
-  onClick, disabled, children, variant = "primary", subtitle,
-}: {
-  onClick?: () => void;
-  disabled?: boolean;
-  children: React.ReactNode;
-  variant?: "primary" | "secondary" | "danger" | "magic";
-  subtitle?: string;
+function DevPanel({ scenes, onJump, onClose }: {
+  scenes: { id: string; label: string; prompt: string }[];
+  onJump: (prompt: string) => void;
+  onClose: () => void;
 }) {
-  const styles: Record<string, React.CSSProperties> = {
-    primary: { background: "linear-gradient(135deg,#d97706,#92400e)", color: "#0c0a09" },
-    secondary: { background: "#1c1917", color: "#fde68a", border: "1px solid #44403c" },
-    danger: { background: "linear-gradient(135deg,#dc2626,#7f1d1d)", color: "#0c0a09" },
-    magic: { background: "linear-gradient(135deg,#3b82f6,#1e40af)", color: "#0c0a09" },
-  };
-  const disabledStyle: React.CSSProperties = { background: "#292524", color: "#57534e", border: "1px solid #292524" };
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className="w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-all active:scale-[0.98] disabled:cursor-not-allowed"
-      style={{ ...(disabled ? disabledStyle : styles[variant]), fontFamily: "serif" }}
-    >
-      <div>{children}</div>
-      {subtitle && <div className="text-xs font-normal opacity-70 mt-0.5">{subtitle}</div>}
-    </button>
-  );
-}
-
-function CombatButtonsWarrior({
-  berserkUsed, onAttack, onBerserk, onDefend, onFree,
-}: {
-  berserkUsed: boolean;
-  onAttack: () => void;
-  onBerserk: () => void;
-  onDefend: () => void;
-  onFree: () => void;
-}) {
-  return (
-    <>
-      <CombatBtn onClick={onAttack} variant="primary">⚔️ Атаковать (меч d8)</CombatBtn>
-      <CombatBtn onClick={berserkUsed ? undefined : onBerserk} disabled={berserkUsed} variant="danger" subtitle={berserkUsed ? "Использован в этом бою" : "+2 урон / -2 AC на 2 хода"}>
-        🔥 Берсерк
-      </CombatBtn>
-      <CombatBtn onClick={onDefend} variant="secondary" subtitle="+2 AC до следующего хода">
-        🛡 Занять оборону
-      </CombatBtn>
-      <CombatBtn onClick={onFree} variant="secondary">✍ Свой вариант…</CombatBtn>
-    </>
-  );
-}
-
-function CombatButtonsRogue({
-  canSneak, onAttack, onDodge, onFree,
-}: {
-  canSneak: boolean;
-  onAttack: () => void;
-  onDodge: () => void;
-  onFree: () => void;
-}) {
-  return (
-    <>
-      <CombatBtn onClick={onAttack} variant="primary">🗡 Атаковать (кинжал d6)</CombatBtn>
-      <CombatBtn onClick={canSneak ? onAttack : undefined} disabled={!canSneak} variant="danger" subtitle={canSneak ? "+d6 урона" : "Доступна после уклонения"}>
-        🎯 Скрытая атака
-      </CombatBtn>
-      <CombatBtn onClick={onDodge} variant="secondary" subtitle="Враг бьёт с помехой">
-        💨 Уклониться
-      </CombatBtn>
-      <CombatBtn onClick={onFree} variant="secondary">✍ Свой вариант…</CombatBtn>
-    </>
-  );
-}
-
-function CombatButtonsMage({
-  spellSlots, showMini, spells, onAttack, onToggleSpells, onCastSpell, onDodge, onFree,
-}: {
-  spellSlots: { current: number; max: number };
-  showMini: boolean;
-  spells: Spell[];
-  onAttack: () => void;
-  onToggleSpells: () => void;
-  onCastSpell: (s: Spell) => void;
-  onDodge: () => void;
-  onFree: () => void;
-}) {
-  const hasSlots = spellSlots.current > 0;
-  return (
-    <>
-      <CombatBtn onClick={onAttack} variant="primary">🪄 Атаковать (посох d6)</CombatBtn>
-      <CombatBtn
-        onClick={hasSlots ? onToggleSpells : undefined}
-        disabled={!hasSlots}
-        variant="magic"
-        subtitle={hasSlots ? `${spellSlots.current}/${spellSlots.max} слотов` : "Нет слотов"}
-      >
-        ✦ Заклинание {hasSlots ? (showMini ? "▾" : "→") : ""}
-      </CombatBtn>
-      {showMini && hasSlots && (
-        <div className="space-y-1.5 pl-3 border-l-2 border-blue-900/60">
-          {spells.map((s, i) => (
-            <button
-              key={i}
-              onClick={() => onCastSpell(s)}
-              className="w-full text-left px-3 py-2 rounded-lg bg-stone-900 border border-stone-700 hover:border-blue-700 transition-colors"
-              style={{ fontFamily: "serif" }}
-            >
-              <div className="text-amber-100 text-sm font-bold">{s.name}</div>
-              <div className="text-stone-500 text-xs">{s.description}</div>
-            </button>
-          ))}
-        </div>
-      )}
-      <CombatBtn onClick={onDodge} variant="secondary" subtitle="Враг бьёт с помехой">
-        💨 Уклониться
-      </CombatBtn>
-      <CombatBtn onClick={onFree} variant="secondary">✍ Свой вариант…</CombatBtn>
-    </>
-  );
-}
-
-function DevPanel({ onJump, onClose }: { onJump: (prompt: string) => void; onClose: () => void }) {
+  const { t } = useTranslation();
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.75)" }} onClick={onClose}>
       <div className="w-full max-w-md bg-stone-900 border border-amber-900/50 rounded-t-3xl p-6 pb-10" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-1">
-          <div className="text-amber-500 font-bold text-sm" style={{ fontFamily: "serif" }}>🛠 Dev Mode</div>
+          <div className="text-amber-500 font-bold text-sm" style={{ fontFamily: "serif" }}>🛠 {t("dev.title")}</div>
           <button onClick={onClose} className="text-stone-500 text-xl leading-none">✕</button>
         </div>
-        <div className="text-stone-600 text-xs mb-4">Телепортирует в сцену без прохождения пути</div>
+        <div className="text-stone-600 text-xs mb-4">{t("dev.subtitle")}</div>
         <div className="grid grid-cols-2 gap-2">
-          {DEV_SCENES.map(scene => (
+          {scenes.map(scene => (
             <button key={scene.id} onClick={() => { onJump(scene.prompt); onClose(); }}
               className="py-3 px-3 rounded-xl border border-stone-700 bg-stone-800 text-amber-100 text-sm text-left hover:border-amber-700 transition-colors active:scale-95">
               {scene.label}
@@ -882,38 +882,39 @@ function DefeatedScreen({
   onMenu: () => void;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.9)" }}>
       <div className="relative max-w-sm w-full mx-4 text-center">
         <button
           onClick={onClose}
-          aria-label="Закрыть"
-          title="Закрыть и перечитать журнал"
+          aria-label={t("defeated.closeAria")}
+          title={t("defeated.closeTitle")}
           className="absolute -top-2 -right-2 w-9 h-9 rounded-full border border-stone-700 bg-stone-900 text-stone-400 hover:text-amber-200 hover:border-amber-700 transition-colors flex items-center justify-center text-lg"
           style={{ fontFamily: "serif" }}
         >
           ✕
         </button>
         <div className="text-6xl mb-4">💀</div>
-        <div className="text-2xl font-bold text-red-400 mb-2" style={{ fontFamily: "serif" }}>Ты повержен</div>
-        <div className="text-stone-400 text-sm mb-6">Силы покидают тебя. Тьма смыкается...</div>
+        <div className="text-2xl font-bold text-red-400 mb-2" style={{ fontFamily: "serif" }}>{t("defeated.title")}</div>
+        <div className="text-stone-400 text-sm mb-6">{t("defeated.subtitle")}</div>
         <div className="space-y-3">
           {hasPotion && (
             <button onClick={onUsePotion}
               className="w-full py-3 rounded-xl font-bold text-stone-900"
               style={{ background: "linear-gradient(135deg,#d97706,#92400e)", fontFamily: "serif" }}>
-              🧪 Выпить зелье лечения
+              🧪 {t("defeated.drinkPotion")}
             </button>
           )}
           <button onClick={onRetry}
             className="w-full py-3 rounded-xl border border-stone-600 bg-stone-800 text-amber-100 font-bold"
             style={{ fontFamily: "serif" }}>
-            ⚔️ Начать бой заново
+            ⚔️ {t("defeated.retry")}
           </button>
           <button onClick={onMenu}
             className="w-full py-3 rounded-xl border border-stone-700 bg-stone-900 text-stone-400 text-sm"
             style={{ fontFamily: "serif" }}>
-            ← Вернуться в меню
+            ← {t("defeated.returnToMenu")}
           </button>
         </div>
       </div>
@@ -922,6 +923,7 @@ function DefeatedScreen({
 }
 
 function CharacterCard({ char, selected, onSelect }: { char: Character; selected: boolean; onSelect: (c: Character) => void }) {
+  const { t } = useTranslation();
   return (
     <button onClick={() => onSelect(char)}
       className={`relative w-full text-left rounded-2xl p-5 border transition-all duration-300 overflow-hidden ${selected ? "border-amber-400 shadow-lg shadow-amber-900/40 scale-[1.02]" : "border-stone-700 hover:border-stone-500"}`}
@@ -938,10 +940,10 @@ function CharacterCard({ char, selected, onSelect }: { char: Character; selected
         </div>
         <p className="text-stone-400 text-xs leading-relaxed mb-3">{char.backstory}</p>
         <div className="flex gap-3 text-xs mb-2">
-          {([["СИЛ", char.stats.str], ["ЛОВ", char.stats.dex], ["ИНТ", char.stats.int]] as const).map(([l, v]) => (
+          {([[t("stats.str"), char.stats.str], [t("stats.dex"), char.stats.dex], [t("stats.int"), char.stats.int]] as const).map(([l, v]) => (
             <span key={l} className="text-stone-500">{l} <span className="text-amber-300">{v >= 0 ? "+" : ""}{v}</span></span>
           ))}
-          <span className="text-stone-500">HP <span className="text-red-400">{char.hp}</span></span>
+          <span className="text-stone-500">{t("stats.hp")} <span className="text-red-400">{char.hp}</span></span>
         </div>
         <div className="text-xs" style={{ color: char.color }}>✦ {char.ability}: <span className="text-stone-400">{char.abilityDesc}</span></div>
         <div className="text-xs text-stone-600 mt-1">🗡 {char.weapon.name} ({char.weapon.dice})</div>
@@ -949,15 +951,6 @@ function CharacterCard({ char, selected, onSelect }: { char: Character; selected
     </button>
   );
 }
-
-const FREE_INPUT_PLACEHOLDERS = [
-  "Прыгнуть со стола на врага...",
-  "Схватить факел и поджечь занавески...",
-  "Попытаться договориться с главарём...",
-  "Кинуть горсть пыли в глаза...",
-  "Опрокинуть стол как щит...",
-  "Крикнуть чтобы отвлечь внимание...",
-];
 
 function CombatPanel({
   character, berserkUsedThisCombat, didDodgeLastTurn, spellSlots,
@@ -976,6 +969,7 @@ function CombatPanel({
   onCastSpell: (s: Spell) => void;
   onFreeInput: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-2">
       <div className="grid grid-cols-4 gap-2">
@@ -983,7 +977,7 @@ function CombatPanel({
           className="flex flex-col items-center py-3 rounded-xl text-stone-900 font-bold active:scale-95 transition-transform"
           style={{ background: "linear-gradient(135deg,#d97706,#92400e)", fontFamily: "serif" }}>
           <span className="text-xl">⚔️</span>
-          <span className="text-xs mt-0.5">Атака</span>
+          <span className="text-xs mt-0.5">{t("combat.attack")}</span>
         </button>
 
         {character.id === "warrior" && (
@@ -996,7 +990,7 @@ function CombatPanel({
               fontFamily: "serif",
             }}>
             <span className="text-xl">🔥</span>
-            <span className="text-xs mt-0.5">Берсерк</span>
+            <span className="text-xs mt-0.5">{t("combat.berserk")}</span>
           </button>
         )}
         {character.id === "rogue" && (
@@ -1009,7 +1003,7 @@ function CombatPanel({
               fontFamily: "serif",
             }}>
             <span className="text-xl">🎯</span>
-            <span className="text-xs mt-0.5">Скрытая</span>
+            <span className="text-xs mt-0.5">{t("combat.sneak")}</span>
           </button>
         )}
         {character.id === "mage" && spellSlots && (
@@ -1030,14 +1024,14 @@ function CombatPanel({
           className="flex flex-col items-center py-3 rounded-xl border border-stone-700 bg-stone-900 font-bold active:scale-95 transition-transform"
           style={{ color: "#fde68a", fontFamily: "serif" }}>
           <span className="text-xl">{character.id === "warrior" ? "🛡" : "💨"}</span>
-          <span className="text-xs mt-0.5">{character.id === "warrior" ? "Оборона" : "Уклон"}</span>
+          <span className="text-xs mt-0.5">{character.id === "warrior" ? t("combat.defend") : t("combat.dodge")}</span>
         </button>
 
         <button onClick={onFreeInput}
           className="flex flex-col items-center py-3 rounded-xl border border-stone-600 bg-stone-950 font-bold active:scale-95 transition-transform"
           style={{ color: "#78716c", fontFamily: "serif" }}>
           <span className="text-xl">✍</span>
-          <span className="text-xs mt-0.5">Своё...</span>
+          <span className="text-xs mt-0.5">{t("combat.freeAction")}</span>
         </button>
       </div>
 
@@ -1054,12 +1048,23 @@ function CombatPanel({
 }
 
 // ─────────────────────────────────────────────────────────────────
-// ГЛАВНЫЙ КОМПОНЕНТ
+// MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────
 export default function SoloDnD() {
+  const { t, i18n: i18nInstance } = useTranslation();
+  const language: "en" | "ru" = i18nInstance.language === "ru" ? "ru" : "en";
+
+  // CHARACTERS rebuilt whenever the active language changes so the menu
+  // shows localized names/items immediately.
+  const characters = useMemo(() => buildCharacters(t), [t, i18nInstance.language]);
+  const devScenes = useMemo(() => buildDevScenes(t), [t, i18nInstance.language]);
+  const freeInputPlaceholders = useMemo(() => {
+    const list = i18nInstance.t("free.placeholders", { returnObjects: true }) as unknown;
+    return Array.isArray(list) ? (list as string[]) : [];
+  }, [i18nInstance, i18nInstance.language]);
+
   const [screen, setScreen] = useState<"select" | "game">("select");
   const [selectedChar, setSelectedChar] = useState<Character | null>(null);
-  const { t } = useTranslation();
   const [character, setCharacter] = useState<Character | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -1082,15 +1087,21 @@ export default function SoloDnD() {
   const [defensiveStance, setDefensiveStance] = useState(false);
   const [showSpellMini, setShowSpellMini] = useState(false);
   const [selectingTarget, setSelectingTarget] = useState(false);
-  const [freeInputPlaceholder] = useState(() => FREE_INPUT_PLACEHOLDERS[Math.floor(Math.random() * FREE_INPUT_PLACEHOLDERS.length)]);
+  const [freeInputPlaceholder, setFreeInputPlaceholder] = useState("");
   const [showDev, setShowDev] = useState(false);
   const [showDefeated, setShowDefeated] = useState(false);
-  // Поражение «отложено»: HP=0, но даём игроку прочитать сообщение мастера
-  // прежде чем показать плашку. После закрытия плашки этот флаг остаётся
-  // true — он управляет показом кнопок «Заново / Меню» вместо боевых.
+  // Defeat is "deferred": HP=0, but we let the player read the DM's last
+  // message before showing the screen. After the screen closes this flag
+  // stays true — it controls showing "Retry / Menu" instead of combat buttons.
   const [defeatPending, setDefeatPending] = useState(false);
+  // Language-switch confirmation dialog (only shown if a session is active).
+  const [pendingLanguageSwitch, setPendingLanguageSwitch] = useState<{
+    next: "en" | "ru";
+    resolve: (ok: boolean) => void;
+  } | null>(null);
   const combatStartSnapshotRef = useRef<{ hp: number; enemies: Enemy[]; allies: Ally[] } | null>(null);
-  // Бонусное действие "выпито зелье" — копится здесь и приклеивается к следующему основному действию игрока.
+  // Bonus action "potion drunk" — accumulated here and attached to the next
+  // main player action.
   const pendingPotionInfoRef = useRef<string | null>(null);
   const devTaps = useRef(0);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -1112,49 +1123,61 @@ export default function SoloDnD() {
   useEffect(() => { initAnalytics(); }, []);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, loading, pendingRoll, pendingInitiative]);
 
-  // Когда поражение «отложено» — ждём, пока мастер закончит говорить
-  // (loading=false), и даём игроку ~2.2с на чтение последнего сообщения,
-  // только после этого показываем плашку «Ты повержен».
+  // Pick a fresh free-input placeholder when the placeholder list updates
+  // (i.e. on first render and on every language change).
+  useEffect(() => {
+    if (freeInputPlaceholders.length === 0) {
+      setFreeInputPlaceholder("");
+      return;
+    }
+    const idx = Math.floor(Math.random() * freeInputPlaceholders.length);
+    setFreeInputPlaceholder(freeInputPlaceholders[idx]);
+  }, [freeInputPlaceholders]);
+
+  // When defeat is "deferred" — wait until the DM is done speaking
+  // (loading=false), and give the player ~2.2s to read the last message,
+  // only then show the "You are defeated" screen.
   useEffect(() => {
     if (!defeatPending || loading || showDefeated) return;
-    const t = setTimeout(() => setShowDefeated(true), 2200);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setShowDefeated(true), 2200);
+    return () => clearTimeout(timer);
   }, [defeatPending, loading, showDefeated, messages]);
 
-  // ── Сейв (localStorage, безопасно к SSR) ──────────────────────
+  // ── Save (localStorage, SSR-safe) ─────────────────────────────
   function doSave(char: Character, currentHp: number, currentInv: string[], currentEff: string[], msgs: ChatMessage[]) {
     if (typeof window === "undefined") return;
     const recent = msgs.filter(m => m.role === "assistant").slice(-3)
       .map(m => (m.parsed?.narrative || m.content).slice(0, 100)).join(" → ");
     const save = {
-      savedAt: new Date().toLocaleString("ru"),
+      savedAt: new Date().toISOString(),
+      locale: language,
       character: { id: char.id, name: char.name, emoji: char.emoji },
       hp: currentHp, maxHp: char.maxHp,
       inventory: currentInv, effects: currentEff,
-      plotSummary: recent || "Начало приключения",
+      plotSummary: recent || "Adventure begins",
       messageCount: msgs.length,
     };
     try { window.localStorage.setItem("dnd_save_v3", JSON.stringify(save)); } catch { /* noop */ }
     trackEvent("session_saved", { characterId: char.id, messageNumber: msgs.length });
   }
 
-  // ── API: запрос к серверной функции /api/dm ───────────────────
+  // ── API: request to the /api/dm server function ───────────────
   async function callAPI(char: Character, currentHp: number, currentInv: string[], currentEff: string[], history: ChatMessage[], userMessage: string) {
     const slotsForPrompt = char.id === "mage" ? (stateRef.current.spellSlots ?? { current: 0, max: 0 }) : null;
     const res = await fetch("/api/dm", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        system: buildSystemPrompt(char, currentHp, currentInv, currentEff, slotsForPrompt),
+        system: buildSystemPrompt(char, currentHp, currentInv, currentEff, slotsForPrompt, language),
         messages: [...history, { role: "user", content: userMessage }].map(m => ({ role: m.role, content: m.content })),
       }),
     });
     if (!res.ok) throw new Error(`API error ${res.status}`);
     const data = await res.json() as { text?: string };
-    return data.text || "Мастер молчит...";
+    return data.text || t("dm.silent");
   }
 
-  // ── Обработка ответа DM ───────────────────────────────────────
+  // ── Apply parsed DM response ──────────────────────────────────
   function applyParsed(parsed: Parsed, currentHp: number, currentInv: string[], currentEff: string[], currentEnemies: Enemy[]) {
     let newHp = currentHp;
     let newInv = [...currentInv];
@@ -1164,9 +1187,9 @@ export default function SoloDnD() {
     if (parsed.damage) {
       newHp = Math.max(0, newHp - parsed.damage);
       setHp(newHp);
-      // НЕ показываем плашку поражения сразу — даём мастеру дорассказать.
-      // Просто помечаем поражение как «ожидающее»; эффект ниже подхватит
-      // флаг и откроет плашку с задержкой, когда мастер закончит говорить.
+      // Don't show the defeat screen immediately — let the DM finish narrating.
+      // We just mark the defeat as "pending"; the effect above will pick up
+      // the flag and open the screen with a delay once the DM is done.
       if (newHp <= 0) setDefeatPending(true);
     }
 
@@ -1187,7 +1210,7 @@ export default function SoloDnD() {
           newInv = [...newInv.slice(0, idx), up.to, ...newInv.slice(idx + 1)];
           changed = true;
         } else {
-          // если старого нет — просто добавим новый
+          // if the old item is missing — just add the new one
           newInv = [...newInv, up.to];
           changed = true;
         }
@@ -1208,9 +1231,11 @@ export default function SoloDnD() {
         });
       }
     } else if (newEnemies.length === 0) {
-      // Защита: DM забыл объявить врагов через [ВРАГ:], но в нарративе явно идёт бой.
-      // Пробуем извлечь имена и HP из текста по паттерну "Имя (HP: X/Y)".
-      const combatHints = /(атакует|нападает|нападают|HP:|культист|бандит|враг|разбойник|гоблин|орк|скелет|гнолл)/i;
+      // Safety net: DM forgot to declare enemies via [ENEMY:] but the narrative
+      // clearly describes a fight. Try to extract names and HP from text by
+      // the "Name (HP: X/Y)" pattern. Keep multilingual combat hints to also
+      // catch DM responses written in Russian.
+      const combatHints = /(attack|attacks|ambush|HP:|cultist|bandit|enemy|raider|goblin|orc|skeleton|gnoll|атакует|нападает|нападают|культист|бандит|враг|разбойник|гоблин|орк|скелет|гнолл)/i;
       if (combatHints.test(parsed.narrative)) {
         const inferred: Enemy[] = [];
         const hpRe = /([A-Za-zА-Яа-яЁё][A-Za-zА-Яа-яЁё\s'`-]{1,30}?)\s*\(\s*HP:\s*(\d+)\s*\/\s*(\d+)\s*\)/gi;
@@ -1218,12 +1243,12 @@ export default function SoloDnD() {
         const seen = new Set<string>();
         while ((m = hpRe.exec(parsed.narrative)) !== null) {
           const name = m[1].trim().replace(/^[—–\-•:,\.]+/, "").trim();
-          const hp = parseInt(m[2]);
+          const enemyHp = parseInt(m[2]);
           const maxHp = parseInt(m[3]);
           const key = `${name.toLowerCase()}|${maxHp}`;
           if (name && maxHp > 0 && !seen.has(key)) {
             seen.add(key);
-            inferred.push({ name, hp, maxHp, ac: 12, damage: "d4+1" });
+            inferred.push({ name, hp: enemyHp, maxHp, ac: 12, damage: "d4+1" });
           }
         }
         if (inferred.length) {
@@ -1252,7 +1277,7 @@ export default function SoloDnD() {
       setEnemies(newEnemies);
     }
 
-    // Союзники: добавление и урон
+    // Allies: spawning and damage
     if (parsed.newAllies?.length) {
       setAllies(prev => [...prev, ...parsed.newAllies.map(a => ({ ...a }))]);
     }
@@ -1274,7 +1299,7 @@ export default function SoloDnD() {
       setInCombat(false);
       setEnemies([]);
       setAllies([]);
-      // Сброс боевых состояний при окончании боя
+      // Reset combat state on combat end
       setBerserkChargesLeft(0);
       setBerserkUsedThisCombat(false);
       setDidDodgeLastTurn(false);
@@ -1298,16 +1323,16 @@ export default function SoloDnD() {
       setEffects(finalEffects);
     }
 
-    // При окончании боя — убрать эффект Берсерка из списка
+    // On combat end — strip the Berserk effect from the list
     if (parsed.combatEnd || (newEnemies.length > 0 && newEnemies.every(e => e.hp <= 0))) {
-      const cleaned = finalEffects.filter(e => !/берсерк/i.test(e));
+      const cleaned = finalEffects.filter(e => !/berserk|берсерк/i.test(e));
       if (cleaned.length !== finalEffects.length) {
         finalEffects = cleaned;
         setEffects(cleaned);
       }
     }
 
-    // При начале нового боя — сбросить уклонение, оборону и UI-флаги
+    // On a new combat start — reset dodge, defensive stance and UI flags
     if (parsed.initiativeTrigger) {
       setDidDodgeLastTurn(false);
       setDefensiveStance(false);
@@ -1318,8 +1343,8 @@ export default function SoloDnD() {
     return { newHp, newInv, newEff: finalEffects, newEnemies };
   }
 
-  // Авто-бросок атаки: считает d20+mod+prof vs AC, формирует системное сообщение для DM,
-  // отправляет его через handleChoice. Никакого RollBlock — всё мгновенно.
+  // Auto attack-roll: computes d20+mod+prof vs AC, builds a system message
+  // for the DM, sends it via handleChoice. No RollBlock — instant.
   async function executeAttackRoll(req: { weapon: string; dice: string; mod: number; ac: number; targetName?: string }) {
     const hitRoll = rollDice(20);
     const prof = PROFICIENCY_BONUS;
@@ -1335,17 +1360,17 @@ export default function SoloDnD() {
         : rollDice(dmgDice) + req.mod;
       if (damage < 1) damage = 1;
     }
-    const tname = req.targetName ? `, цель: ${req.targetName}` : "";
-    const tagName = req.targetName ?? "Имя";
+    const tname = req.targetName ? `, target: ${req.targetName}` : "";
+    const tagName = req.targetName ?? "Name";
     let msg: string;
     if (autoMiss) {
-      msg = `[Атака: ${req.weapon}${tname} — d20(1) АВТОПРОМАХ vs AC${req.ac}]`;
+      msg = i18n.t("system.attackAutoMiss", { weapon: req.weapon, target: tname, ac: req.ac });
     } else if (crit) {
-      msg = `[Атака: ${req.weapon}${tname} — d20(20) КРИТ vs AC${req.ac} → Урон врагу: ${damage}. Опиши удар и напиши [ВРАГ_УРОН: ${tagName}, ${damage}].]`;
+      msg = i18n.t("system.attackCrit", { weapon: req.weapon, target: tname, ac: req.ac, damage, tagName });
     } else if (hit) {
-      msg = `[Атака: ${req.weapon}${tname} — d20(${hitRoll})+mod(${req.mod})+prof(${prof})=${total} vs AC${req.ac} ПОПАЛ → Урон врагу: ${damage}. Опиши удар и напиши [ВРАГ_УРОН: ${tagName}, ${damage}].]`;
+      msg = i18n.t("system.attackHit", { weapon: req.weapon, target: tname, ac: req.ac, damage, tagName, roll: hitRoll, mod: req.mod, prof, total });
     } else {
-      msg = `[Атака: ${req.weapon}${tname} — d20(${hitRoll})+mod(${req.mod})+prof(${prof})=${total} vs AC${req.ac} МИМО]`;
+      msg = i18n.t("system.attackMiss", { weapon: req.weapon, target: tname, ac: req.ac, roll: hitRoll, mod: req.mod, prof, total });
     }
     await handleChoice(msg);
   }
@@ -1356,7 +1381,7 @@ export default function SoloDnD() {
     const { newHp, newInv, newEff } = applyParsed(parsed, currentHp, currentInv, currentEff, currentEnemies);
     setMessages(newMsgs);
 
-    // Сохраняем снапшот в начале каждого боя — для кнопки "Начать заново"
+    // Snapshot the start of every fight — used by the "Restart fight" button
     if (parsed.initiativeTrigger) {
       const snapEnemies = (parsed.newEnemies?.length ? parsed.newEnemies : stateRef.current.enemies).map(e => ({ ...e }));
       const snapAllies = stateRef.current.allies.map(a => ({ ...a }));
@@ -1365,23 +1390,26 @@ export default function SoloDnD() {
 
     let autoAttackReq: { weapon: string; dice: string; mod: number; ac: number } | null = null;
 
-    // В бою атаки идут только через боевые кнопки игрока — не от DM-инициированных [АТАКА:].
-    // Если DM всё-таки прислал [АТАКА:] в бою (игнорируя промпт) — игнорируем тег, чтобы не
-    // ломать порядок хода и не атаковать после победы в инициативе автоматически.
+    // In combat, attacks only flow through player combat buttons — not via
+    // DM-initiated [ATTACK:] tags. If the DM sends [ATTACK:] in combat
+    // anyway (ignoring the prompt), drop the tag so we don't auto-attack
+    // after winning initiative.
     const wasInCombat = stateRef.current.enemies.length > 0 || currentEnemies.length > 0;
 
     if (parsed.initiativeTrigger) {
       setPendingInitiative(true);
       setPendingRoll(null);
     } else if (parsed.attackRequest && !wasInCombat) {
-      // Атака вне боя (например, скрытная атака из засады) — авто-бросок
+      // Attack outside combat (e.g. an ambush sneak attack) — auto-roll
       const mod = char.stats[char.weapon.stat] || 0;
       autoAttackReq = { ...parsed.attackRequest, mod };
       setPendingRoll(null);
       setPendingInitiative(false);
     } else if (parsed.rollRequest) {
       const lower = parsed.rollRequest.stat.toLowerCase();
-      const statKey: Stat = lower.includes("сил") ? "str" : lower.includes("лов") ? "dex" : "int";
+      const statKey: Stat = (lower.includes("str") || lower.includes("сил")) ? "str"
+        : (lower.includes("dex") || lower.includes("лов")) ? "dex"
+        : "int";
       const mod = char.stats[statKey] || 0;
       setPendingRoll({ type: "roll", request: { ...parsed.rollRequest, mod } });
       setPendingInitiative(false);
@@ -1398,14 +1426,14 @@ export default function SoloDnD() {
     });
 
     if (autoAttackReq) {
-      // Запускаем авто-бросок асинхронно после возврата текущего тика, чтобы стейт успел примениться
+      // Run the auto-roll asynchronously after the current tick so state has applied
       setTimeout(() => { void executeAttackRoll(autoAttackReq!); }, 0);
     }
 
     return newMsgs;
   }
 
-  // ── Старт игры ────────────────────────────────────────────────
+  // ── Game start ────────────────────────────────────────────────
   async function startGame(char: Character, customPrompt?: string) {
     setCharacter(char);
     setHp(char.hp);
@@ -1428,17 +1456,18 @@ export default function SoloDnD() {
     setScreen("game");
     setLoading(true);
     trackEvent("game_started", { characterId: char.id, messageNumber: 0, characterName: char.name });
-    const prompt = customPrompt || "Начни приключение. Вводная сцена в Сером Берегу. 3 варианта действий.";
+    const prompt = customPrompt || t("dm.startPrompt");
     try {
       const reply = await callAPI(char, char.hp, startInv, [], [], prompt);
       await processAndSetMessages(char, char.hp, startInv, [], [], reply, []);
     } catch {
-      setMessages([{ role: "assistant", content: "Ошибка соединения с Мастером.", parsed: parseDMResponse("Ошибка соединения.") }]);
+      const errText = t("dm.connectionError");
+      setMessages([{ role: "assistant", content: errText, parsed: parseDMResponse(errText) }]);
     }
     setLoading(false);
   }
 
-  // ── Выбор действия ────────────────────────────────────────────
+  // ── Choice handling ───────────────────────────────────────────
   async function handleChoice(choiceText: string) {
     if (loading) return;
     const { character: c, hp: h, inventory: inv, effects: eff, enemies: en, messages: msgs } = stateRef.current;
@@ -1450,47 +1479,56 @@ export default function SoloDnD() {
     const newMsgs: ChatMessage[] = [...msgs, { role: "user", content: choiceText }];
     setMessages(newMsgs);
     setLoading(true);
-    // В бою после КАЖДОГО действия игрока — добавляем системное правило
-    // чтобы враги ОБЯЗАТЕЛЬНО атаковали в этом же ответе DM.
-    // Исключение: само сообщение "[Инициатива выиграна: ...]" — там враги ещё не ходят,
-    // ждём первого действия игрока.
-    const isInitiativeWin = /Инициатива выиграна/i.test(choiceText);
-    // Если до этого было выпито зелье как бонусное действие — приклеиваем его к
-    // основному действию ОДНИМ запросом, чтобы DM описал и зелье, и атаку,
-    // и только ПОСЛЕ этого враги отвечали.
+    // After EVERY player action in combat — append a system rule so enemies
+    // are forced to attack in this same DM response.
+    // Exception: the "[Initiative won: ...]" message itself — enemies don't
+    // act there; we wait for the player's first action.
+    const isInitiativeWin = /Initiative won/i.test(choiceText);
+    // If a potion was drunk as a bonus action — attach it to the main action
+    // in ONE request so the DM describes both the potion and the attack
+    // before enemies retaliate.
     const potionInfo = pendingPotionInfoRef.current;
     pendingPotionInfoRef.current = null;
     const choiceWithPotion = potionInfo ? `${potionInfo}\n${choiceText}` : choiceText;
     const apiMessage = (inCombat || en.length > 0) && !isInitiativeWin
-      ? `${choiceWithPotion}\n\n[СИСТЕМНОЕ ПРАВИЛО: После описания результата действия игрока — враги ОБЯЗАНЫ атаковать в этом же ответе. Каждый живой враг делает одну атаку. Используй [УРОН: X] для каждого попадания. Не жди следующего хода игрока. Не предлагай варианты 1-2-3.]`
+      ? `${choiceWithPotion}\n\n${i18n.t("system.combatTurnReminder")}`
       : choiceWithPotion;
     try {
       const reply = await callAPI(c, h, inv, eff, msgs, apiMessage);
       await processAndSetMessages(c, h, inv, eff, en, reply, newMsgs);
     } catch {
-      setMessages([...newMsgs, { role: "assistant", content: "Связь прервалась.", parsed: parseDMResponse("Связь прервалась.") }]);
+      const lostText = t("dm.connectionLost");
+      setMessages([...newMsgs, { role: "assistant", content: lostText, parsed: parseDMResponse(lostText) }]);
     }
     setLoading(false);
   }
 
-  // ── Результат броска ──────────────────────────────────────────
+  // ── Roll result ───────────────────────────────────────────────
   async function handleRollResult(rollRes: RollResult) {
     const r = pendingRoll;
     if (!r) return;
     setPendingRoll(null);
     let msg: string;
     if (r.type === "attack") {
+      const tname = "";
       if (rollRes.autoMiss) {
-        msg = `[Атака: ${r.request.weapon} — d20(1) АВТОПРОМАХ vs AC${rollRes.ac}]`;
+        msg = i18n.t("system.attackAutoMiss", { weapon: r.request.weapon, target: tname, ac: rollRes.ac });
       } else if (rollRes.crit) {
-        msg = `[Атака: ${r.request.weapon} — d20(20) КРИТ vs AC${rollRes.ac} → Урон врагу: ${rollRes.damage}. Опиши удар и напиши [ВРАГ_УРОН: Имя, ${rollRes.damage}].]`;
+        msg = i18n.t("system.attackCrit", { weapon: r.request.weapon, target: tname, ac: rollRes.ac, damage: rollRes.damage, tagName: "Name" });
       } else if (rollRes.success) {
-        msg = `[Атака: ${r.request.weapon} — d20(${rollRes.hitRoll})+mod(${rollRes.mod})+prof(${rollRes.prof})=${rollRes.total} vs AC${rollRes.ac} ПОПАЛ → Урон врагу: ${rollRes.damage}. Опиши удар и напиши [ВРАГ_УРОН: Имя, ${rollRes.damage}].]`;
+        msg = i18n.t("system.attackHit", { weapon: r.request.weapon, target: tname, ac: rollRes.ac, damage: rollRes.damage, tagName: "Name", roll: rollRes.hitRoll, mod: rollRes.mod, prof: rollRes.prof, total: rollRes.total });
       } else {
-        msg = `[Атака: ${r.request.weapon} — d20(${rollRes.hitRoll})+mod(${rollRes.mod})+prof(${rollRes.prof})=${rollRes.total} vs AC${rollRes.ac} МИМО]`;
+        msg = i18n.t("system.attackMiss", { weapon: r.request.weapon, target: tname, ac: rollRes.ac, roll: rollRes.hitRoll, mod: rollRes.mod, prof: rollRes.prof, total: rollRes.total });
       }
     } else {
-      msg = `[Проверка: ${r.request.stat} — ${rollRes.success ? "УСПЕХ" : "ПРОВАЛ"} (${rollRes.hitRoll}${rollRes.mod !== 0 ? `${rollRes.mod >= 0 ? "+" : ""}${rollRes.mod}` : ""}=${rollRes.total} vs DC${rollRes.dc})]`;
+      const modPart = rollRes.mod !== 0 ? `${rollRes.mod >= 0 ? "+" : ""}${rollRes.mod}` : "";
+      msg = i18n.t(rollRes.success ? "system.rollSuccess" : "system.rollFail", {
+        stat: r.request.stat,
+        roll: rollRes.hitRoll,
+        modPart,
+        total: rollRes.total,
+        dc: rollRes.dc,
+      });
     }
     await handleChoice(msg);
   }
@@ -1498,18 +1536,18 @@ export default function SoloDnD() {
   async function handleInitiativeResult(res: { player: number; enemy: number; playerWins: boolean }) {
     setPendingInitiative(false);
     const msg = res.playerWins
-      ? `[Инициатива выиграна: ты ${res.player} vs враг ${res.enemy} — действуешь первым]`
-      : `[Инициатива проиграна: ты ${res.player} vs враг ${res.enemy} — враг атакует первым]`;
+      ? i18n.t("system.initiativeWon", { player: res.player, enemy: res.enemy })
+      : i18n.t("system.initiativeLost", { player: res.player, enemy: res.enemy });
     await handleChoice(msg);
   }
 
   function handleUseItem(_item: string, idx: number) {
     const { hp: h, character: c } = stateRef.current;
     if (!c) return;
-    // В бою зелье можно пить ТОЛЬКО в свой ход и ТОЛЬКО перед основным действием.
-    // Условия "свой ход": не идёт запрос (loading), не висит бросок и не идёт инициатива.
+    // In combat, a potion can ONLY be drunk on your turn and ONLY before the main action.
+    // "Your turn" conditions: no pending request (loading), no pending roll, no pending initiative.
     if (inCombat && (loading || pendingRoll || pendingInitiative)) return;
-    // Нельзя выпить второе зелье поверх ещё не использованного бонусного действия.
+    // Cannot drink a second potion on top of an unspent bonus action.
     if (inCombat && pendingPotionInfoRef.current) return;
     const heal = rollDice(6) + 2;
     const newHp = Math.min(c.maxHp, h + heal);
@@ -1517,43 +1555,48 @@ export default function SoloDnD() {
     setInventory(prev => prev.filter((_, i) => i !== idx));
     setShowInventory(false);
     if (inCombat) {
-      // Бонусное действие: НЕ обращаемся к DM сейчас, иначе враги атакуют после описания зелья.
-      // Применяем эффект локально, показываем серое системное сообщение, а информация
-      // о зелье будет приклеена к следующему основному действию игрока (атака/уклонение/спецспособность).
-      pendingPotionInfoRef.current = `[Бонусное действие перед основной атакой: игрок выпил зелье лечения, +${heal} HP (${newHp}/${c.maxHp}). Опиши глоток зелья ОДНИМ предложением, затем сразу опиши основное действие игрока, описанное ниже.]`;
+      // Bonus action: do NOT call the DM now, otherwise enemies attack right after the potion.
+      // Apply the effect locally, show a grey system message, and the potion info is
+      // attached to the next main player action (attack/dodge/special).
+      pendingPotionInfoRef.current = i18n.t("system.potionBonusAction", { heal, hp: newHp, max: c.maxHp });
+      const narrativeText = t("combat.potionUsed", { heal, hp: newHp, max: c.maxHp });
+      const parsedText = t("combat.potionUsedNarrative", { heal, hp: newHp, max: c.maxHp });
       setMessages(prev => [...prev, {
         role: "assistant",
-        content: `🧪 Ты выпиваешь зелье. +${heal} HP. (${newHp}/${c.maxHp}) — теперь выбери основное действие.`,
-        parsed: parseDMResponse(`✦ Бонусное действие: ты выпиваешь зелье лечения. +${heal} HP. (${newHp}/${c.maxHp}). Теперь выбери основное действие.`)
+        content: narrativeText,
+        parsed: parseDMResponse(parsedText),
       }]);
       return;
     }
+    const narrativeText = t("combat.potionOutOfCombat", { heal, hp: newHp, max: c.maxHp });
+    const parsedText = t("combat.potionOutOfCombatNarrative", { heal, hp: newHp, max: c.maxHp });
     setMessages(prev => [...prev, {
       role: "assistant",
-      content: `Зелье выпито. +${heal} HP. (${newHp}/${c.maxHp})`,
-      parsed: parseDMResponse(`✦ Ты выпиваешь зелье лечения. Тёплая волна прокатывается по телу. +${heal} HP. (${newHp}/${c.maxHp})`)
+      content: narrativeText,
+      parsed: parseDMResponse(parsedText),
     }]);
   }
 
-  // Использование зелья на экране поражения — лечит и продолжает бой
+  // Use a potion on the defeated screen — heals and continues the fight
   function handleDefeatedUsePotion() {
     const { inventory: inv, character: c } = stateRef.current;
     if (!c) return;
-    const potionIdx = inv.findIndex(i => i.toLowerCase().includes("зелье"));
+    const potionIdx = inv.findIndex(isPotion);
     if (potionIdx < 0) return;
     const heal = rollDice(6) + 2;
     setHp(Math.min(c.maxHp, heal));
     setInventory(prev => prev.filter((_, i) => i !== potionIdx));
     setShowDefeated(false);
     setDefeatPending(false);
+    const text = t("combat.defeatedRescue", { heal });
     setMessages(prev => [...prev, {
       role: "assistant",
-      content: `🧪 Последним усилием ты выпиваешь зелье. +${heal} HP. Ты снова в строю.`,
-      parsed: parseDMResponse(`🧪 Последним усилием ты выпиваешь зелье. +${heal} HP. Ты снова в строю.`),
+      content: text,
+      parsed: parseDMResponse(text),
     }]);
   }
 
-  // Начать бой заново — восстанавливаем снапшот
+  // Restart the fight — restore the snapshot
   function handleDefeatedRetry() {
     const snap = combatStartSnapshotRef.current;
     const { character: c } = stateRef.current;
@@ -1562,7 +1605,7 @@ export default function SoloDnD() {
       setDefeatPending(false);
       return;
     }
-    // Сначала очищаем (фикс: иначе двоятся враги/союзники), потом восстанавливаем в следующем тике
+    // Clear first (fix: otherwise enemies/allies double up), then restore in the next tick
     setEnemies([]);
     setAllies([]);
     setShowDefeated(false);
@@ -1580,7 +1623,7 @@ export default function SoloDnD() {
       setEnemies(snap.enemies.map(e => ({ ...e, hp: e.maxHp })));
       setAllies(snap.allies ? snap.allies.map(a => ({ ...a })) : []);
       setInCombat(true);
-      void handleChoice(`[Игрок начинает бой заново — то же столкновение, исходные HP]`);
+      void handleChoice(i18n.t("system.retryCombat"));
     }, 0);
   }
 
@@ -1591,10 +1634,11 @@ export default function SoloDnD() {
     const newHp = Math.min(c.maxHp, h + heal);
     setHp(newHp);
     setShowInventory(false);
+    const text = t("combat.shortRestNarrative", { heal, hp: newHp, max: c.maxHp });
     setMessages(prev => [...prev, {
       role: "assistant",
-      content: `✦ Короткий отдых. Восстановлено ${heal} HP. (${newHp}/${c.maxHp})`,
-      parsed: parseDMResponse(`✦ Короткий отдых. Восстановлено ${heal} HP. (${newHp}/${c.maxHp})`)
+      content: text,
+      parsed: parseDMResponse(text),
     }]);
   }
 
@@ -1606,14 +1650,15 @@ export default function SoloDnD() {
     setBerserkChargesLeft(0);
     setBerserkUsedThisCombat(false);
     setShowInventory(false);
+    const text = t("combat.longRestNarrative");
     setMessages(prev => [...prev, {
       role: "assistant",
-      content: `✦ Длинный отдых. HP и слоты полностью восстановлены.`,
-      parsed: parseDMResponse(`✦ Длинный отдых. HP и слоты полностью восстановлены.`)
+      content: text,
+      parsed: parseDMResponse(text),
     }]);
   }
 
-  // ── Боевые действия ───────────────────────────────────────────
+  // ── Combat actions ────────────────────────────────────────────
   async function handleAttack(targetName?: string) {
     const { character: ch, enemies: en, berserkChargesLeft: bcl } = stateRef.current;
     if (!ch) return;
@@ -1639,19 +1684,19 @@ export default function SoloDnD() {
     setBerserkUsedThisCombat(true);
     setDefensiveStance(false);
     setDidDodgeLastTurn(false);
-    setEffects(prev => [...prev, "Берсерк: +2 урон / -2 AC (2 хода)"]);
-    await handleChoice(`[Активирован Берсерк: +2 к урону и -2 AC на 2 хода]`);
+    setEffects(prev => [...prev, t("combat.berserkEffect")]);
+    await handleChoice(i18n.t("system.berserkActivated"));
   }
 
   async function handleDefend() {
     setDefensiveStance(true);
     setDidDodgeLastTurn(false);
-    await handleChoice(`[Занята оборона: +2 AC до следующего хода]`);
+    await handleChoice(i18n.t("system.defendStance"));
   }
 
   async function handleDodge() {
     setDidDodgeLastTurn(true);
-    await handleChoice(`[Уклонение: враг атакует с помехой (два броска, меньший результат)]`);
+    await handleChoice(i18n.t("system.dodge"));
   }
 
   async function handleSpell(s: Spell) {
@@ -1665,7 +1710,7 @@ export default function SoloDnD() {
     setDidDodgeLastTurn(false);
 
     if (s.type === "attack") {
-      // Огненный болт — атака со слотом, авто-бросок
+      // Fire Bolt — slot-based attack, auto-roll
       const statKey: Stat = s.stat ?? "int";
       const mod = ch.stats[statKey] || 0;
       const target = en.find(e => e.hp > 0);
@@ -1673,26 +1718,21 @@ export default function SoloDnD() {
       await executeAttackRoll({ weapon: s.name, dice: s.dice ?? "d10", mod, ac, targetName: target?.name });
       return;
     }
-    if (s.name === "Магическая стрела") {
-      const dmg = rollDice(4) + rollDice(4) + rollDice(4) + 3;
-      await handleChoice(`[Магическая стрела: ${dmg} гарантированного урона → напиши [ВРАГ_УРОН: Имя, ${dmg}]]`);
-      return;
-    }
     if (s.type === "defense") {
-      await handleChoice(`[Применён Щит: +5 AC до следующего хода]`);
+      await handleChoice(i18n.t("system.shieldCast"));
       return;
     }
-    if (s.type === "control" && s.name === "Усыпление") {
-      // Механика пула: 5d8. DM сам распределяет на врагов от слабого к сильному.
+    if (s.type === "control" && s.id === "sleep") {
+      // Pool mechanic: 5d8. The DM distributes across enemies from weakest to strongest.
       const pool = rollDice(8) + rollDice(8) + rollDice(8) + rollDice(8) + rollDice(8);
-      await handleChoice(`[Усыпление: пул ${pool} HP. Засыпают живые враги начиная с наименьшего HP пока пул не иссякнет (вычитай HP уснувшего из пула). Нежить, конструкты и демоны иммунны. Для каждого уснувшего напиши [ЭФФЕКТ: <Имя_врага>_спит, 2 раунда]. Спящие беспомощны но живы — спроси игрока что делать с каждым (добить, связать, допросить, обыскать) — это уже не активный бой со спящими, дай 3 варианта.]`);
+      await handleChoice(i18n.t("system.sleepCast", { pool }));
       return;
     }
     if (s.type === "control") {
-      await handleChoice(`[Применено заклинание контроля: ${s.name}. Spell Save DC 14.]`);
+      await handleChoice(i18n.t("system.controlSpellCast", { name: s.name }));
       return;
     }
-    await handleChoice(`[Применено: ${s.name}]`);
+    await handleChoice(i18n.t("system.spellCast", { name: s.name }));
   }
 
   function exitToMenu() {
@@ -1731,13 +1771,31 @@ export default function SoloDnD() {
       const reply = await callAPI(c, h, inv, eff, [], prompt);
       await processAndSetMessages(c, h, inv, eff, [], reply, []);
     } catch {
-      setMessages([{ role: "assistant", content: "Ошибка.", parsed: parseDMResponse("Ошибка.") }]);
+      const text = t("dm.genericError");
+      setMessages([{ role: "assistant", content: text, parsed: parseDMResponse(text) }]);
     }
     setLoading(false);
   }
 
+  // Language switch confirmation: only intercept if the user is in a game
+  // session (we have a character + at least one DM message), otherwise let
+  // the switch happen immediately.
+  function handleLanguageBeforeChange(next: "en" | "ru"): Promise<boolean> {
+    const inSession = stateRef.current.character !== null && stateRef.current.messages.length > 0;
+    if (!inSession) return Promise.resolve(true);
+    return new Promise<boolean>((resolve) => {
+      setPendingLanguageSwitch({ next, resolve });
+    });
+  }
+
+  function resolveLanguageSwitch(ok: boolean) {
+    if (!pendingLanguageSwitch) return;
+    pendingLanguageSwitch.resolve(ok);
+    setPendingLanguageSwitch(null);
+  }
+
   // ─────────────────────────────────────────────────────────────
-  // ЭКРАН ВЫБОРА
+  // SELECT SCREEN
   // ─────────────────────────────────────────────────────────────
   if (screen === "select") {
     return (
@@ -1753,7 +1811,7 @@ export default function SoloDnD() {
         </div>
         <div className="px-4 pb-8 flex flex-col gap-3 max-w-md mx-auto w-full">
           <p className="text-stone-500 text-xs text-center mb-1 tracking-wide uppercase">{t("menu.chooseHero")}</p>
-          {CHARACTERS.map(char => (
+          {characters.map(char => (
             <CharacterCard key={char.id} char={char} selected={selectedChar?.id === char.id} onSelect={setSelectedChar} />
           ))}
           <button
@@ -1774,14 +1832,14 @@ export default function SoloDnD() {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // ИГРОВОЙ ЭКРАН
+  // GAME SCREEN
   // ─────────────────────────────────────────────────────────────
   const lastMsg = messages[messages.length - 1];
   const parsed = lastMsg?.parsed;
-  // Поражение зафиксировано (HP=0). При закрытом окне поражения вместо
-  // боевых кнопок показываем «Заново / Меню», чтобы игрок мог либо
-  // перечитать журнал, либо продолжить.
-  const hasPotion = inventory.some(i => i.toLowerCase().includes("зелье"));
+  // Defeat is registered (HP=0). When the defeat screen is closed, we show
+  // "Retry / Menu" instead of combat buttons so the player can re-read the
+  // journal or continue.
+  const hasPotion = inventory.some(isPotion);
   const showDefeatActions = defeatPending && !showDefeated && !loading;
   const showCombatButtons = !loading && !freeInput && !pendingRoll && !pendingInitiative && !showDefeated && !defeatPending && inCombat && !!character;
   const showChoices = !loading && !freeInput && !pendingRoll && !pendingInitiative && !showDefeated && !defeatPending && !inCombat && (parsed?.choices?.length ?? 0) > 0;
@@ -1810,10 +1868,10 @@ export default function SoloDnD() {
           onClose={() => setShowSpells(false)}
         />
       )}
-      {showDev && <DevPanel onJump={jumpToScene} onClose={() => setShowDev(false)} />}
+      {showDev && <DevPanel scenes={devScenes} onJump={jumpToScene} onClose={() => setShowDev(false)} />}
       {showDefeated && (
         <DefeatedScreen
-          hasPotion={inventory.some(i => i.toLowerCase().includes("зелье"))}
+          hasPotion={inventory.some(isPotion)}
           onUsePotion={handleDefeatedUsePotion}
           onRetry={handleDefeatedRetry}
           onMenu={() => { setShowDefeated(false); setDefeatPending(false); exitToMenu(); }}
@@ -1821,11 +1879,40 @@ export default function SoloDnD() {
         />
       )}
 
+      {pendingLanguageSwitch && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center px-4" style={{ background: "rgba(0,0,0,0.85)" }}>
+          <div className="max-w-sm w-full bg-stone-900 border border-stone-700 rounded-2xl p-6">
+            <div className="text-amber-200 font-bold text-lg mb-2" style={{ fontFamily: "serif" }}>
+              {t("language.switchDuringGame.title")}
+            </div>
+            <div className="text-stone-400 text-sm leading-relaxed mb-5">
+              {t("language.switchDuringGame.body")}
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => resolveLanguageSwitch(false)}
+                className="flex-1 py-2.5 rounded-xl border border-stone-700 bg-stone-800 text-stone-300 text-sm font-bold transition-colors hover:text-stone-100"
+                style={{ fontFamily: "serif" }}
+              >
+                {t("language.switchDuringGame.cancel")}
+              </button>
+              <button
+                onClick={() => resolveLanguageSwitch(true)}
+                className="flex-[2] py-2.5 rounded-xl font-bold text-sm text-stone-900 transition-transform active:scale-95"
+                style={{ background: "linear-gradient(135deg,#d97706,#92400e)", fontFamily: "serif" }}
+              >
+                {t("language.switchDuringGame.confirm")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="sticky top-0 z-20 border-b border-stone-800/60 backdrop-blur" style={{ background: "rgba(12,10,9,0.93)" }}>
         <div className="flex items-center justify-between px-4 py-2.5 gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <button onClick={exitToMenu} className="text-stone-500 text-sm hover:text-stone-300 transition-colors whitespace-nowrap">← {t("common.menu")}</button>
-            <LanguageSwitcher />
+            <LanguageSwitcher onBeforeChange={handleLanguageBeforeChange} />
           </div>
 
           <div className="text-center cursor-pointer select-none" onClick={handleDevTap}>
@@ -1834,7 +1921,7 @@ export default function SoloDnD() {
               onClick={e => { e.stopPropagation(); setShowInventory(true); }}
               className="text-stone-500 text-xs hover:text-amber-400 transition-colors"
             >
-              🎒 {inventory.length} предм.
+              🎒 {t("header.items", { count: inventory.length })}
             </button>
           </div>
 
@@ -1844,13 +1931,13 @@ export default function SoloDnD() {
                 onClick={() => setShowSpells(true)}
                 className="text-sm tracking-widest hover:opacity-80 transition-opacity"
                 style={{ color: "#60a5fa", fontFamily: "serif" }}
-                title={`Слоты заклинаний: ${spellSlots.current}/${spellSlots.max}`}
+                title={t("header.spellSlotsTitle", { current: spellSlots.current, max: spellSlots.max })}
               >
                 {Array.from({ length: spellSlots.max }, (_, i) => i < spellSlots.current ? "✦" : "◇").join("")}
               </button>
             )}
             <div className="flex items-center gap-1.5">
-              <div className="text-xs text-stone-500">HP</div>
+              <div className="text-xs text-stone-500">{t("stats.hp")}</div>
               <div className="font-bold text-sm" style={{ color: character && hp / character.maxHp > 0.5 ? "#f87171" : character && hp / character.maxHp > 0.25 ? "#fbbf24" : "#ef4444" }}>{hp}</div>
               <div className="text-stone-600 text-xs">/{character?.maxHp}</div>
             </div>
@@ -1903,12 +1990,12 @@ export default function SoloDnD() {
                 <p className="text-amber-100/90 text-sm leading-relaxed whitespace-pre-line" style={{ fontFamily: "serif", overflowWrap: "break-word", wordBreak: "break-word" }}>
                   {p.narrative}
                 </p>
-                {p.newItem && <div className="mt-2 text-xs text-amber-500">✦ Получен: {p.newItem}</div>}
+                {p.newItem && <div className="mt-2 text-xs text-amber-500">✦ {t("dm.receivedItem", { item: p.newItem })}</div>}
               </div>
               {p.damage ? (
                 <div className="flex justify-end">
                   <div className="rounded-xl border border-red-900/40 bg-stone-950/80 px-3 py-1.5 text-xs text-red-400 font-mono">
-                    ⚡ Урон игроку: −{p.damage} HP
+                    ⚡ {t("combat.damageToPlayer", { amount: p.damage })}
                   </div>
                 </div>
               ) : null}
@@ -1923,7 +2010,7 @@ export default function SoloDnD() {
         {loading && (
           <div className="bg-stone-900/60 rounded-2xl rounded-tl-sm px-4 py-4 border border-stone-800/40">
             <div className="flex gap-1.5 items-center">
-              <div className="text-amber-600 text-xs tracking-widest">Мастер думает</div>
+              <div className="text-amber-600 text-xs tracking-widest">{t("dm.thinking")}</div>
               {[0, 1, 2].map(i => (
                 <span key={i} className="w-1 h-1 bg-amber-600 rounded-full animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
               ))}
@@ -1938,24 +2025,24 @@ export default function SoloDnD() {
           {showDefeatActions && (
             <>
               <div className="text-center text-xs text-stone-500 pb-1" style={{ fontFamily: "serif" }}>
-                💀 Ты повержен
+                {t("defeated.footer")}
               </div>
               {hasPotion && (
                 <button onClick={handleDefeatedUsePotion}
                   className="w-full py-3 rounded-xl font-bold text-stone-900"
                   style={{ background: "linear-gradient(135deg,#d97706,#92400e)", fontFamily: "serif" }}>
-                  🧪 Выпить зелье лечения
+                  🧪 {t("defeated.drinkPotion")}
                 </button>
               )}
               <button onClick={handleDefeatedRetry}
                 className="w-full py-3 rounded-xl border border-stone-600 bg-stone-800 text-amber-100 font-bold"
                 style={{ fontFamily: "serif" }}>
-                ⚔️ Начать бой заново
+                ⚔️ {t("defeated.retry")}
               </button>
               <button onClick={() => { setDefeatPending(false); exitToMenu(); }}
                 className="w-full py-3 rounded-xl border border-stone-700 bg-stone-900 text-stone-400 text-sm"
                 style={{ fontFamily: "serif" }}>
-                ← Вернуться в меню
+                ← {t("defeated.returnToMenu")}
               </button>
             </>
           )}
@@ -1978,7 +2065,7 @@ export default function SoloDnD() {
                 }}
                 onSpecial={() => {
                   if (character.id === "warrior") void handleBerserk();
-                  else if (character.id === "rogue") void handleAttack(); // скрытая = атака после уклонения
+                  else if (character.id === "rogue") void handleAttack(); // sneak = attack after dodge
                   else if (character.id === "mage") setShowSpellMini(v => !v);
                 }}
                 onDefend={() => {
@@ -1994,7 +2081,7 @@ export default function SoloDnD() {
               />
               {selectingTarget && (
                 <div className="space-y-1 pl-2 border-l-2 border-amber-900/60">
-                  <div className="text-xs text-stone-500 px-2">Выбери цель:</div>
+                  <div className="text-xs text-stone-500 px-2">{t("combat.selectTarget")}</div>
                   {enemies.filter(e => e.hp > 0).map((en, i) => (
                     <button key={i}
                       onClick={() => { setSelectingTarget(false); void handleAttack(en.name); }}
@@ -2006,7 +2093,7 @@ export default function SoloDnD() {
                   ))}
                   <button onClick={() => setSelectingTarget(false)}
                     className="w-full text-center px-3 py-1.5 text-xs text-stone-500 hover:text-stone-300 transition-colors">
-                    Отмена
+                    {t("common.cancel")}
                   </button>
                 </div>
               )}
@@ -2016,7 +2103,7 @@ export default function SoloDnD() {
           {showChoices && parsed && (
             <>
               {parsed.choices
-                .filter(choice => !/свой\s*вариант/i.test(choice.text))
+                .filter(choice => !/free\s*(choice|action)|свой\s*вариант/i.test(choice.text))
                 .map((choice, i) => (
                 <button key={i} onClick={() => handleChoice(choice.text)}
                   className="w-full text-left px-4 py-3 rounded-xl border border-stone-700 bg-stone-900/95 text-amber-100 text-sm leading-snug transition-all active:scale-[0.98] hover:border-amber-700/50 hover:bg-stone-800"
@@ -2033,7 +2120,7 @@ export default function SoloDnD() {
               }}
                 className="w-full text-left px-4 py-3 rounded-xl border border-stone-800 bg-stone-950/90 text-stone-400 text-sm transition-all active:scale-[0.98] hover:border-stone-600 hover:text-stone-300"
                 style={{ fontFamily: "serif" }}>
-                <span className="text-stone-600 mr-2">✍</span>Свой вариант...
+                <span className="text-stone-600 mr-2">✍</span>{t("dm.freeChoiceLabel")}
               </button>
             </>
           )}
@@ -2048,7 +2135,7 @@ export default function SoloDnD() {
               <div className="flex gap-2">
                 <button onClick={() => { setFreeInput(false); setFreeText(""); }}
                   className="flex-1 py-2.5 rounded-xl border border-stone-700 bg-stone-900 text-stone-400 text-sm hover:text-stone-300 transition-colors">
-                  Отмена
+                  {t("common.cancel")}
                 </button>
                 <button onClick={() => freeText.trim() && handleChoice(freeText.trim())}
                   disabled={!freeText.trim()}
@@ -2057,7 +2144,7 @@ export default function SoloDnD() {
                     background: freeText.trim() ? "linear-gradient(135deg,#d97706,#92400e)" : "#292524",
                     color: freeText.trim() ? "#0c0a09" : "#57534e"
                   }}>
-                  Действовать
+                  {t("common.act")}
                 </button>
               </div>
             </>
