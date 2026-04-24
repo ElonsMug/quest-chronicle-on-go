@@ -1141,10 +1141,10 @@ export default function SoloDnD() {
   // (loading=false), and give the player ~2.2s to read the last message,
   // only then show the "You are defeated" screen.
   useEffect(() => {
-    if (!defeatPending || loading || showDefeated) return;
+    if (!defeatPending || loading || showDefeated || defeatDismissed) return;
     const timer = setTimeout(() => setShowDefeated(true), 2200);
     return () => clearTimeout(timer);
-  }, [defeatPending, loading, showDefeated, messages]);
+  }, [defeatPending, loading, showDefeated, defeatDismissed, messages]);
 
   // ── Save (localStorage, SSR-safe) ─────────────────────────────
   function doSave(char: Character, currentHp: number, currentInv: string[], currentEff: string[], msgs: ChatMessage[]) {
