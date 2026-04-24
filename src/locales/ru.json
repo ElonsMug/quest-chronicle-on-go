@@ -7,7 +7,10 @@
     "continue": "Продолжить",
     "back": "Назад",
     "loading": "Загрузка...",
-    "error": "Ошибка"
+    "error": "Ошибка",
+    "ok": "OK",
+    "use": "Использовать",
+    "act": "Действовать"
   },
   "language": {
     "label": "Язык",
@@ -28,5 +31,207 @@
     "chooseHero": "Выбери своего героя",
     "startAs": "Начать за {{name}}",
     "selectCharacter": "Выбери персонажа"
+  },
+  "stats": {
+    "str": "СИЛ",
+    "dex": "ЛОВ",
+    "int": "ИНТ",
+    "hp": "HP"
+  },
+  "characters": {
+    "warrior": {
+      "name": "Воин",
+      "subtitle": "Закалённый боец",
+      "ability": "Берсерк",
+      "abilityDesc": "Раз в бой: +2 урон / -2 AC на 2 хода",
+      "weapon": "Меч",
+      "backstory": "Бывший наёмник из Серого Берега. Ты видел войны и предательства, но меч не бросил.",
+      "items": {
+        "shortSword": "Короткий меч",
+        "leatherArmor": "Кожаный доспех",
+        "healingPotion": "Зелье лечения (d6+2 HP)"
+      }
+    },
+    "rogue": {
+      "name": "Плут",
+      "subtitle": "Теневой клинок",
+      "ability": "Скрытая атака",
+      "abilityDesc": "+d6 урона после уклонения",
+      "weapon": "Кинжал",
+      "backstory": "Сирота с городских улиц. Ты вырос в переулках и знаешь каждую тень портового квартала.",
+      "items": {
+        "dagger": "Кинжал",
+        "lockpicks": "Отмычки",
+        "healingPotion": "Зелье лечения (d6+2 HP)"
+      }
+    },
+    "mage": {
+      "name": "Маг",
+      "subtitle": "Изгнанник Академии",
+      "ability": "Заклинания",
+      "abilityDesc": "3 слота в день",
+      "weapon": "Посох",
+      "backstory": "Отчисленный студент Академии Серых Магов. Тебе запретили практиковать — ты практикуешь.",
+      "items": {
+        "staff": "Посох",
+        "healingPotion": "Зелье лечения (d6+2 HP)",
+        "fireBoltScroll": "Свиток Огненного Болта"
+      },
+      "spells": {
+        "fireBolt": {
+          "name": "Огненный болт",
+          "description": "d10+INT урон"
+        },
+        "shield": {
+          "name": "Щит",
+          "description": "+5 AC до следующего хода"
+        },
+        "sleep": {
+          "name": "Усыпление",
+          "description": "Бросаем 5d8 пул HP. Засыпают враги от слабых к сильным пока пул не иссякнет. Нежить — иммунны."
+        }
+      }
+    }
+  },
+  "header": {
+    "items": "{{count}} предм.",
+    "spellSlotsTitle": "Слоты заклинаний: {{current}}/{{max}}"
+  },
+  "inventory": {
+    "title": "Инвентарь",
+    "empty": "Пусто",
+    "activeEffects": "Активные эффекты",
+    "rest": "Отдых",
+    "shortRest": "Короткий отдых",
+    "shortRestSubtitle": "Восстановить d6 HP · Слоты не вернутся",
+    "longRest": "Длинный отдых",
+    "longRestSubtitle": "Полное HP · Все слоты заклинаний",
+    "noRestInCombat": "Нельзя отдыхать в бою",
+    "potionInCombatHint": "Зелье можно выпить только в свой ход — перед основным действием"
+  },
+  "spells": {
+    "title": "Заклинания",
+    "subhead": "Заклинания (1 слот)",
+    "cast": "Применить",
+    "noSlots": "Нет слотов"
+  },
+  "combat": {
+    "attack": "Атака",
+    "berserk": "Берсерк",
+    "berserkUsed": "Использован в этом бою",
+    "berserkSubtitle": "+2 урон / -2 AC на 2 хода",
+    "sneak": "Скрытая",
+    "sneakSubtitle": "Доступна после уклонения",
+    "sneakBonus": "+d6 урона",
+    "spell": "Заклинание",
+    "noSpellSlots": "Нет слотов",
+    "defend": "Оборона",
+    "defendSubtitle": "+2 AC до следующего хода",
+    "dodge": "Уклон",
+    "dodgeSubtitle": "Враг бьёт с помехой",
+    "freeAction": "Своё...",
+    "freeActionLong": "Свой вариант…",
+    "selectTarget": "Выбери цель:",
+    "attackWithWeapon": "Атаковать ({{weapon}} {{dice}})",
+    "attackLabel": "Атака",
+    "rollLabel": "Проверка",
+    "rollDie": "Бросить d20",
+    "rollInitiative": "Бросить инициативу",
+    "initiative": "Инициатива",
+    "initiativeFooter": "Инициатива: ты {{player}} / враг {{enemy}} → {{result}}",
+    "initiativeYouFirst": "Ты первый",
+    "initiativeEnemyFirst": "Враг первый",
+    "youAreFirst": "✦ Ты действуешь первым!",
+    "enemyIsFirst": "✦ Враг атакует первым!",
+    "you": "Ты",
+    "enemy": "Враг",
+    "vs": "vs",
+    "hit": "ПОПАЛ",
+    "miss": "МИМО",
+    "crit": "КРИТ",
+    "autoMiss": "АВТОПРОМАХ",
+    "success": "УСПЕХ",
+    "fail": "ПРОВАЛ",
+    "damage": "Урон",
+    "damageToPlayer": "Урон игроку: −{{amount}} HP",
+    "potionUsed": "🧪 Ты выпиваешь зелье. +{{heal}} HP. ({{hp}}/{{max}}) — теперь выбери основное действие.",
+    "potionUsedNarrative": "✦ Бонусное действие: ты выпиваешь зелье лечения. +{{heal}} HP. ({{hp}}/{{max}}). Теперь выбери основное действие.",
+    "potionOutOfCombat": "Зелье выпито. +{{heal}} HP. ({{hp}}/{{max}})",
+    "potionOutOfCombatNarrative": "✦ Ты выпиваешь зелье лечения. Тёплая волна прокатывается по телу. +{{heal}} HP. ({{hp}}/{{max}})",
+    "shortRestNarrative": "✦ Короткий отдых. Восстановлено {{heal}} HP. ({{hp}}/{{max}})",
+    "longRestNarrative": "✦ Длинный отдых. HP и слоты полностью восстановлены.",
+    "berserkEffect": "Берсерк: +2 урон / -2 AC (2 хода)",
+    "defeatedRescue": "🧪 Последним усилием ты выпиваешь зелье. +{{heal}} HP. Ты снова в строю."
+  },
+  "defeated": {
+    "title": "Ты повержен",
+    "subtitle": "Силы покидают тебя. Тьма смыкается...",
+    "drinkPotion": "Выпить зелье лечения",
+    "retry": "Начать бой заново",
+    "returnToMenu": "Вернуться в меню",
+    "closeAria": "Закрыть",
+    "closeTitle": "Закрыть и перечитать журнал",
+    "footer": "💀 Ты повержен"
+  },
+  "free": {
+    "placeholders": [
+      "Прыгнуть со стола на врага...",
+      "Схватить факел и поджечь занавески...",
+      "Попытаться договориться с главарём...",
+      "Кинуть горсть пыли в глаза...",
+      "Опрокинуть стол как щит...",
+      "Крикнуть чтобы отвлечь внимание..."
+    ]
+  },
+  "dev": {
+    "title": "Dev Mode",
+    "subtitle": "Телепортирует в сцену без прохождения пути",
+    "scenes": {
+      "tavern": "🍺 Таверна",
+      "combat": "⚔️ Бой",
+      "social": "🗣️ Допрос NPC",
+      "mystery": "🔍 Тайна",
+      "magic": "✨ Магический ивент",
+      "boss": "💀 Финальный босс"
+    }
+  },
+  "dm": {
+    "thinking": "Мастер думает",
+    "silent": "Мастер молчит...",
+    "connectionError": "Ошибка соединения с Мастером.",
+    "connectionLost": "Связь прервалась.",
+    "genericError": "Ошибка.",
+    "receivedItem": "Получен: {{item}}",
+    "startPrompt": "Начни приключение. Вводная сцена в Сером Берегу. 3 варианта действий.",
+    "freeChoiceLabel": "Свой вариант...",
+    "scenes": {
+      "tavern": "Начни сцену: игрок в таверне «Сломанный якорь». Незнакомец предлагает задание. 3 варианта.",
+      "combat": "Начни боевую сцену: на игрока нападают 2 бандита в переулке. Используй [ENEMY: Бандит, HP:8] для каждого. Объяви [INITIATIVE]. Дай варианты: атаковать, уклониться, свой.",
+      "social": "Начни допрос: игрок допрашивает пойманного вора. NPC скрывает что-то важное. 3 варианта.",
+      "mystery": "Начни сцену: игрок обнаруживает труп в порту. Улики вокруг. 3 варианта.",
+      "magic": "Начни сцену: над городом вспыхивает магическая аномалия. 3 варианта реакции.",
+      "boss": "Начни финальную сцену: игрок встречает Архимага Сейдра. Используй [ENEMY: Архимаг Сейдр, HP:24]. Напряжённый момент. 3 варианта."
+    }
+  },
+  "system": {
+    "potionBonusAction": "[Bonus action before main attack: the player drinks a healing potion, +{{heal}} HP ({{hp}}/{{max}}). Describe the gulp of the potion in ONE sentence, then immediately describe the player's main action described below.]",
+    "combatTurnReminder": "[SYSTEM RULE: After describing the result of the player's action — enemies MUST attack in the same response. Each living enemy makes one attack. Use [DAMAGE: X] for each hit. Do not wait for the next player turn. Do not offer choices 1-2-3.]",
+    "berserkActivated": "[Berserk activated: +2 damage and -2 AC for 2 turns]",
+    "defendStance": "[Defensive stance: +2 AC until next turn]",
+    "dodge": "[Dodge: enemy attacks at disadvantage (two rolls, take the lower)]",
+    "shieldCast": "[Shield cast: +5 AC until next turn]",
+    "magicMissile": "[Magic Missile: {{damage}} guaranteed damage → write [ENEMY_DAMAGE: Name, {{damage}}]]",
+    "sleepCast": "[Sleep: pool of {{pool}} HP. Living enemies fall asleep starting from the lowest HP until the pool runs out (subtract sleeping enemy's HP from the pool). Undead, constructs and demons are immune. For each sleeping enemy write [EFFECT: <Enemy_name>_asleep, 2 rounds]. The sleepers are helpless but alive — ask the player what to do with each (finish, bind, interrogate, search) — this is no longer active combat with sleepers, give 3 choices.]",
+    "controlSpellCast": "[Control spell cast: {{name}}. Spell Save DC 14.]",
+    "spellCast": "[Cast: {{name}}]",
+    "retryCombat": "[Player restarts the fight — same encounter, original HP]",
+    "initiativeWon": "[Initiative won: you {{player}} vs enemy {{enemy}} — you act first]",
+    "initiativeLost": "[Initiative lost: you {{player}} vs enemy {{enemy}} — enemy attacks first]",
+    "attackAutoMiss": "[Attack: {{weapon}}{{target}} — d20(1) AUTO-MISS vs AC{{ac}}]",
+    "attackCrit": "[Attack: {{weapon}}{{target}} — d20(20) CRIT vs AC{{ac}} → Damage to enemy: {{damage}}. Describe the strike and write [ENEMY_DAMAGE: {{tagName}}, {{damage}}].]",
+    "attackHit": "[Attack: {{weapon}}{{target}} — d20({{roll}})+mod({{mod}})+prof({{prof}})={{total}} vs AC{{ac}} HIT → Damage to enemy: {{damage}}. Describe the strike and write [ENEMY_DAMAGE: {{tagName}}, {{damage}}].]",
+    "attackMiss": "[Attack: {{weapon}}{{target}} — d20({{roll}})+mod({{mod}})+prof({{prof}})={{total}} vs AC{{ac}} MISS]",
+    "rollSuccess": "[Check: {{stat}} — SUCCESS ({{roll}}{{modPart}}={{total}} vs DC{{dc}})]",
+    "rollFail": "[Check: {{stat}} — FAIL ({{roll}}{{modPart}}={{total}} vs DC{{dc}})]"
   }
 }
