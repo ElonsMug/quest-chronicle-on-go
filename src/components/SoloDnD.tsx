@@ -1802,7 +1802,8 @@ export default function SoloDnD() {
           hasPotion={inventory.some(i => i.toLowerCase().includes("зелье"))}
           onUsePotion={handleDefeatedUsePotion}
           onRetry={handleDefeatedRetry}
-          onMenu={() => { setShowDefeated(false); exitToMenu(); }}
+          onMenu={() => { setShowDefeated(false); setDefeatPending(false); exitToMenu(); }}
+          onClose={() => setShowDefeated(false)}
         />
       )}
 
