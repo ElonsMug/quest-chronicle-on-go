@@ -1542,6 +1542,7 @@ export default function SoloDnD() {
     setHp(Math.min(c.maxHp, heal));
     setInventory(prev => prev.filter((_, i) => i !== potionIdx));
     setShowDefeated(false);
+    setDefeatPending(false);
     setMessages(prev => [...prev, {
       role: "assistant",
       content: `🧪 Последним усилием ты выпиваешь зелье. +${heal} HP. Ты снова в строю.`,
