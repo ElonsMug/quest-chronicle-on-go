@@ -1877,8 +1877,8 @@ export default function SoloDnD() {
           hasPotion={inventory.some(isPotion)}
           onUsePotion={handleDefeatedUsePotion}
           onRetry={handleDefeatedRetry}
-          onMenu={() => { setShowDefeated(false); setDefeatPending(false); exitToMenu(); }}
-          onClose={() => setShowDefeated(false)}
+          onMenu={() => { setShowDefeated(false); setDefeatPending(false); setDefeatDismissed(false); exitToMenu(); }}
+          onClose={() => { setShowDefeated(false); setDefeatDismissed(true); }}
         />
       )}
 
