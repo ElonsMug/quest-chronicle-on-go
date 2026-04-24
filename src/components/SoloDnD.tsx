@@ -1193,7 +1193,7 @@ export default function SoloDnD() {
       // Don't show the defeat screen immediately — let the DM finish narrating.
       // We just mark the defeat as "pending"; the effect above will pick up
       // the flag and open the screen with a delay once the DM is done.
-      if (newHp <= 0) setDefeatPending(true);
+      if (newHp <= 0) { setDefeatPending(true); setDefeatDismissed(false); }
     }
 
     if (parsed.newItems?.length) {
