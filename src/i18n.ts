@@ -33,16 +33,29 @@ function readSavedLocale(): Locale {
 }
 
 if (!i18n.isInitialized) {
+  // CRITICAL: initialize with DEFAULT_LOCALE so SSR and the first client
+  // render produce identical HTML. The saved locale is applied right after
+  // hydration in the effect below — a tiny flash is acceptable and avoids
+  // a hydration mismatch crash.
   void i18n.use(initReactI18next).init({
     resources: {
       en: { translation: en },
       ru: { translation: ru },
     },
-    lng: readSavedLocale(),
+    lng: DEFAULT_LOCALE,
     fallbackLng: DEFAULT_LOCALE,
     interpolation: { escapeValue: false },
     returnNull: false,
   });
+
+  // Apply saved locale on the client after init (post-hydration safe).
+  if (typeof window !== "undefined") {
+    const saved = readSavedLocale();
+    if (saved !== DEFAULT_LOCALE) {
+      // Defer to next tick so React has finished its first commit.
+      queueMicrotask(() => void i18n.changeLanguage(saved));
+    }
+  }
 }
 
 export function setLocale(locale: Locale) {
