@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-// Прокси к Anthropic Messages API.
-// Принимает { system: string, messages: [{role, content}] }, возвращает { text: string }.
+// Proxy to the Anthropic Messages API.
+// Accepts { system: string, messages: [{role, content}] }, returns { text: string }.
 export const Route = createFileRoute("/api/dm")({
   // @ts-expect-error - `server` API is supported at runtime by @tanstack/react-start
   // but the route type generated for this version doesn't include it yet.
@@ -36,7 +36,7 @@ export const Route = createFileRoute("/api/dm")({
           );
         }
 
-        // Базовая валидация и нормализация
+        // Basic validation and normalization
         const safeMessages = messages
           .filter(
             (m) =>
@@ -76,7 +76,7 @@ export const Route = createFileRoute("/api/dm")({
           const data = (await res.json()) as {
             content?: Array<{ text?: string }>;
           };
-          const text = data.content?.[0]?.text ?? "Мастер молчит...";
+          const text = data.content?.[0]?.text ?? "The Master is silent...";
 
           return new Response(JSON.stringify({ text }), {
             status: 200,

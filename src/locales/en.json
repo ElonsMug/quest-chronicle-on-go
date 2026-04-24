@@ -7,7 +7,10 @@
     "continue": "Continue",
     "back": "Back",
     "loading": "Loading...",
-    "error": "Error"
+    "error": "Error",
+    "ok": "OK",
+    "use": "Use",
+    "act": "Act"
   },
   "language": {
     "label": "Language",
@@ -16,7 +19,7 @@
     "switchTitle": "Change language",
     "switchDuringGame": {
       "title": "Switch language?",
-      "body": "The menu, inventory and new events will appear in the new language. Messages already written by the Dungeon Master will stay in the current language.",
+      "body": "Menus, inventory and new events will appear in the new language. Messages already written by the Dungeon Master will stay in the current language.",
       "confirm": "Switch",
       "cancel": "Keep current"
     }
@@ -28,5 +31,207 @@
     "chooseHero": "Choose your hero",
     "startAs": "Begin as {{name}}",
     "selectCharacter": "Select a character"
+  },
+  "stats": {
+    "str": "STR",
+    "dex": "DEX",
+    "int": "INT",
+    "hp": "HP"
+  },
+  "characters": {
+    "warrior": {
+      "name": "Warrior",
+      "subtitle": "Hardened Fighter",
+      "ability": "Berserk",
+      "abilityDesc": "Once per fight: +2 damage / -2 AC for 2 turns",
+      "weapon": "Sword",
+      "backstory": "A former mercenary from Grey Shore. You've seen wars and betrayals, but you never put down the blade.",
+      "items": {
+        "shortSword": "Short Sword",
+        "leatherArmor": "Leather Armor",
+        "healingPotion": "Healing Potion (d6+2 HP)"
+      }
+    },
+    "rogue": {
+      "name": "Rogue",
+      "subtitle": "Shadow Blade",
+      "ability": "Sneak Attack",
+      "abilityDesc": "+d6 damage after dodging",
+      "weapon": "Dagger",
+      "backstory": "An orphan from the city streets. You grew up in alleyways and know every shadow of the harbor district.",
+      "items": {
+        "dagger": "Dagger",
+        "lockpicks": "Lockpicks",
+        "healingPotion": "Healing Potion (d6+2 HP)"
+      }
+    },
+    "mage": {
+      "name": "Mage",
+      "subtitle": "Academy Exile",
+      "ability": "Spells",
+      "abilityDesc": "3 slots per day",
+      "weapon": "Staff",
+      "backstory": "An expelled student of the Grey Mages' Academy. They forbade you from practicing — you practice anyway.",
+      "items": {
+        "staff": "Staff",
+        "healingPotion": "Healing Potion (d6+2 HP)",
+        "fireBoltScroll": "Scroll of Fire Bolt"
+      },
+      "spells": {
+        "fireBolt": {
+          "name": "Fire Bolt",
+          "description": "d10+INT damage"
+        },
+        "shield": {
+          "name": "Shield",
+          "description": "+5 AC until your next turn"
+        },
+        "sleep": {
+          "name": "Sleep",
+          "description": "Roll a 5d8 HP pool. Enemies fall asleep from weakest to strongest until the pool runs out. Undead are immune."
+        }
+      }
+    }
+  },
+  "header": {
+    "items": "{{count}} items",
+    "spellSlotsTitle": "Spell slots: {{current}}/{{max}}"
+  },
+  "inventory": {
+    "title": "Inventory",
+    "empty": "Empty",
+    "activeEffects": "Active effects",
+    "rest": "Rest",
+    "shortRest": "Short Rest",
+    "shortRestSubtitle": "Restore d6 HP · Slots not recovered",
+    "longRest": "Long Rest",
+    "longRestSubtitle": "Full HP · All spell slots restored",
+    "noRestInCombat": "Cannot rest during combat",
+    "potionInCombatHint": "A potion can only be drunk on your turn — before your main action"
+  },
+  "spells": {
+    "title": "Spells",
+    "subhead": "Spells (1 slot)",
+    "cast": "Cast",
+    "noSlots": "No slots"
+  },
+  "combat": {
+    "attack": "Attack",
+    "berserk": "Berserk",
+    "berserkUsed": "Used this fight",
+    "berserkSubtitle": "+2 damage / -2 AC for 2 turns",
+    "sneak": "Sneak",
+    "sneakSubtitle": "Available after dodging",
+    "sneakBonus": "+d6 damage",
+    "spell": "Spell",
+    "noSpellSlots": "No slots",
+    "defend": "Defend",
+    "defendSubtitle": "+2 AC until next turn",
+    "dodge": "Dodge",
+    "dodgeSubtitle": "Enemy attacks at disadvantage",
+    "freeAction": "Free...",
+    "freeActionLong": "Free action…",
+    "selectTarget": "Pick a target:",
+    "attackWithWeapon": "Attack ({{weapon}} {{dice}})",
+    "attackLabel": "Attack",
+    "rollLabel": "Check",
+    "rollDie": "Roll d20",
+    "rollInitiative": "Roll initiative",
+    "initiative": "Initiative",
+    "initiativeFooter": "Initiative: you {{player}} / enemy {{enemy}} → {{result}}",
+    "initiativeYouFirst": "You act first",
+    "initiativeEnemyFirst": "Enemy acts first",
+    "youAreFirst": "✦ You act first!",
+    "enemyIsFirst": "✦ Enemy attacks first!",
+    "you": "You",
+    "enemy": "Enemy",
+    "vs": "vs",
+    "hit": "HIT",
+    "miss": "MISS",
+    "crit": "CRIT",
+    "autoMiss": "AUTO-MISS",
+    "success": "SUCCESS",
+    "fail": "FAIL",
+    "damage": "Damage",
+    "damageToPlayer": "Damage to player: −{{amount}} HP",
+    "potionUsed": "You drink the potion. +{{heal}} HP. ({{hp}}/{{max}}) — now choose your main action.",
+    "potionUsedNarrative": "✦ Bonus action: you drink a healing potion. +{{heal}} HP. ({{hp}}/{{max}}). Now choose your main action.",
+    "potionOutOfCombat": "Potion drunk. +{{heal}} HP. ({{hp}}/{{max}})",
+    "potionOutOfCombatNarrative": "✦ You drink a healing potion. A warm wave rolls through your body. +{{heal}} HP. ({{hp}}/{{max}})",
+    "shortRestNarrative": "✦ Short rest. Restored {{heal}} HP. ({{hp}}/{{max}})",
+    "longRestNarrative": "✦ Long rest. HP and spell slots fully restored.",
+    "berserkEffect": "Berserk: +2 damage / -2 AC (2 turns)",
+    "defeatedRescue": "🧪 With your last effort, you drink the potion. +{{heal}} HP. You are back on your feet."
+  },
+  "defeated": {
+    "title": "You are defeated",
+    "subtitle": "Your strength fails you. The darkness closes in...",
+    "drinkPotion": "Drink healing potion",
+    "retry": "Restart the fight",
+    "returnToMenu": "Return to menu",
+    "closeAria": "Close",
+    "closeTitle": "Close and re-read the journal",
+    "footer": "💀 You are defeated"
+  },
+  "free": {
+    "placeholders": [
+      "Leap from the table onto your foe...",
+      "Grab a torch and set the curtains ablaze...",
+      "Try to reason with the leader...",
+      "Throw a handful of dust in their eyes...",
+      "Tip the table over as a shield...",
+      "Shout to draw their attention..."
+    ]
+  },
+  "dev": {
+    "title": "Dev Mode",
+    "subtitle": "Teleports into a scene without playing through",
+    "scenes": {
+      "tavern": "🍺 Tavern",
+      "combat": "⚔️ Combat",
+      "social": "🗣️ NPC Interrogation",
+      "mystery": "🔍 Mystery",
+      "magic": "✨ Magic Event",
+      "boss": "💀 Final Boss"
+    }
+  },
+  "dm": {
+    "thinking": "The Master is thinking",
+    "silent": "The Master is silent...",
+    "connectionError": "Connection to the Master failed.",
+    "connectionLost": "Connection lost.",
+    "genericError": "Error.",
+    "receivedItem": "Received: {{item}}",
+    "startPrompt": "Begin the adventure. An opening scene in Grey Shore. 3 action choices.",
+    "freeChoiceLabel": "Free choice...",
+    "scenes": {
+      "tavern": "Begin a scene: the player is in the \"Broken Anchor\" tavern. A stranger offers them a job. 3 choices.",
+      "combat": "Begin a combat scene: 2 bandits ambush the player in an alley. Use [ENEMY: Bandit, HP:8] for each. Announce [INITIATIVE]. Offer choices: attack, dodge, free action.",
+      "social": "Begin an interrogation: the player questions a captured thief. The NPC is hiding something important. 3 choices.",
+      "mystery": "Begin a scene: the player discovers a corpse at the docks. Clues lie around. 3 choices.",
+      "magic": "Begin a scene: a magical anomaly flares up over the city. 3 reaction choices.",
+      "boss": "Begin the final scene: the player faces Archmage Seydra. Use [ENEMY: Archmage Seydra, HP:24]. A tense moment. 3 choices."
+    }
+  },
+  "system": {
+    "potionBonusAction": "[Bonus action before main attack: the player drinks a healing potion, +{{heal}} HP ({{hp}}/{{max}}). Describe the gulp of the potion in ONE sentence, then immediately describe the player's main action described below.]",
+    "combatTurnReminder": "[SYSTEM RULE: After describing the result of the player's action — enemies MUST attack in the same response. Each living enemy makes one attack. Use [DAMAGE: X] for each hit. Do not wait for the next player turn. Do not offer choices 1-2-3.]",
+    "berserkActivated": "[Berserk activated: +2 damage and -2 AC for 2 turns]",
+    "defendStance": "[Defensive stance: +2 AC until next turn]",
+    "dodge": "[Dodge: enemy attacks at disadvantage (two rolls, take the lower)]",
+    "shieldCast": "[Shield cast: +5 AC until next turn]",
+    "magicMissile": "[Magic Missile: {{damage}} guaranteed damage → write [ENEMY_DAMAGE: Name, {{damage}}]]",
+    "sleepCast": "[Sleep: pool of {{pool}} HP. Living enemies fall asleep starting from the lowest HP until the pool runs out (subtract sleeping enemy's HP from the pool). Undead, constructs and demons are immune. For each sleeping enemy write [EFFECT: <Enemy_name>_asleep, 2 rounds]. The sleepers are helpless but alive — ask the player what to do with each (finish, bind, interrogate, search) — this is no longer active combat with sleepers, give 3 choices.]",
+    "controlSpellCast": "[Control spell cast: {{name}}. Spell Save DC 14.]",
+    "spellCast": "[Cast: {{name}}]",
+    "retryCombat": "[Player restarts the fight — same encounter, original HP]",
+    "initiativeWon": "[Initiative won: you {{player}} vs enemy {{enemy}} — you act first]",
+    "initiativeLost": "[Initiative lost: you {{player}} vs enemy {{enemy}} — enemy attacks first]",
+    "attackAutoMiss": "[Attack: {{weapon}}{{target}} — d20(1) AUTO-MISS vs AC{{ac}}]",
+    "attackCrit": "[Attack: {{weapon}}{{target}} — d20(20) CRIT vs AC{{ac}} → Damage to enemy: {{damage}}. Describe the strike and write [ENEMY_DAMAGE: {{tagName}}, {{damage}}].]",
+    "attackHit": "[Attack: {{weapon}}{{target}} — d20({{roll}})+mod({{mod}})+prof({{prof}})={{total}} vs AC{{ac}} HIT → Damage to enemy: {{damage}}. Describe the strike and write [ENEMY_DAMAGE: {{tagName}}, {{damage}}].]",
+    "attackMiss": "[Attack: {{weapon}}{{target}} — d20({{roll}})+mod({{mod}})+prof({{prof}})={{total}} vs AC{{ac}} MISS]",
+    "rollSuccess": "[Check: {{stat}} — SUCCESS ({{roll}}{{modPart}}={{total}} vs DC{{dc}})]",
+    "rollFail": "[Check: {{stat}} — FAIL ({{roll}}{{modPart}}={{total}} vs DC{{dc}})]"
   }
 }
