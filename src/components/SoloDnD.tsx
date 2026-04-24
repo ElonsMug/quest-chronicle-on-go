@@ -1615,6 +1615,7 @@ export default function SoloDnD() {
     setAllies([]);
     setShowDefeated(false);
     setDefeatPending(false);
+    setDefeatDismissed(false);
     setBerserkChargesLeft(0);
     setBerserkUsedThisCombat(false);
     setDidDodgeLastTurn(false);
