@@ -1059,6 +1059,7 @@ function CombatPanel({
 export default function SoloDnD() {
   const [screen, setScreen] = useState<"select" | "game">("select");
   const [selectedChar, setSelectedChar] = useState<Character | null>(null);
+  const { t } = useTranslation();
   const [character, setCharacter] = useState<Character | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
