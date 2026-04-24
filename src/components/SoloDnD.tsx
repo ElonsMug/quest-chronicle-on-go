@@ -1772,9 +1772,14 @@ export default function SoloDnD() {
   // ─────────────────────────────────────────────────────────────
   const lastMsg = messages[messages.length - 1];
   const parsed = lastMsg?.parsed;
-  const showCombatButtons = !loading && !freeInput && !pendingRoll && !pendingInitiative && !showDefeated && inCombat && !!character;
-  const showChoices = !loading && !freeInput && !pendingRoll && !pendingInitiative && !inCombat && (parsed?.choices?.length ?? 0) > 0;
-  const showFreeArea = freeInput && !loading;
+  // Поражение зафиксировано (HP=0). При закрытом окне поражения вместо
+  // боевых кнопок показываем «Заново / Меню», чтобы игрок мог либо
+  // перечитать журнал, либо продолжить.
+  const hasPotion = inventory.some(i => i.toLowerCase().includes("зелье"));
+  const showDefeatActions = defeatPending && !showDefeated && !loading;
+  const showCombatButtons = !loading && !freeInput && !pendingRoll && !pendingInitiative && !showDefeated && !defeatPending && inCombat && !!character;
+  const showChoices = !loading && !freeInput && !pendingRoll && !pendingInitiative && !showDefeated && !defeatPending && !inCombat && (parsed?.choices?.length ?? 0) > 0;
+  const showFreeArea = freeInput && !loading && !defeatPending;
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(180deg,#0c0a09 0%,#1c1917 100%)", fontFamily: "serif" }}>
