@@ -1072,6 +1072,10 @@ export default function SoloDnD() {
   const [freeInputPlaceholder] = useState(() => FREE_INPUT_PLACEHOLDERS[Math.floor(Math.random() * FREE_INPUT_PLACEHOLDERS.length)]);
   const [showDev, setShowDev] = useState(false);
   const [showDefeated, setShowDefeated] = useState(false);
+  // Поражение «отложено»: HP=0, но даём игроку прочитать сообщение мастера
+  // прежде чем показать плашку. После закрытия плашки этот флаг остаётся
+  // true — он управляет показом кнопок «Заново / Меню» вместо боевых.
+  const [defeatPending, setDefeatPending] = useState(false);
   const combatStartSnapshotRef = useRef<{ hp: number; enemies: Enemy[]; allies: Ally[] } | null>(null);
   // Бонусное действие "выпито зелье" — копится здесь и приклеивается к следующему основному действию игрока.
   const pendingPotionInfoRef = useRef<string | null>(null);
