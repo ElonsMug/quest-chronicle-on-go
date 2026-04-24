@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { initAnalytics, trackEvent } from "@/lib/analytics";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 // ─────────────────────────────────────────────────────────────────
 // ДАННЫЕ
