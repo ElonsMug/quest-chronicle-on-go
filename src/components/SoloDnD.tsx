@@ -872,16 +872,26 @@ function DevPanel({ onJump, onClose }: { onJump: (prompt: string) => void; onClo
 }
 
 function DefeatedScreen({
-  hasPotion, onUsePotion, onRetry, onMenu,
+  hasPotion, onUsePotion, onRetry, onMenu, onClose,
 }: {
   hasPotion: boolean;
   onUsePotion: () => void;
   onRetry: () => void;
   onMenu: () => void;
+  onClose: () => void;
 }) {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.9)" }}>
-      <div className="max-w-sm w-full mx-4 text-center">
+      <div className="relative max-w-sm w-full mx-4 text-center">
+        <button
+          onClick={onClose}
+          aria-label="Закрыть"
+          title="Закрыть и перечитать журнал"
+          className="absolute -top-2 -right-2 w-9 h-9 rounded-full border border-stone-700 bg-stone-900 text-stone-400 hover:text-amber-200 hover:border-amber-700 transition-colors flex items-center justify-center text-lg"
+          style={{ fontFamily: "serif" }}
+        >
+          ✕
+        </button>
         <div className="text-6xl mb-4">💀</div>
         <div className="text-2xl font-bold text-red-400 mb-2" style={{ fontFamily: "serif" }}>Ты повержен</div>
         <div className="text-stone-400 text-sm mb-6">Силы покидают тебя. Тьма смыкается...</div>
@@ -1072,6 +1082,10 @@ export default function SoloDnD() {
   const [freeInputPlaceholder] = useState(() => FREE_INPUT_PLACEHOLDERS[Math.floor(Math.random() * FREE_INPUT_PLACEHOLDERS.length)]);
   const [showDev, setShowDev] = useState(false);
   const [showDefeated, setShowDefeated] = useState(false);
+  // Поражение «отложено»: HP=0, но даём игроку прочитать сообщение мастера
+  // прежде чем показать плашку. После закрытия плашки этот флаг остаётся
+  // true — он управляет показом кнопок «Заново / Меню» вместо боевых.
+  const [defeatPending, setDefeatPending] = useState(false);
   const combatStartSnapshotRef = useRef<{ hp: number; enemies: Enemy[]; allies: Ally[] } | null>(null);
   // Бонусное действие "выпито зелье" — копится здесь и приклеивается к следующему основному действию игрока.
   const pendingPotionInfoRef = useRef<string | null>(null);
@@ -1094,6 +1108,15 @@ export default function SoloDnD() {
 
   useEffect(() => { initAnalytics(); }, []);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, loading, pendingRoll, pendingInitiative]);
+
+  // Когда поражение «отложено» — ждём, пока мастер закончит говорить
+  // (loading=false), и даём игроку ~2.2с на чтение последнего сообщения,
+  // только после этого показываем плашку «Ты повержен».
+  useEffect(() => {
+    if (!defeatPending || loading || showDefeated) return;
+    const t = setTimeout(() => setShowDefeated(true), 2200);
+    return () => clearTimeout(t);
+  }, [defeatPending, loading, showDefeated, messages]);
 
   // ── Сейв (localStorage, безопасно к SSR) ──────────────────────
   function doSave(char: Character, currentHp: number, currentInv: string[], currentEff: string[], msgs: ChatMessage[]) {
@@ -1138,7 +1161,10 @@ export default function SoloDnD() {
     if (parsed.damage) {
       newHp = Math.max(0, newHp - parsed.damage);
       setHp(newHp);
-      if (newHp <= 0) setShowDefeated(true);
+      // НЕ показываем плашку поражения сразу — даём мастеру дорассказать.
+      // Просто помечаем поражение как «ожидающее»; эффект ниже подхватит
+      // флаг и откроет плашку с задержкой, когда мастер закончит говорить.
+      if (newHp <= 0) setDefeatPending(true);
     }
 
     if (parsed.newItems?.length) {
@@ -1516,6 +1542,7 @@ export default function SoloDnD() {
     setHp(Math.min(c.maxHp, heal));
     setInventory(prev => prev.filter((_, i) => i !== potionIdx));
     setShowDefeated(false);
+    setDefeatPending(false);
     setMessages(prev => [...prev, {
       role: "assistant",
       content: `🧪 Последним усилием ты выпиваешь зелье. +${heal} HP. Ты снова в строю.`,
@@ -1529,12 +1556,14 @@ export default function SoloDnD() {
     const { character: c } = stateRef.current;
     if (!snap || !c) {
       setShowDefeated(false);
+      setDefeatPending(false);
       return;
     }
     // Сначала очищаем (фикс: иначе двоятся враги/союзники), потом восстанавливаем в следующем тике
     setEnemies([]);
     setAllies([]);
     setShowDefeated(false);
+    setDefeatPending(false);
     setBerserkChargesLeft(0);
     setBerserkUsedThisCombat(false);
     setDidDodgeLastTurn(false);
@@ -1743,9 +1772,14 @@ export default function SoloDnD() {
   // ─────────────────────────────────────────────────────────────
   const lastMsg = messages[messages.length - 1];
   const parsed = lastMsg?.parsed;
-  const showCombatButtons = !loading && !freeInput && !pendingRoll && !pendingInitiative && !showDefeated && inCombat && !!character;
-  const showChoices = !loading && !freeInput && !pendingRoll && !pendingInitiative && !inCombat && (parsed?.choices?.length ?? 0) > 0;
-  const showFreeArea = freeInput && !loading;
+  // Поражение зафиксировано (HP=0). При закрытом окне поражения вместо
+  // боевых кнопок показываем «Заново / Меню», чтобы игрок мог либо
+  // перечитать журнал, либо продолжить.
+  const hasPotion = inventory.some(i => i.toLowerCase().includes("зелье"));
+  const showDefeatActions = defeatPending && !showDefeated && !loading;
+  const showCombatButtons = !loading && !freeInput && !pendingRoll && !pendingInitiative && !showDefeated && !defeatPending && inCombat && !!character;
+  const showChoices = !loading && !freeInput && !pendingRoll && !pendingInitiative && !showDefeated && !defeatPending && !inCombat && (parsed?.choices?.length ?? 0) > 0;
+  const showFreeArea = freeInput && !loading && !defeatPending;
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(180deg,#0c0a09 0%,#1c1917 100%)", fontFamily: "serif" }}>
@@ -1776,7 +1810,8 @@ export default function SoloDnD() {
           hasPotion={inventory.some(i => i.toLowerCase().includes("зелье"))}
           onUsePotion={handleDefeatedUsePotion}
           onRetry={handleDefeatedRetry}
-          onMenu={() => { setShowDefeated(false); exitToMenu(); }}
+          onMenu={() => { setShowDefeated(false); setDefeatPending(false); exitToMenu(); }}
+          onClose={() => setShowDefeated(false)}
         />
       )}
 
@@ -1891,6 +1926,30 @@ export default function SoloDnD() {
 
       <div className="fixed bottom-0 left-0 right-0 z-10" style={{ background: "linear-gradient(0deg,#0c0a09 60%,transparent 100%)" }}>
         <div className="px-4 pb-6 pt-3 max-w-md mx-auto space-y-2">
+          {showDefeatActions && (
+            <>
+              <div className="text-center text-xs text-stone-500 pb-1" style={{ fontFamily: "serif" }}>
+                💀 Ты повержен
+              </div>
+              {hasPotion && (
+                <button onClick={handleDefeatedUsePotion}
+                  className="w-full py-3 rounded-xl font-bold text-stone-900"
+                  style={{ background: "linear-gradient(135deg,#d97706,#92400e)", fontFamily: "serif" }}>
+                  🧪 Выпить зелье лечения
+                </button>
+              )}
+              <button onClick={handleDefeatedRetry}
+                className="w-full py-3 rounded-xl border border-stone-600 bg-stone-800 text-amber-100 font-bold"
+                style={{ fontFamily: "serif" }}>
+                ⚔️ Начать бой заново
+              </button>
+              <button onClick={() => { setDefeatPending(false); exitToMenu(); }}
+                className="w-full py-3 rounded-xl border border-stone-700 bg-stone-900 text-stone-400 text-sm"
+                style={{ fontFamily: "serif" }}>
+                ← Вернуться в меню
+              </button>
+            </>
+          )}
           {showCombatButtons && character && (
             <>
               <CombatPanel
