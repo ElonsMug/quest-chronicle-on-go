@@ -1556,12 +1556,14 @@ export default function SoloDnD() {
     const { character: c } = stateRef.current;
     if (!snap || !c) {
       setShowDefeated(false);
+      setDefeatPending(false);
       return;
     }
     // Сначала очищаем (фикс: иначе двоятся враги/союзники), потом восстанавливаем в следующем тике
     setEnemies([]);
     setAllies([]);
     setShowDefeated(false);
+    setDefeatPending(false);
     setBerserkChargesLeft(0);
     setBerserkUsedThisCombat(false);
     setDidDodgeLastTurn(false);
