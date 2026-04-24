@@ -1591,6 +1591,7 @@ export default function SoloDnD() {
     setInventory(prev => prev.filter((_, i) => i !== potionIdx));
     setShowDefeated(false);
     setDefeatPending(false);
+    setDefeatDismissed(false);
     const text = t("combat.defeatedRescue", { heal });
     setMessages(prev => [...prev, {
       role: "assistant",
@@ -1606,6 +1607,7 @@ export default function SoloDnD() {
     if (!snap || !c) {
       setShowDefeated(false);
       setDefeatPending(false);
+      setDefeatDismissed(false);
       return;
     }
     // Clear first (fix: otherwise enemies/allies double up), then restore in the next tick
