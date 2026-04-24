@@ -872,16 +872,26 @@ function DevPanel({ onJump, onClose }: { onJump: (prompt: string) => void; onClo
 }
 
 function DefeatedScreen({
-  hasPotion, onUsePotion, onRetry, onMenu,
+  hasPotion, onUsePotion, onRetry, onMenu, onClose,
 }: {
   hasPotion: boolean;
   onUsePotion: () => void;
   onRetry: () => void;
   onMenu: () => void;
+  onClose: () => void;
 }) {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.9)" }}>
-      <div className="max-w-sm w-full mx-4 text-center">
+      <div className="relative max-w-sm w-full mx-4 text-center">
+        <button
+          onClick={onClose}
+          aria-label="Закрыть"
+          title="Закрыть и перечитать журнал"
+          className="absolute -top-2 -right-2 w-9 h-9 rounded-full border border-stone-700 bg-stone-900 text-stone-400 hover:text-amber-200 hover:border-amber-700 transition-colors flex items-center justify-center text-lg"
+          style={{ fontFamily: "serif" }}
+        >
+          ✕
+        </button>
         <div className="text-6xl mb-4">💀</div>
         <div className="text-2xl font-bold text-red-400 mb-2" style={{ fontFamily: "serif" }}>Ты повержен</div>
         <div className="text-stone-400 text-sm mb-6">Силы покидают тебя. Тьма смыкается...</div>
