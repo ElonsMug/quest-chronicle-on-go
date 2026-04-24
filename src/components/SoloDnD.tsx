@@ -1822,8 +1822,11 @@ export default function SoloDnD() {
       )}
 
       <div className="sticky top-0 z-20 border-b border-stone-800/60 backdrop-blur" style={{ background: "rgba(12,10,9,0.93)" }}>
-        <div className="flex items-center justify-between px-4 py-2.5">
-          <button onClick={exitToMenu} className="text-stone-500 text-sm hover:text-stone-300 transition-colors">← Меню</button>
+        <div className="flex items-center justify-between px-4 py-2.5 gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <button onClick={exitToMenu} className="text-stone-500 text-sm hover:text-stone-300 transition-colors whitespace-nowrap">← {t("common.menu")}</button>
+            <LanguageSwitcher />
+          </div>
 
           <div className="text-center cursor-pointer select-none" onClick={handleDevTap}>
             <div className="text-amber-200 text-sm font-bold">{character?.emoji} {character?.name}</div>
