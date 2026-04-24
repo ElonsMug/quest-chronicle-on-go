@@ -1926,6 +1926,30 @@ export default function SoloDnD() {
 
       <div className="fixed bottom-0 left-0 right-0 z-10" style={{ background: "linear-gradient(0deg,#0c0a09 60%,transparent 100%)" }}>
         <div className="px-4 pb-6 pt-3 max-w-md mx-auto space-y-2">
+          {showDefeatActions && (
+            <>
+              <div className="text-center text-xs text-stone-500 pb-1" style={{ fontFamily: "serif" }}>
+                💀 Ты повержен
+              </div>
+              {hasPotion && (
+                <button onClick={handleDefeatedUsePotion}
+                  className="w-full py-3 rounded-xl font-bold text-stone-900"
+                  style={{ background: "linear-gradient(135deg,#d97706,#92400e)", fontFamily: "serif" }}>
+                  🧪 Выпить зелье лечения
+                </button>
+              )}
+              <button onClick={handleDefeatedRetry}
+                className="w-full py-3 rounded-xl border border-stone-600 bg-stone-800 text-amber-100 font-bold"
+                style={{ fontFamily: "serif" }}>
+                ⚔️ Начать бой заново
+              </button>
+              <button onClick={() => { setDefeatPending(false); exitToMenu(); }}
+                className="w-full py-3 rounded-xl border border-stone-700 bg-stone-900 text-stone-400 text-sm"
+                style={{ fontFamily: "serif" }}>
+                ← Вернуться в меню
+              </button>
+            </>
+          )}
           {showCombatButtons && character && (
             <>
               <CombatPanel
