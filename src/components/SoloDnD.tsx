@@ -1180,7 +1180,7 @@ export default function SoloDnD() {
                 🤝 {t("negotiation.accept")}
               </button>
               <button
-                onClick={() => void handleChoice(i18n.t("system.keepAttacking", { name: leader.name }))}
+                onClick={() => { setNegotiationDeclined(true); void handleChoice(i18n.t("system.keepAttacking", { name: leader.name })); }}
                 className="w-full py-3 rounded-xl border border-red-900/60 bg-stone-900 text-red-300 font-bold active:scale-95 transition-transform"
                 style={{ fontFamily: "serif" }}>
                 ⚔️ {t("negotiation.keepAttacking")}
