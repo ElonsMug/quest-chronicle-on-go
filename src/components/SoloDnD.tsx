@@ -263,6 +263,18 @@ export default function SoloDnD() {
       setDefeatPending(false);
       setDefeatDismissed(false);
       setShowDefeated(false);
+    } else if (newHp <= 0 && (parsed.combatEnd || parsed.combatEndType === "narrative")) {
+      // Safety net: the DM ended combat narratively (player defeated path) but
+      // forgot the [PLAYER_HP: N] tag. Without HP restore the player is stuck
+      // at 0 with no way to act. Default to 1 HP — the story continues, the
+      // player is "barely alive". Better than a softlock; matches the prompt's
+      // documented minimum for the rescue path.
+      const ch = stateRef.current.character;
+      newHp = ch ? Math.min(ch.maxHp, 1) : 1;
+      setHp(newHp);
+      setDefeatPending(false);
+      setDefeatDismissed(false);
+      setShowDefeated(false);
     }
 
     if (parsed.newItems?.length) {
