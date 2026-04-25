@@ -362,6 +362,7 @@ export default function SoloDnD() {
       setDidDodgeLastTurn(false);
       setDefensiveStance(false);
       setSelectingTarget(false);
+      setPendingAction(null);
       setShowSpellMini(false);
       pendingPotionInfoRef.current = null;
       if (wasInCombat) {
@@ -394,6 +395,7 @@ export default function SoloDnD() {
       setDidDodgeLastTurn(false);
       setDefensiveStance(false);
       setSelectingTarget(false);
+      setPendingAction(null);
       setShowSpellMini(false);
     }
 
