@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 
@@ -21,7 +22,7 @@ export type Locale = "en" | "ru";
 export const SUPPORTED_LOCALES: Locale[] = ["en", "ru"];
 export const DEFAULT_LOCALE: Locale = "en";
 
-function readSavedLocale(): Locale {
+export function readSavedLocale(): Locale {
   if (typeof window === "undefined") return DEFAULT_LOCALE;
   try {
     const saved = window.localStorage.getItem(STORAGE_KEY);
@@ -34,9 +35,10 @@ function readSavedLocale(): Locale {
 
 if (!i18n.isInitialized) {
   // CRITICAL: initialize with DEFAULT_LOCALE so SSR and the first client
-  // render produce identical HTML. The saved locale is applied right after
-  // hydration in the effect below — a tiny flash is acceptable and avoids
-  // a hydration mismatch crash.
+  // render produce identical HTML. The saved locale is applied AFTER
+  // hydration via the useHydratedLocale() hook below — applying it here
+  // (even via queueMicrotask) runs before React's first commit on the
+  // client and causes hydration mismatches.
   void i18n.use(initReactI18next).init({
     resources: {
       en: { translation: en },
@@ -47,15 +49,6 @@ if (!i18n.isInitialized) {
     interpolation: { escapeValue: false },
     returnNull: false,
   });
-
-  // Apply saved locale on the client after init (post-hydration safe).
-  if (typeof window !== "undefined") {
-    const saved = readSavedLocale();
-    if (saved !== DEFAULT_LOCALE) {
-      // Defer to next tick so React has finished its first commit.
-      queueMicrotask(() => void i18n.changeLanguage(saved));
-    }
-  }
 }
 
 export function setLocale(locale: Locale) {
@@ -72,6 +65,23 @@ export function setLocale(locale: Locale) {
 export function getLocale(): Locale {
   const cur = i18n.language;
   return cur === "ru" ? "ru" : "en";
+}
+
+
+/**
+ * Mount this hook once near the root of the client tree (e.g. in the root
+ * route component). It applies the user's saved locale AFTER React has
+ * hydrated, which avoids SSR/client mismatches: the server always renders
+ * in DEFAULT_LOCALE, the client's first render also uses DEFAULT_LOCALE,
+ * and only then we switch (causing a single re-render — no hydration crash).
+ */
+export function useHydratedLocale() {
+  useEffect(() => {
+    const saved = readSavedLocale();
+    if (saved !== i18n.language) {
+      void i18n.changeLanguage(saved);
+    }
+  }, []);
 }
 
 export default i18n;

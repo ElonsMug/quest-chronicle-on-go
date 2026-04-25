@@ -1,6 +1,7 @@
 import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
 
 import "@/i18n"; // bootstrap i18next once at app init
+import { useHydratedLocale } from "@/i18n";
 import appCss from "../styles.css?url";
 
 function NotFoundComponent() {
@@ -70,5 +71,6 @@ function RootShell({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
+  useHydratedLocale();
   return <Outlet />;
 }
