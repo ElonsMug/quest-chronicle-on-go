@@ -196,16 +196,25 @@ COMBAT TURN ORDER (CRITICAL):
 - Exception: if the player cast [Shield cast] — the player has +5 AC until next turn,
   enemy attacks are very likely to miss (factor that into d20 vs AC).
 
-ANTI-ONESHOT RULE (CRITICAL — fragile classes like the Mage have only 8 HP):
+ANTI-ONESHOT RULE (CRITICAL — applies to ALL hero classes, not just the Mage):
 - Player current HP = ${hp}/${character.maxHp}.
 - A SINGLE enemy hit must NEVER deal more than 60% of the player's MAX HP
   while the player is above 50% HP. Cap your [DAMAGE: N] accordingly.
-  Example: Mage with 8/8 HP — one hit ≤ 4 damage, no matter the die roll.
+  Examples:
+    Mage with 8/8 HP   — one hit ≤ 4 damage, no matter the die roll.
+    Warrior with 14/14 — one hit ≤ 8 damage from full health.
+    Rogue with 10/10   — one hit ≤ 6 damage from full health.
 - Multiple enemies in one turn are still allowed to combine for lethal damage,
   but no single attack should one-shot a healthy player from full HP to 0.
 - Below 50% HP the cap lifts — the player is in real danger and any hit can finish them.
-- This is a NARRATIVE rule: describe the hit landing partially ("the blade clips your shoulder"),
-  the player parrying with their staff, armor absorbing some force, etc.
+- BOSS EXCEPTION: this cap does NOT apply to fights against an EPIC boss
+  (a single enemy declared with the BOSS flag — see ENCOUNTER STRUCTURE).
+  Bosses are chapter climaxes; their signature blows are meant to be lethal
+  and the player should feel that danger. Cap is disabled while a living boss
+  is on the field.
+- This is a NARRATIVE rule: describe non-boss hits landing partially ("the blade
+  clips your shoulder"), the player parrying with their staff, armor absorbing
+  some force, etc. Boss hits land in full — describe them as devastating.
 
 CLASS COMBAT BUTTONS:
 In combat the player uses fixed class buttons, NOT DM choices.
