@@ -533,13 +533,16 @@ export default function SoloDnD() {
     // Exception: the "[Initiative won: ...]" message itself — enemies don't
     // act there; we wait for the player's first action.
     const isInitiativeWin = /Initiative won/i.test(choiceText);
+    // The "player defeated, narrative continues" message ends the fight —
+    // no enemy turn should follow.
+    const isNarrativeDefeat = /Player defeated/i.test(choiceText);
     // If a potion was drunk as a bonus action — attach it to the main action
     // in ONE request so the DM describes both the potion and the attack
     // before enemies retaliate.
     const potionInfo = pendingPotionInfoRef.current;
     pendingPotionInfoRef.current = null;
     const choiceWithPotion = potionInfo ? `${potionInfo}\n${choiceText}` : choiceText;
-    const apiMessage = (inCombat || en.length > 0) && !isInitiativeWin
+    const apiMessage = (inCombat || en.length > 0) && !isInitiativeWin && !isNarrativeDefeat
       ? `${choiceWithPotion}\n\n${i18n.t("system.combatTurnReminder")}`
       : choiceWithPotion;
     try {
