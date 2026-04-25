@@ -72,6 +72,13 @@ export default function SoloDnD() {
   const [showSpells, setShowSpells] = useState(false);
   const [showSpellMini, setShowSpellMini] = useState(false);
   const [selectingTarget, setSelectingTarget] = useState(false);
+  // What the target picker is for. Null when picker is closed.
+  const [pendingAction, setPendingAction] = useState<
+    | { type: "attack" }
+    | { type: "sneak" }
+    | { type: "spell"; spell: Spell }
+    | null
+  >(null);
   const [freeInputPlaceholder, setFreeInputPlaceholder] = useState("");
   const [showDev, setShowDev] = useState(false);
   const [showDefeated, setShowDefeated] = useState(false);
@@ -79,6 +86,10 @@ export default function SoloDnD() {
   // message before showing the screen. After the screen closes this flag
   // stays true — it controls showing "Retry / Menu" instead of combat buttons.
   const [defeatPending, setDefeatPending] = useState(false);
+  // Once the player chooses "Finish them off" during a behavior shift, hide
+  // the negotiation panel for the rest of this fight (resets on combat end
+  // / new initiative).
+  const [negotiationDeclined, setNegotiationDeclined] = useState(false);
   // True once the player explicitly closed the defeat screen — prevents it
   // from reappearing on subsequent DM messages while defeatPending is still on.
   const [defeatDismissed, setDefeatDismissed] = useState(false);
@@ -231,6 +242,18 @@ export default function SoloDnD() {
       if (newHp <= 0) { setDefeatPending(true); setDefeatDismissed(false); }
     }
 
+    // [PLAYER_HP: N] — narrative HP restore (after rescue/capture etc.).
+    // Clears the "defeated" overlay state since the story now continues.
+    if (parsed.playerHpRestore !== null && parsed.playerHpRestore !== undefined) {
+      const ch = stateRef.current.character;
+      const cap = ch ? ch.maxHp : parsed.playerHpRestore;
+      newHp = Math.max(1, Math.min(cap, parsed.playerHpRestore));
+      setHp(newHp);
+      setDefeatPending(false);
+      setDefeatDismissed(false);
+      setShowDefeated(false);
+    }
+
     if (parsed.newItems?.length) {
       newInv = [...newInv, ...parsed.newItems];
       setInventory(newInv);
@@ -343,7 +366,9 @@ export default function SoloDnD() {
       setDidDodgeLastTurn(false);
       setDefensiveStance(false);
       setSelectingTarget(false);
+      setPendingAction(null);
       setShowSpellMini(false);
+      setNegotiationDeclined(false);
       pendingPotionInfoRef.current = null;
       if (wasInCombat) {
         trackEvent("combat_ended", {
@@ -375,7 +400,9 @@ export default function SoloDnD() {
       setDidDodgeLastTurn(false);
       setDefensiveStance(false);
       setSelectingTarget(false);
+      setPendingAction(null);
       setShowSpellMini(false);
+      setNegotiationDeclined(false);
     }
 
     return { newHp, newInv, newEff: finalEffects, newEnemies };
@@ -512,13 +539,16 @@ export default function SoloDnD() {
     // Exception: the "[Initiative won: ...]" message itself — enemies don't
     // act there; we wait for the player's first action.
     const isInitiativeWin = /Initiative won/i.test(choiceText);
+    // The "player defeated, narrative continues" message ends the fight —
+    // no enemy turn should follow.
+    const isNarrativeDefeat = /Player defeated/i.test(choiceText);
     // If a potion was drunk as a bonus action — attach it to the main action
     // in ONE request so the DM describes both the potion and the attack
     // before enemies retaliate.
     const potionInfo = pendingPotionInfoRef.current;
     pendingPotionInfoRef.current = null;
     const choiceWithPotion = potionInfo ? `${potionInfo}\n${choiceText}` : choiceText;
-    const apiMessage = (inCombat || en.length > 0) && !isInitiativeWin
+    const apiMessage = (inCombat || en.length > 0) && !isInitiativeWin && !isNarrativeDefeat
       ? `${choiceWithPotion}\n\n${i18n.t("system.combatTurnReminder")}`
       : choiceWithPotion;
     try {
@@ -625,7 +655,26 @@ export default function SoloDnD() {
     }]);
   }
 
-  // Restart the fight — restore the snapshot
+  // Continue the story after defeat: ask the DM to narrate what happens
+  // next (capture, rescue, awakening) and to restore HP via [PLAYER_HP: N].
+  // Closes the defeat overlay and ends combat — control returns to the
+  // narrative flow.
+  async function handleContinueStory() {
+    setShowDefeated(false);
+    setDefeatPending(false);
+    setDefeatDismissed(true);
+    setSelectingTarget(false);
+    setPendingAction(null);
+    setShowSpellMini(false);
+    setPendingRoll(null);
+    setPendingInitiative(false);
+    // Clear the active combat — the player is down, the fight is over
+    // narratively. The DM will write the aftermath.
+    setEnemies([]);
+    setAllies([]);
+    setInCombat(false);
+    await handleChoice(i18n.t("system.playerDefeatedNarrative"));
+  }
   function handleDefeatedRetry() {
     const snap = combatStartSnapshotRef.current;
     const { character: c } = stateRef.current;
@@ -692,6 +741,7 @@ export default function SoloDnD() {
     const { character: ch, enemies: en, berserkChargesLeft: bcl } = stateRef.current;
     if (!ch) return;
     setSelectingTarget(false);
+    setPendingAction(null);
     setDidDodgeLastTurn(false);
     let mod = ch.stats[ch.weapon.stat] || 0;
     if (bcl > 0) {
@@ -726,21 +776,34 @@ export default function SoloDnD() {
     await handleChoice(i18n.t("system.dodge"));
   }
 
-  async function handleSpell(s: Spell) {
+  // Sneak attack — same target picker flow as a regular attack (rogue only).
+  async function handleSneak(targetName?: string) {
+    setSelectingTarget(false);
+    setPendingAction(null);
+    // Sneak is implemented as a normal attack; bonus damage is applied
+    // narratively by the DM (it sees the system message context).
+    await handleAttack(targetName);
+  }
+
+  async function handleSpell(s: Spell, targetName?: string) {
     const slots = stateRef.current.spellSlots;
     if (!slots || slots.current <= 0) return;
     const { character: ch, enemies: en } = stateRef.current;
     if (!ch) return;
     setShowSpells(false);
     setShowSpellMini(false);
+    setSelectingTarget(false);
+    setPendingAction(null);
     setSpellSlots({ current: slots.current - 1, max: slots.max });
     setDidDodgeLastTurn(false);
 
     if (s.type === "attack") {
-      // Fire Bolt — slot-based attack, auto-roll
+      // Fire Bolt — slot-based attack, auto-roll on a chosen target
       const statKey: Stat = s.stat ?? "int";
       const mod = ch.stats[statKey] || 0;
-      const target = en.find(e => e.hp > 0);
+      const target = targetName
+        ? en.find(e => e.hp > 0 && e.name === targetName)
+        : en.find(e => e.hp > 0);
       const ac = target?.ac ?? 12;
       await executeAttackRoll({ weapon: s.name, dice: s.dice ?? "d10", mod, ac, targetName: target?.name });
       return;
@@ -868,6 +931,35 @@ export default function SoloDnD() {
   // journal or continue.
   const hasPotion = inventory.some(isPotion);
   const showDefeatActions = defeatPending && !showDefeated && !loading;
+
+  // ── Behavior shift / negotiation moment ──────────────────────
+  // Pick the leader: the enemy with the highest maxHp (matches how the prompt
+  // declares ONE leader per encounter via [ENEMY:]). When that leader drops
+  // below 40% HP, the DM is instructed to pause and let the player choose
+  // surrender / continue / let go. We surface those choices as dedicated UI.
+  const liveEnemies = enemies.filter(e => e.hp > 0);
+  const leader = liveEnemies.length
+    ? [...liveEnemies].sort((a, b) => b.maxHp - a.maxHp)[0]
+    : null;
+  const leaderInShift = !!(leader && leader.hp / leader.maxHp < 0.4 && leader.hp > 0);
+  const showNegotiation =
+    !loading && !freeInput && !pendingRoll && !pendingInitiative &&
+    !showDefeated && !defeatPending && inCombat && leaderInShift &&
+    !negotiationDeclined && !!character;
+
+  function openTargetPickerOr(
+    action: { type: "attack" } | { type: "sneak" } | { type: "spell"; spell: Spell },
+    fallback: () => void,
+  ) {
+    const live = stateRef.current.enemies.filter(e => e.hp > 0);
+    if (live.length > 1) {
+      setPendingAction(action);
+      setSelectingTarget(true);
+    } else {
+      fallback();
+    }
+  }
+
   const showCombatButtons = !loading && !freeInput && !pendingRoll && !pendingInitiative && !showDefeated && !defeatPending && inCombat && !!character;
   const showChoices = !loading && !freeInput && !pendingRoll && !pendingInitiative && !showDefeated && !defeatPending && !inCombat && (parsed?.choices?.length ?? 0) > 0;
   const showFreeArea = freeInput && !loading && !defeatPending;
@@ -899,6 +991,7 @@ export default function SoloDnD() {
       {showDefeated && (
         <DefeatedScreen
           hasPotion={inventory.some(isPotion)}
+          onContinueStory={() => void handleContinueStory()}
           onUsePotion={handleDefeatedUsePotion}
           onRetry={handleDefeatedRetry}
           onMenu={() => { setShowDefeated(false); setDefeatPending(false); setDefeatDismissed(false); exitToMenu(); }}
@@ -1054,26 +1147,60 @@ export default function SoloDnD() {
               <div className="text-center text-xs text-stone-500 pb-1" style={{ fontFamily: "serif" }}>
                 {t("defeated.footer")}
               </div>
+              <button onClick={() => void handleContinueStory()}
+                className="w-full py-3 rounded-xl font-bold text-stone-900 active:scale-95 transition-transform"
+                style={{ background: "linear-gradient(135deg,#d97706,#92400e)", fontFamily: "serif" }}>
+                📖 {t("defeated.continueStory")}
+              </button>
               {hasPotion && (
                 <button onClick={handleDefeatedUsePotion}
-                  className="w-full py-3 rounded-xl font-bold text-stone-900"
-                  style={{ background: "linear-gradient(135deg,#d97706,#92400e)", fontFamily: "serif" }}>
+                  className="w-full py-3 rounded-xl border border-amber-900/60 bg-stone-900 text-amber-200 font-bold">
                   🧪 {t("defeated.drinkPotion")}
                 </button>
               )}
               <button onClick={handleDefeatedRetry}
-                className="w-full py-3 rounded-xl border border-stone-600 bg-stone-800 text-amber-100 font-bold"
+                className="w-full py-3 rounded-xl border border-stone-700 bg-stone-900 text-stone-300 text-sm font-bold"
                 style={{ fontFamily: "serif" }}>
                 ⚔️ {t("defeated.retry")}
               </button>
               <button onClick={() => { setDefeatPending(false); setDefeatDismissed(false); exitToMenu(); }}
-                className="w-full py-3 rounded-xl border border-stone-700 bg-stone-900 text-stone-400 text-sm"
+                className="w-full py-3 rounded-xl border border-stone-800 bg-stone-950 text-stone-500 text-sm"
                 style={{ fontFamily: "serif" }}>
                 ← {t("defeated.returnToMenu")}
               </button>
             </>
           )}
-          {showCombatButtons && character && (
+          {showNegotiation && leader && (
+            <div className="space-y-2">
+              <div className="text-center text-xs text-amber-500/80 pb-1" style={{ fontFamily: "serif" }}>
+                {t("negotiation.prompt", { name: leader.name })}
+              </div>
+              <button
+                onClick={() => void handleChoice(i18n.t("system.acceptSurrender", { name: leader.name }))}
+                className="w-full py-3 rounded-xl font-bold text-stone-900 active:scale-95 transition-transform"
+                style={{ background: "linear-gradient(135deg,#d97706,#92400e)", fontFamily: "serif" }}>
+                🤝 {t("negotiation.accept")}
+              </button>
+              <button
+                onClick={() => { setNegotiationDeclined(true); void handleChoice(i18n.t("system.keepAttacking", { name: leader.name })); }}
+                className="w-full py-3 rounded-xl border border-red-900/60 bg-stone-900 text-red-300 font-bold active:scale-95 transition-transform"
+                style={{ fontFamily: "serif" }}>
+                ⚔️ {t("negotiation.keepAttacking")}
+              </button>
+              <button
+                onClick={() => void handleChoice(i18n.t("system.letThemGo", { name: leader.name }))}
+                className="w-full py-3 rounded-xl border border-stone-700 bg-stone-900 text-stone-300 font-bold active:scale-95 transition-transform"
+                style={{ fontFamily: "serif" }}>
+                🚪 {t("negotiation.letGo")}
+              </button>
+              <button
+                onClick={() => setFreeInput(true)}
+                className="w-full text-center px-3 py-2 text-xs text-stone-500 hover:text-stone-300 transition-colors">
+                ✍ {t("negotiation.freeAction")}
+              </button>
+            </div>
+          )}
+          {showCombatButtons && character && !showNegotiation && (
             <>
               <CombatPanel
                 character={character}
@@ -1082,17 +1209,13 @@ export default function SoloDnD() {
                 spellSlots={spellSlots}
                 showSpellMini={showSpellMini}
                 spells={character.spells}
-                onAttackClick={() => {
-                  const liveEnemies = stateRef.current.enemies.filter(e => e.hp > 0);
-                  if (liveEnemies.length > 1) {
-                    setSelectingTarget(true);
-                  } else {
-                    void handleAttack();
-                  }
-                }}
+                onAttackClick={() => openTargetPickerOr({ type: "attack" }, () => void handleAttack())}
                 onSpecial={() => {
                   if (character.id === "warrior") void handleBerserk();
-                  else if (character.id === "rogue") void handleAttack(); // sneak = attack after dodge
+                  else if (character.id === "rogue") {
+                    // Sneak attack — pick a target like a regular attack.
+                    openTargetPickerOr({ type: "sneak" }, () => void handleSneak());
+                  }
                   else if (character.id === "mage") setShowSpellMini(v => !v);
                 }}
                 onDefend={() => {
@@ -1100,25 +1223,39 @@ export default function SoloDnD() {
                   else void handleDodge();
                 }}
                 onToggleSpells={() => setShowSpellMini(v => !v)}
-                onCastSpell={handleSpell}
+                onCastSpell={(s) => {
+                  // Attacking spells (Fire Bolt) go through the same target picker.
+                  if (s.type === "attack") {
+                    openTargetPickerOr({ type: "spell", spell: s }, () => void handleSpell(s));
+                  } else {
+                    void handleSpell(s);
+                  }
+                }}
                 onFreeInput={() => {
                   trackEvent("free_input_used", { characterId: character.id, messageNumber: messages.length, inCombat: true });
                   setFreeInput(true);
                 }}
               />
-              {selectingTarget && (
+              {selectingTarget && pendingAction && (
                 <div className="space-y-1 pl-2 border-l-2 border-amber-900/60">
                   <div className="text-xs text-stone-500 px-2">{t("combat.selectTarget")}</div>
                   {enemies.filter(e => e.hp > 0).map((en, i) => (
                     <button key={i}
-                      onClick={() => { setSelectingTarget(false); void handleAttack(en.name); }}
+                      onClick={() => {
+                        const action = pendingAction;
+                        setSelectingTarget(false);
+                        setPendingAction(null);
+                        if (action.type === "attack") void handleAttack(en.name);
+                        else if (action.type === "sneak") void handleSneak(en.name);
+                        else if (action.type === "spell") void handleSpell(action.spell, en.name);
+                      }}
                       className="w-full text-left px-3 py-2 rounded-lg bg-stone-900 border border-stone-700 hover:border-amber-700 text-amber-100 text-sm transition-colors"
                       style={{ fontFamily: "serif" }}>
                       {en.name}
                       <span className="text-stone-500 text-xs ml-2">{en.hp}/{en.maxHp} HP</span>
                     </button>
                   ))}
-                  <button onClick={() => setSelectingTarget(false)}
+                  <button onClick={() => { setSelectingTarget(false); setPendingAction(null); }}
                     className="w-full text-center px-3 py-1.5 text-xs text-stone-500 hover:text-stone-300 transition-colors">
                     {t("common.cancel")}
                   </button>

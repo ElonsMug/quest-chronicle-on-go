@@ -166,12 +166,20 @@
   "defeated": {
     "title": "Ты повержен",
     "subtitle": "Силы покидают тебя. Тьма смыкается...",
+    "continueStory": "Продолжить историю",
     "drinkPotion": "Выпить зелье лечения",
     "retry": "Начать бой заново",
     "returnToMenu": "Вернуться в меню",
     "closeAria": "Закрыть",
     "closeTitle": "Закрыть и перечитать журнал",
     "footer": "💀 Ты повержен"
+  },
+  "negotiation": {
+    "prompt": "{{name}} сломлен. Что ты сделаешь?",
+    "accept": "Принять сдачу",
+    "keepAttacking": "Добить",
+    "letGo": "Отпустить",
+    "freeAction": "Сказать что-то своё..."
   },
   "free": {
     "placeholders": [
@@ -232,6 +240,11 @@
     "attackHit": "[Attack: {{weapon}}{{target}} — d20({{roll}})+mod({{mod}})+prof({{prof}})={{total}} vs AC{{ac}} HIT → Damage to enemy: {{damage}}. Describe the strike and write [ENEMY_DAMAGE: {{tagName}}, {{damage}}].]",
     "attackMiss": "[Attack: {{weapon}}{{target}} — d20({{roll}})+mod({{mod}})+prof({{prof}})={{total}} vs AC{{ac}} MISS]",
     "rollSuccess": "[Check: {{stat}} — SUCCESS ({{roll}}{{modPart}}={{total}} vs DC{{dc}})]",
-    "rollFail": "[Check: {{stat}} — FAIL ({{roll}}{{modPart}}={{total}} vs DC{{dc}})]"
+    "rollFail": "[Check: {{stat}} — FAIL ({{roll}}{{modPart}}={{total}} vs DC{{dc}})]",
+    "acceptSurrender": "[Player accepts {{name}}'s surrender. Spare them. Open dialogue: extract information, demand something, or let them be. Write [END_COMBAT: surrender] on its own line. NO [DAMAGE:]. Then 3 numbered choices for the new situation.]",
+    "keepAttacking": "[Player rejects mercy and continues to attack {{name}}. The next player attack still goes through normal combat — wait for the [ATTACK:] roll. Describe the enemy bracing for it (or trying one last desperate move). Continue combat normally. NO [END_COMBAT] in this response.]",
+    "letThemGo": "[Player lets {{name}} disengage and walk away. Narrate the retreat (3-5 sentences). The enemy survives at current HP and remembers this — reference it later in the world. Write [END_COMBAT: retreat] on its own line. NO [DAMAGE:]. Then 3 numbered choices.]",
+    "freeNegotiation": "[Player wants to say or do something specific to {{name}} during the surrender moment. Show the free-input field — wait for the player's text. Do NOT auto-resolve.]",
+    "playerDefeatedNarrative": "[Player defeated, narrative continues. Write 3-5 sentences continuing the story from the player's defeat (captured & wakes elsewhere / robbed & left unconscious / a stranger intervenes / regains consciousness later, weakened). Restore HP via [PLAYER_HP: N] (1-3 = barely alive, 5-7 = rescued, max = long recovery). Write [END_COMBAT: narrative] on its own line. NO [DAMAGE:]. Then 3 numbered choices for the new situation.]"
   }
 }
