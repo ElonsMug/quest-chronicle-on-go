@@ -21,7 +21,7 @@ export type Locale = "en" | "ru";
 export const SUPPORTED_LOCALES: Locale[] = ["en", "ru"];
 export const DEFAULT_LOCALE: Locale = "en";
 
-function readSavedLocale(): Locale {
+export function readSavedLocale(): Locale {
   if (typeof window === "undefined") return DEFAULT_LOCALE;
   try {
     const saved = window.localStorage.getItem(STORAGE_KEY);
@@ -34,9 +34,10 @@ function readSavedLocale(): Locale {
 
 if (!i18n.isInitialized) {
   // CRITICAL: initialize with DEFAULT_LOCALE so SSR and the first client
-  // render produce identical HTML. The saved locale is applied right after
-  // hydration in the effect below — a tiny flash is acceptable and avoids
-  // a hydration mismatch crash.
+  // render produce identical HTML. The saved locale is applied AFTER
+  // hydration via the useHydratedLocale() hook below — applying it here
+  // (even via queueMicrotask) runs before React's first commit on the
+  // client and causes hydration mismatches.
   void i18n.use(initReactI18next).init({
     resources: {
       en: { translation: en },
@@ -47,15 +48,6 @@ if (!i18n.isInitialized) {
     interpolation: { escapeValue: false },
     returnNull: false,
   });
-
-  // Apply saved locale on the client after init (post-hydration safe).
-  if (typeof window !== "undefined") {
-    const saved = readSavedLocale();
-    if (saved !== DEFAULT_LOCALE) {
-      // Defer to next tick so React has finished its first commit.
-      queueMicrotask(() => void i18n.changeLanguage(saved));
-    }
-  }
 }
 
 export function setLocale(locale: Locale) {
