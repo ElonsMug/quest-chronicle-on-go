@@ -942,7 +942,8 @@ export default function SoloDnD() {
   const leaderInShift = !!(leader && leader.hp / leader.maxHp < 0.4 && leader.hp > 0);
   const showNegotiation =
     !loading && !freeInput && !pendingRoll && !pendingInitiative &&
-    !showDefeated && !defeatPending && inCombat && leaderInShift && !!character;
+    !showDefeated && !defeatPending && inCombat && leaderInShift &&
+    !negotiationDeclined && !!character;
 
   function openTargetPickerOr(
     action: { type: "attack" } | { type: "sneak" } | { type: "spell"; spell: Spell },
