@@ -368,6 +368,7 @@ export default function SoloDnD() {
       setSelectingTarget(false);
       setPendingAction(null);
       setShowSpellMini(false);
+      setNegotiationDeclined(false);
       pendingPotionInfoRef.current = null;
       if (wasInCombat) {
         trackEvent("combat_ended", {
@@ -401,6 +402,7 @@ export default function SoloDnD() {
       setSelectingTarget(false);
       setPendingAction(null);
       setShowSpellMini(false);
+      setNegotiationDeclined(false);
     }
 
     return { newHp, newInv, newEff: finalEffects, newEnemies };
