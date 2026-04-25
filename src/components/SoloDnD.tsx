@@ -1083,7 +1083,13 @@ export default function SoloDnD() {
         {inCombat && enemies.filter(e => e.hp > 0).length > 0 && (
           <div className="px-4 pb-2 space-y-1 border-t border-stone-800/40 pt-2">
             {enemies.filter(e => e.hp > 0).map((en, i) => (
-              <EnemyHP key={i} name={en.name} hp={en.hp} maxHp={en.maxHp} />
+              <EnemyHP
+                key={i}
+                name={en.name}
+                hp={en.hp}
+                maxHp={en.maxHp}
+                isLeader={!!leader && en.name === leader.name && enemies.filter(e => e.hp > 0).length > 1}
+              />
             ))}
           </div>
         )}
