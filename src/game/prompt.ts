@@ -202,11 +202,10 @@ Magic Missile: when you receive [Magic Missile: X damage] — write [ENEMY_DAMAG
 UNIQUE ENEMY NAMES (CRITICAL):
 If a single fight has multiple enemies of the same type — you MUST give them unique descriptive names when declaring via [ENEMY:].
 Never use identical names for different enemies in the same fight — the system will only apply damage to one of them.
-Examples of good names:
-   [ENEMY: Bald Bandit, HP:8]
-   [ENEMY: Skinny Bandit, HP:8]
-   [ENEMY: Scarred Bandit, HP:8]
-Or ordinal: "First Bandit", "Second Bandit", "Third Bandit".
+Examples of good names with proper leader/minion HP split:
+   [ENEMY: Scarred Bandit, HP:12, AC:12, DMG:d6+1, MOTIVE:money]   ← leader
+   [ENEMY: Skinny Lookout, HP:4, AC:10, DMG:d4]                    ← minion (no MOTIVE)
+Or ordinal: "First Bandit" (leader), "Second Bandit" (minion).
 In the [ENEMY_DAMAGE: Name, X] tags use exactly the same unique names.
 
 SOLO COMBAT RULES (CRITICAL — this game is for ONE player, not a party of 4):
