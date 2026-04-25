@@ -635,27 +635,23 @@ export default function SoloDnD() {
       setDefeatDismissed(false);
       return;
     }
-    // Clear first (fix: otherwise enemies/allies double up), then restore in the next tick
-    setEnemies([]);
-    setAllies([]);
+    // UI flags first…
     setShowDefeated(false);
     setDefeatPending(false);
     setDefeatDismissed(false);
-    setBerserkChargesLeft(0);
-    setBerserkUsedThisCombat(false);
-    setDidDodgeLastTurn(false);
-    setDefensiveStance(false);
     setSelectingTarget(false);
     setShowSpellMini(false);
     setPendingRoll(null);
     setPendingInitiative(false);
-    setTimeout(() => {
-      setHp(snap.hp);
-      setEnemies(snap.enemies.map(e => ({ ...e, hp: e.maxHp })));
-      setAllies(snap.allies ? snap.allies.map(a => ({ ...a })) : []);
-      setInCombat(true);
-      void handleChoice(i18n.t("system.retryCombat"));
-    }, 0);
+    // …then atomic snapshot restore (hp, enemies, allies, inCombat=true,
+    // and combat-flag reset all in one reducer transition — no double-up).
+    dispatch({
+      type: "RESTORE_SNAPSHOT",
+      hp: snap.hp,
+      enemies: snap.enemies.map(e => ({ ...e, hp: e.maxHp })),
+      allies: snap.allies ? snap.allies.map(a => ({ ...a })) : [],
+    });
+    void handleChoice(i18n.t("system.retryCombat"));
   }
 
   function handleShortRest() {
