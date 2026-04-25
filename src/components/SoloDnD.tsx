@@ -1187,7 +1187,7 @@ export default function SoloDnD() {
                 🚪 {t("negotiation.letGo")}
               </button>
               <button
-                onClick={() => void handleChoice(i18n.t("system.freeNegotiation", { name: leader.name }))}
+                onClick={() => setFreeInput(true)}
                 className="w-full text-center px-3 py-2 text-xs text-stone-500 hover:text-stone-300 transition-colors">
                 ✍ {t("negotiation.freeAction")}
               </button>
