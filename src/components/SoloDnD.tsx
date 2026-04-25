@@ -6,7 +6,7 @@
 // parsed responses.
 // ─────────────────────────────────────────────────────────────────
 
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useReducer } from "react";
 import { useTranslation } from "react-i18next";
 import { initAnalytics, trackEvent } from "@/lib/analytics";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -30,6 +30,8 @@ import { parseDMResponse } from "@/game/parser";
 import { callDM } from "@/game/api";
 import { rollDice, parseDiceSides, PROFICIENCY_BONUS } from "@/game/dice";
 import { isPotion } from "@/game/inventory";
+import { gameReducer } from "@/game/reducer";
+import { initialGameState } from "@/game/state";
 
 // ─── UI components ───────────────────────────────────────────────
 import { EnemyHP } from "@/components/game/EnemyHP";
