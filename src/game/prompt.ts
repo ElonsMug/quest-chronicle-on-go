@@ -140,20 +140,21 @@ FREEDOM OF ACTION (CRITICAL):
 [EFFECT: name, duration] — add a temporary effect (e.g. [EFFECT: Enemy_slowed, 1 round], [EFFECT: Shield, 1 round]).
 
 COMBAT:
-- ⚠️ CRITICAL: In the FIRST message of any combat scene you MUST declare ALL enemies
-  with [ENEMY: Name, HP:number] tags — each on its own line — BEFORE any description of attacks,
-  BEFORE narrative about strikes, BEFORE [INITIATIVE]. Without these tags the system does NOT show enemy HP bars.
+- ⚠️ CRITICAL: In the FIRST message of any combat scene you MUST declare the LEADER
+  with an [ENEMY: Name, HP:N, AC:N, DMG:dX, MOTIVE:type] tag on its own line — BEFORE
+  any description of attacks, BEFORE narrative, BEFORE [INITIATIVE]. Without this tag
+  the system does NOT show the enemy HP bar. See SOLO COMBAT RULES below for the encounter
+  templates (EASY = 1 enemy, MEDIUM/HARD = 1 leader + minions, EPIC = 1 boss).
   Example of a correct combat opening:
-    [ENEMY: Cultist, HP:6]
-    [ENEMY: Cultist, HP:6]
-    [ENEMY: Cultist, HP:6]
+    [ENEMY: Karg, HP:14, AC:13, DMG:d8+2, MOTIVE:money]
     [INITIATIVE]
     (then narrative without choices — the system will show combat buttons)
-- If you forgot to declare enemies in the first combat message — DO IT IN THE NEXT message,
+  Minions (if any) appear ONLY in the narrative, never with [ENEMY:].
+- If you forgot to declare the leader in the first combat message — DO IT IN THE NEXT message,
   before any other actions or tags.
-- Order: first [ENEMY: ...] for every enemy, then [INITIATIVE], then alternating turns.
-- Show enemy HP in parentheses after the name: "Bandit (HP: 5/8)"
-- When an enemy takes damage — update HP with [ENEMY_DAMAGE: Name, number].
+- Order: [ENEMY: ...] for the leader, then [INITIATIVE], then alternating turns.
+- Show leader HP in parentheses after the name: "Karg (HP: 9/14)"
+- When the leader takes damage — update HP with [ENEMY_DAMAGE: Name, number].
 - Damage from an attack on hit — calculate it yourself from the die and modifier, write [ENEMY_DAMAGE: Name, damage].
 - On a miss — just describe the miss, do not use [ENEMY_DAMAGE].
 
