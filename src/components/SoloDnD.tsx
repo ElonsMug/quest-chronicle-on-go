@@ -1140,20 +1140,24 @@ export default function SoloDnD() {
               <div className="text-center text-xs text-stone-500 pb-1" style={{ fontFamily: "serif" }}>
                 {t("defeated.footer")}
               </div>
+              <button onClick={() => void handleContinueStory()}
+                className="w-full py-3 rounded-xl font-bold text-stone-900 active:scale-95 transition-transform"
+                style={{ background: "linear-gradient(135deg,#d97706,#92400e)", fontFamily: "serif" }}>
+                📖 {t("defeated.continueStory")}
+              </button>
               {hasPotion && (
                 <button onClick={handleDefeatedUsePotion}
-                  className="w-full py-3 rounded-xl font-bold text-stone-900"
-                  style={{ background: "linear-gradient(135deg,#d97706,#92400e)", fontFamily: "serif" }}>
+                  className="w-full py-3 rounded-xl border border-amber-900/60 bg-stone-900 text-amber-200 font-bold">
                   🧪 {t("defeated.drinkPotion")}
                 </button>
               )}
               <button onClick={handleDefeatedRetry}
-                className="w-full py-3 rounded-xl border border-stone-600 bg-stone-800 text-amber-100 font-bold"
+                className="w-full py-3 rounded-xl border border-stone-700 bg-stone-900 text-stone-300 text-sm font-bold"
                 style={{ fontFamily: "serif" }}>
                 ⚔️ {t("defeated.retry")}
               </button>
               <button onClick={() => { setDefeatPending(false); setDefeatDismissed(false); exitToMenu(); }}
-                className="w-full py-3 rounded-xl border border-stone-700 bg-stone-900 text-stone-400 text-sm"
+                className="w-full py-3 rounded-xl border border-stone-800 bg-stone-950 text-stone-500 text-sm"
                 style={{ fontFamily: "serif" }}>
                 ← {t("defeated.returnToMenu")}
               </button>
