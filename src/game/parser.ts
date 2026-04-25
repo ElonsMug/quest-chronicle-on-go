@@ -28,6 +28,9 @@ export function parseDMResponse(text: string) {
 
   // English-tag parser. Tags are part of an internal contract between the DM
   // and the parser — they do not get translated when the UI language changes.
+  // The character class `[^\]]*` is intentionally permissive so a malformed
+  // tag (extra space, trailing text inside brackets) still gets stripped from
+  // the visible narrative even if its dedicated extractor regex doesn't fire.
   const TAG = /\[(ATTACK|ROLL|DAMAGE|ITEM|UPGRADE|ENEMY|ENEMY_DAMAGE|ALLY|ALLY_DAMAGE|EFFECT|INITIATIVE|END_COMBAT|PLAYER_HP|BEHAVIOR_SHIFT)[^\]]*\]/gi;
 
   const atk = text.match(/\[ATTACK:\s*([^,\]]+),\s*([^,\]]+),\s*([^,\]]+),\s*AC(\d+)\]/i);
