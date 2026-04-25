@@ -27,6 +27,7 @@ import type {
 import { buildCharacters } from "@/game/characters";
 import { buildDevScenes } from "@/game/devScenes";
 import { parseDMResponse } from "@/game/parser";
+import { reportLanguageLeaks } from "@/game/langGuard";
 import { callDM } from "@/game/api";
 import { rollDice, parseDiceSides, PROFICIENCY_BONUS } from "@/game/dice";
 import { isPotion } from "@/game/inventory";
@@ -442,6 +443,9 @@ export default function SoloDnD() {
 
   async function processAndSetMessages(char: Character, currentHp: number, currentInv: string[], currentEff: string[], currentEnemies: Enemy[], reply: string, prevMessages: ChatMessage[]) {
     const parsed = parseDMResponse(reply);
+    // Dev-only: warn in console if the DM leaked Latin words into a Russian
+    // narrative. Helps catch prompt regressions before they ship.
+    reportLanguageLeaks(parsed.narrative, language, parsed.narrative);
     const newMsgs: ChatMessage[] = [...prevMessages, { role: "assistant", content: reply, parsed }];
     const { newHp, newInv, newEff } = applyParsed(parsed, currentHp, currentInv, currentEff, currentEnemies);
     setMessages(newMsgs);

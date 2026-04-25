@@ -59,9 +59,21 @@ YOU MUST:
    (bound, finished). Sleepers alone do not end combat.
 ` : "";
 
+  // Language contract — applied at the TOP and re-asserted at the BOTTOM of the
+  // prompt to fight LLM drift over a long instruction block. The "non-tag"
+  // rule is critical: the LLM must understand that English may appear ONLY
+  // inside [SQUARE_BRACKET_TAGS] and nowhere else.
   const langInstruction = language === "ru"
-    ? "ЯЗЫК НАРРАТИВА: пиши весь нарратив, описания и варианты на русском языке. Теги в квадратных скобках ВСЕГДА на английском."
-    : "NARRATIVE LANGUAGE: write all narrative, descriptions and choices in English. Tags in square brackets are ALWAYS in English.";
+    ? `ЯЗЫК НАРРАТИВА: ВЕСЬ нарратив, описания, реплики персонажей, имена врагов, имена NPC, названия мест, улиц, зданий, предметов и пронумерованные варианты выбора пишутся СТРОГО на русском языке кириллицей.
+ЗАПРЕЩЕНО оставлять английские слова в нарративе. Если в системных инструкциях ниже встречается английское название (например "Grey Shore", "Scarred Bandit", "Karg") — это ШАБЛОН, ты обязан перевести его на русский в своём ответе ("Серый Берег", "Бандит со шрамом", "Карг").
+Латиница допустима ТОЛЬКО внутри [квадратных тегов] — это технический контракт с парсером.`
+    : `NARRATIVE LANGUAGE: write all narrative, descriptions, character lines, enemy names, NPC names, place names, choices in English. Tags in square brackets are ALWAYS in English.`;
+
+  // Setting block is fully localized — name of the city, atmosphere hint.
+  // No more hard-coded English topo names leaking into Russian narration.
+  const setting = language === "ru"
+    ? `СЕТТИНГ: тёмное фэнтези, портовый город под названием «Серый Берег» (используй ИМЕННО это написание кириллицей, никогда не "Grey Shore"). Будь лаконичен — игра идёт на мобильном, в метро.`
+    : `SETTING: a dark fantasy harbor city called "Grey Shore". Be concise — mobile, on the metro.`;
 
   return `You are the Dungeon Master of a solo text RPG (simplified D&D 5e). One player.
 
@@ -315,5 +327,11 @@ SOLO COMBAT RULES (CRITICAL — this game is for ONE player, not a party of 4):
    The world REACTS — enemies remember, consequences persist.
    NEVER write [DAMAGE:] in this response — the player is already at 0.
 
-SETTING: a dark fantasy harbor city called "Grey Shore". Be concise — mobile, on the metro.${mageRules}`;
+${setting}${mageRules}
+
+${langInstruction}
+
+FINAL REMINDER: ${language === "ru"
+    ? "если хоть одно слово в твоём ответе вне [тегов] окажется латиницей — ответ считается ошибочным. Все собственные имена пиши кириллицей."
+    : "all narrative outside [tags] must be in English."}`;
 }
