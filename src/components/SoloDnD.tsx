@@ -889,6 +889,34 @@ export default function SoloDnD() {
   // journal or continue.
   const hasPotion = inventory.some(isPotion);
   const showDefeatActions = defeatPending && !showDefeated && !loading;
+
+  // ── Behavior shift / negotiation moment ──────────────────────
+  // Pick the leader: the enemy with the highest maxHp (matches how the prompt
+  // declares ONE leader per encounter via [ENEMY:]). When that leader drops
+  // below 40% HP, the DM is instructed to pause and let the player choose
+  // surrender / continue / let go. We surface those choices as dedicated UI.
+  const liveEnemies = enemies.filter(e => e.hp > 0);
+  const leader = liveEnemies.length
+    ? [...liveEnemies].sort((a, b) => b.maxHp - a.maxHp)[0]
+    : null;
+  const leaderInShift = !!(leader && leader.hp / leader.maxHp < 0.4 && leader.hp > 0);
+  const showNegotiation =
+    !loading && !freeInput && !pendingRoll && !pendingInitiative &&
+    !showDefeated && !defeatPending && inCombat && leaderInShift && !!character;
+
+  function openTargetPickerOr(
+    action: { type: "attack" } | { type: "sneak" } | { type: "spell"; spell: Spell },
+    fallback: () => void,
+  ) {
+    const live = stateRef.current.enemies.filter(e => e.hp > 0);
+    if (live.length > 1) {
+      setPendingAction(action);
+      setSelectingTarget(true);
+    } else {
+      fallback();
+    }
+  }
+
   const showCombatButtons = !loading && !freeInput && !pendingRoll && !pendingInitiative && !showDefeated && !defeatPending && inCombat && !!character;
   const showChoices = !loading && !freeInput && !pendingRoll && !pendingInitiative && !showDefeated && !defeatPending && !inCombat && (parsed?.choices?.length ?? 0) > 0;
   const showFreeArea = freeInput && !loading && !defeatPending;
