@@ -72,6 +72,13 @@ export default function SoloDnD() {
   const [showSpells, setShowSpells] = useState(false);
   const [showSpellMini, setShowSpellMini] = useState(false);
   const [selectingTarget, setSelectingTarget] = useState(false);
+  // What the target picker is for. Null when picker is closed.
+  const [pendingAction, setPendingAction] = useState<
+    | { type: "attack" }
+    | { type: "sneak" }
+    | { type: "spell"; spell: Spell }
+    | null
+  >(null);
   const [freeInputPlaceholder, setFreeInputPlaceholder] = useState("");
   const [showDev, setShowDev] = useState(false);
   const [showDefeated, setShowDefeated] = useState(false);
