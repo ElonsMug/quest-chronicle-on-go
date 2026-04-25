@@ -327,5 +327,11 @@ SOLO COMBAT RULES (CRITICAL — this game is for ONE player, not a party of 4):
    The world REACTS — enemies remember, consequences persist.
    NEVER write [DAMAGE:] in this response — the player is already at 0.
 
-SETTING: a dark fantasy harbor city called "Grey Shore". Be concise — mobile, on the metro.${mageRules}`;
+${setting}${mageRules}
+
+${langInstruction}
+
+FINAL REMINDER: ${language === "ru"
+    ? "если хоть одно слово в твоём ответе вне [тегов] окажется латиницей — ответ считается ошибочным. Все собственные имена пиши кириллицей."
+    : "all narrative outside [tags] must be in English."}`;
 }
