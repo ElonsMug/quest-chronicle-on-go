@@ -1227,7 +1227,7 @@ export default function SoloDnD() {
                 {t("negotiation.prompt", { name: leader.name })}
               </div>
               <button
-                onClick={() => void handleChoice(i18n.t("system.acceptSurrender", { name: leader.name }))}
+                onClick={() => void handleAcceptSurrender(leader.name)}
                 className="w-full py-3 rounded-xl font-bold text-stone-900 active:scale-95 transition-transform"
                 style={{ background: "linear-gradient(135deg,#d97706,#92400e)", fontFamily: "serif" }}>
                 🤝 {t("negotiation.accept")}
@@ -1239,7 +1239,7 @@ export default function SoloDnD() {
                 ⚔️ {t("negotiation.keepAttacking")}
               </button>
               <button
-                onClick={() => void handleChoice(i18n.t("system.letThemGo", { name: leader.name }))}
+                onClick={() => void handleLetThemGo(leader.name)}
                 className="w-full py-3 rounded-xl border border-stone-700 bg-stone-900 text-stone-300 font-bold active:scale-95 transition-transform"
                 style={{ fontFamily: "serif" }}>
                 🚪 {t("negotiation.letGo")}
