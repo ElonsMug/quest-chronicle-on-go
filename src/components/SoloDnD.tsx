@@ -672,10 +672,12 @@ export default function SoloDnD() {
   function handleLongRest() {
     const { character: c } = stateRef.current;
     if (!c || inCombat) return;
-    setHp(c.maxHp);
-    if (c.spellSlots) setSpellSlots({ current: c.spellSlots.max, max: c.spellSlots.max });
-    setBerserkChargesLeft(0);
-    setBerserkUsedThisCombat(false);
+    // Atomic: hp=max, refill spell slots, reset berserk counters.
+    dispatch({
+      type: "LONG_REST",
+      hp: c.maxHp,
+      spellSlots: c.spellSlots ? { current: c.spellSlots.max, max: c.spellSlots.max } : null,
+    });
     setShowInventory(false);
     const text = t("combat.longRestNarrative");
     setMessages(prev => [...prev, {
@@ -694,7 +696,7 @@ export default function SoloDnD() {
     let mod = ch.stats[ch.weapon.stat] || 0;
     if (bcl > 0) {
       mod += 2;
-      setBerserkChargesLeft(prev => Math.max(0, prev - 1));
+      dispatch({ type: "DECREMENT_BERSERK_CHARGE" });
     }
     if (stateRef.current.defensiveStance) {
       setDefensiveStance(false);
@@ -707,10 +709,8 @@ export default function SoloDnD() {
   }
 
   async function handleBerserk() {
-    setBerserkChargesLeft(2);
-    setBerserkUsedThisCombat(true);
-    setDefensiveStance(false);
-    setDidDodgeLastTurn(false);
+    // Atomic: charges=2, used=true, defensive=false, didDodge=false.
+    dispatch({ type: "ACTIVATE_BERSERK" });
     setEffects(prev => [...prev, t("combat.berserkEffect")]);
     await handleChoice(i18n.t("system.berserkActivated"));
   }
