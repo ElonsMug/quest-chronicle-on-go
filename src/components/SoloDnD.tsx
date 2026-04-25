@@ -984,6 +984,7 @@ export default function SoloDnD() {
       {showDefeated && (
         <DefeatedScreen
           hasPotion={inventory.some(isPotion)}
+          onContinueStory={() => void handleContinueStory()}
           onUsePotion={handleDefeatedUsePotion}
           onRetry={handleDefeatedRetry}
           onMenu={() => { setShowDefeated(false); setDefeatPending(false); setDefeatDismissed(false); exitToMenu(); }}
