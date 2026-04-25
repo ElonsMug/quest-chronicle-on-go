@@ -785,6 +785,35 @@ export default function SoloDnD() {
     await handleAttack(targetName);
   }
 
+  // ── Negotiation outcomes ─────────────────────────────────────
+  // "Accept surrender" / "Let them go" both end the fight client-side
+  // BEFORE we ask the DM to narrate the aftermath. This prevents the
+  // negotiation panel from re-appearing while the DM's reply is still
+  // in flight (or if the DM forgets to write [END_COMBAT]).
+  async function handleAcceptSurrender(name: string) {
+    setEnemies([]);
+    setAllies([]);
+    setInCombat(false);
+    setSelectingTarget(false);
+    setPendingAction(null);
+    setShowSpellMini(false);
+    setNegotiationDeclined(true);
+    pendingPotionInfoRef.current = null;
+    await handleChoice(i18n.t("system.acceptSurrender", { name }));
+  }
+
+  async function handleLetThemGo(name: string) {
+    setEnemies([]);
+    setAllies([]);
+    setInCombat(false);
+    setSelectingTarget(false);
+    setPendingAction(null);
+    setShowSpellMini(false);
+    setNegotiationDeclined(true);
+    pendingPotionInfoRef.current = null;
+    await handleChoice(i18n.t("system.letThemGo", { name }));
+  }
+
   async function handleSpell(s: Spell, targetName?: string) {
     const slots = stateRef.current.spellSlots;
     if (!slots || slots.current <= 0) return;
