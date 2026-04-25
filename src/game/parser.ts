@@ -105,7 +105,9 @@ export function parseDMResponse(text: string) {
   const endMatch = text.match(/\[END_COMBAT(?::\s*(victory|surrender|retreat|narrative))?\]/i);
   if (endMatch) {
     combatEnd = true;
-    combatEndType = (endMatch[1]?.toLowerCase() as typeof combatEndType) ?? "victory";
+    const t = endMatch[1]?.toLowerCase();
+    combatEndType =
+      t === "surrender" || t === "retreat" || t === "narrative" ? t : "victory";
   }
   // [PLAYER_HP: N] — narrative HP restore after defeat
   const hpRestore = text.match(/\[PLAYER_HP:\s*(\d+)\]/i);
