@@ -27,6 +27,7 @@ import type {
 import { buildCharacters } from "@/game/characters";
 import { buildDevScenes } from "@/game/devScenes";
 import { parseDMResponse } from "@/game/parser";
+import { reportLanguageLeaks } from "@/game/langGuard";
 import { callDM } from "@/game/api";
 import { rollDice, parseDiceSides, PROFICIENCY_BONUS } from "@/game/dice";
 import { isPotion } from "@/game/inventory";
