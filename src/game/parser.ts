@@ -129,12 +129,19 @@ export function parseDMResponse(text: string) {
     if (s === "surrender" || s === "flee" || s === "escalate") behaviorShift = s;
   }
 
-  for (const line of text.trim().split("\n")) {
+  // Build the narrative line-by-line:
+  //  - numbered "1. ..." lines become choices and are pulled out
+  //  - any [TAG: ...] occurrences inside a line are stripped INLINE
+  //    (not the whole line!) so prose mixed on the same line as a tag
+  //    survives and reaches the player. Empty leftover lines are dropped.
+  for (const rawLine of text.trim().split(/\r?\n/)) {
+    const line = rawLine.replace(/\r/g, "");
     const choiceMatch = line.trim().match(/^\*{0,2}(\d+)\.\s+(.+?)\*{0,2}$/);
     if (choiceMatch) { choices.push({ num: choiceMatch[1], text: choiceMatch[2].trim() }); continue; }
-    if (TAG.test(line)) { TAG.lastIndex = 0; continue; }
+    const stripped = line.replace(TAG, "").trim();
     TAG.lastIndex = 0;
-    narrativeLines.push(line);
+    if (stripped.length === 0) continue;
+    narrativeLines.push(stripped);
   }
 
   return {
