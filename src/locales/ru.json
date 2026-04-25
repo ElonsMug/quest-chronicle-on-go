@@ -215,7 +215,7 @@
   },
   "system": {
     "potionBonusAction": "[Bonus action before main attack: the player drinks a healing potion, +{{heal}} HP ({{hp}}/{{max}}). Describe the gulp of the potion in ONE sentence, then immediately describe the player's main action described below.]",
-    "combatTurnReminder": "[SYSTEM RULE: After describing the result of the player's action — enemies MUST attack in the same response. Each living enemy makes one attack. Use [DAMAGE: X] for each hit. Do not wait for the next player turn. Do not offer choices 1-2-3.]",
+    "combatTurnReminder": "[SYSTEM RULE: After describing the result of the player's action — the leader acts according to their behavior state. AGGRESSIVE/TACTICAL/DEFENSIVE → attack with [DAMAGE: X] on hit. RETREATING → narrate the disengage, no attack required. If leader is below 40% HP → trigger the motive-based behavior shift (surrender/flee/escalate). Minions add pressure in the narrative without their own turn. Do not offer choices 1-2-3 unless combat is ending.]",
     "berserkActivated": "[Berserk activated: +2 damage and -2 AC for 2 turns]",
     "defendStance": "[Defensive stance: +2 AC until next turn]",
     "dodge": "[Dodge: enemy attacks at disadvantage (two rolls, take the lower)]",
