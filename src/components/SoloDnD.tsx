@@ -60,28 +60,16 @@ export default function SoloDnD() {
     return Array.isArray(list) ? (list as string[]) : [];
   }, [i18nInstance, i18nInstance.language]);
 
+  // ── UI / transient state (independent flags, kept as useState) ──
   const [screen, setScreen] = useState<"select" | "game">("select");
   const [selectedChar, setSelectedChar] = useState<Character | null>(null);
-  const [character, setCharacter] = useState<Character | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
-  const [hp, setHp] = useState(14);
-  const [inventory, setInventory] = useState<string[]>([]);
-  const [effects, setEffects] = useState<string[]>([]);
-  const [enemies, setEnemies] = useState<Enemy[]>([]);
-  const [allies, setAllies] = useState<Ally[]>([]);
-  const [inCombat, setInCombat] = useState(false);
   const [pendingRoll, setPendingRoll] = useState<PendingRoll | null>(null);
   const [pendingInitiative, setPendingInitiative] = useState(false);
   const [freeInput, setFreeInput] = useState(false);
   const [freeText, setFreeText] = useState("");
   const [showInventory, setShowInventory] = useState(false);
   const [showSpells, setShowSpells] = useState(false);
-  const [spellSlots, setSpellSlots] = useState<{ current: number; max: number } | null>(null);
-  const [berserkChargesLeft, setBerserkChargesLeft] = useState(0);
-  const [berserkUsedThisCombat, setBerserkUsedThisCombat] = useState(false);
-  const [didDodgeLastTurn, setDidDodgeLastTurn] = useState(false);
-  const [defensiveStance, setDefensiveStance] = useState(false);
   const [showSpellMini, setShowSpellMini] = useState(false);
   const [selectingTarget, setSelectingTarget] = useState(false);
   const [freeInputPlaceholder, setFreeInputPlaceholder] = useState("");
@@ -99,26 +87,77 @@ export default function SoloDnD() {
     next: "en" | "ru";
     resolve: (ok: boolean) => void;
   } | null>(null);
+
+  // ── Game state (single reducer — see src/game/state.ts) ─────────
+  // Everything that an async DM callback needs to read after-the-fact
+  // lives here. The reducer guarantees a consistent snapshot per action,
+  // and `stateRef` (below) keeps the same snapshot reachable from
+  // closures captured before the dispatch.
+  const [game, dispatch] = useReducer(gameReducer, initialGameState);
+  const {
+    character,
+    hp,
+    inventory,
+    effects,
+    enemies,
+    allies,
+    inCombat,
+    spellSlots,
+    berserkChargesLeft,
+    berserkUsedThisCombat,
+    didDodgeLastTurn,
+    defensiveStance,
+    messages,
+  } = game;
+
+  // ── Setter shims ────────────────────────────────────────────────
+  // Thin wrappers so existing call-sites keep their familiar
+  // `setX(value)` / `setX(prev => next)` shape. They forward to the
+  // reducer and remain the *only* way to mutate the game state.
+  const setHp = (v: number) => dispatch({ type: "SET_HP", hp: v });
+  const setInventory = (v: string[] | ((prev: string[]) => string[])) =>
+    typeof v === "function"
+      ? dispatch({ type: "UPDATE_INVENTORY", updater: v as (p: string[]) => string[] })
+      : dispatch({ type: "SET_INVENTORY", inventory: v });
+  const setEffects = (v: string[] | ((prev: string[]) => string[])) =>
+    typeof v === "function"
+      ? dispatch({ type: "UPDATE_EFFECTS", updater: v as (p: string[]) => string[] })
+      : dispatch({ type: "SET_EFFECTS", effects: v });
+  const setEnemies = (v: Enemy[]) => dispatch({ type: "SET_ENEMIES", enemies: v });
+  const setAllies = (v: Ally[] | ((prev: Ally[]) => Ally[])) =>
+    typeof v === "function"
+      ? dispatch({ type: "UPDATE_ALLIES", updater: v as (p: Ally[]) => Ally[] })
+      : dispatch({ type: "SET_ALLIES", allies: v });
+  const setMessages = (v: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) =>
+    typeof v === "function"
+      ? dispatch({ type: "UPDATE_MESSAGES", updater: v as (p: ChatMessage[]) => ChatMessage[] })
+      : dispatch({ type: "SET_MESSAGES", messages: v });
+  const setSpellSlots = (v: { current: number; max: number } | null) =>
+    dispatch({ type: "SET_SPELL_SLOTS", slots: v });
+  const setInCombat = (v: boolean) => dispatch({ type: "SET_IN_COMBAT", value: v });
+  const setBerserkChargesLeft = (v: number | ((prev: number) => number)) => {
+    const next = typeof v === "function" ? (v as (p: number) => number)(berserkChargesLeft) : v;
+    dispatch({ type: "SET_BERSERK_CHARGES", value: next });
+  };
+  const setBerserkUsedThisCombat = (v: boolean) =>
+    dispatch({ type: "SET_BERSERK_USED", value: v });
+  const setDidDodgeLastTurn = (v: boolean) =>
+    dispatch({ type: "SET_DID_DODGE", value: v });
+  const setDefensiveStance = (v: boolean) =>
+    dispatch({ type: "SET_DEFENSIVE_STANCE", value: v });
+
   const combatStartSnapshotRef = useRef<{ hp: number; enemies: Enemy[]; allies: Ally[] } | null>(null);
   // Bonus action "potion drunk" — accumulated here and attached to the next
   // main player action.
   const pendingPotionInfoRef = useRef<string | null>(null);
   const devTaps = useRef(0);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const stateRef = useRef<{
-    character: Character | null;
-    hp: number;
-    inventory: string[];
-    effects: string[];
-    enemies: Enemy[];
-    allies: Ally[];
-    messages: ChatMessage[];
-    spellSlots: { current: number; max: number } | null;
-    berserkChargesLeft: number;
-    didDodgeLastTurn: boolean;
-    defensiveStance: boolean;
-  }>({ character: null, hp: 0, inventory: [], effects: [], enemies: [], allies: [], messages: [], spellSlots: null, berserkChargesLeft: 0, didDodgeLastTurn: false, defensiveStance: false });
-  stateRef.current = { character, hp, inventory, effects, enemies, allies, messages, spellSlots, berserkChargesLeft, didDodgeLastTurn, defensiveStance };
+
+  // Mirror of `game` for closures captured by async DM callbacks.
+  // The reducer is the source of truth; this ref just makes the latest
+  // snapshot reachable without re-reading hooks inside async functions.
+  const stateRef = useRef(game);
+  stateRef.current = game;
 
   useEffect(() => { initAnalytics(); }, []);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, loading, pendingRoll, pendingInitiative]);
