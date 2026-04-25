@@ -113,6 +113,14 @@ export function parseDMResponse(text: string) {
   // [PLAYER_HP: N] — narrative HP restore after defeat
   const hpRestore = text.match(/\[PLAYER_HP:\s*(\d+)\]/i);
   if (hpRestore) playerHpRestore = parseInt(hpRestore[1]);
+  // [BEHAVIOR_SHIFT: surrender|flee|escalate] — DM signals a narrative beat where
+  // the leader's behavior changes. The UI uses this to switch from combat
+  // buttons to negotiation choices (for surrender/flee), independent of HP %.
+  const shiftMatch = text.match(/\[BEHAVIOR_SHIFT:\s*(surrender|flee|escalate)\]/i);
+  if (shiftMatch) {
+    const s = shiftMatch[1].toLowerCase();
+    if (s === "surrender" || s === "flee" || s === "escalate") behaviorShift = s;
+  }
 
   for (const line of text.trim().split("\n")) {
     const choiceMatch = line.trim().match(/^\*{0,2}(\d+)\.\s+(.+?)\*{0,2}$/);
