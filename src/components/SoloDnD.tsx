@@ -785,6 +785,35 @@ export default function SoloDnD() {
     await handleAttack(targetName);
   }
 
+  // ── Negotiation outcomes ─────────────────────────────────────
+  // "Accept surrender" / "Let them go" both end the fight client-side
+  // BEFORE we ask the DM to narrate the aftermath. This prevents the
+  // negotiation panel from re-appearing while the DM's reply is still
+  // in flight (or if the DM forgets to write [END_COMBAT]).
+  async function handleAcceptSurrender(name: string) {
+    setEnemies([]);
+    setAllies([]);
+    setInCombat(false);
+    setSelectingTarget(false);
+    setPendingAction(null);
+    setShowSpellMini(false);
+    setNegotiationDeclined(true);
+    pendingPotionInfoRef.current = null;
+    await handleChoice(i18n.t("system.acceptSurrender", { name }));
+  }
+
+  async function handleLetThemGo(name: string) {
+    setEnemies([]);
+    setAllies([]);
+    setInCombat(false);
+    setSelectingTarget(false);
+    setPendingAction(null);
+    setShowSpellMini(false);
+    setNegotiationDeclined(true);
+    pendingPotionInfoRef.current = null;
+    await handleChoice(i18n.t("system.letThemGo", { name }));
+  }
+
   async function handleSpell(s: Spell, targetName?: string) {
     const slots = stateRef.current.spellSlots;
     if (!slots || slots.current <= 0) return;
@@ -925,7 +954,23 @@ export default function SoloDnD() {
   // GAME SCREEN
   // ─────────────────────────────────────────────────────────────
   const lastMsg = messages[messages.length - 1];
-  const parsed = lastMsg?.parsed;
+  // `parsed` is what the bottom action area binds to. Out-of-combat client-only
+  // events (drank a potion, took a short rest) append a synthetic assistant
+  // message with no choices — if we used that as `parsed`, the player would
+  // be stranded without buttons (softlock). Walk back to the most recent
+  // assistant message that actually carries choices, so the previous DM
+  // choices stay live until the DM speaks again.
+  let parsed = lastMsg?.parsed;
+  if (lastMsg?.role === "assistant" && (!parsed?.choices || parsed.choices.length === 0)) {
+    for (let i = messages.length - 2; i >= 0; i--) {
+      const m = messages[i];
+      if (m.role !== "assistant") continue;
+      if (m.parsed?.choices && m.parsed.choices.length > 0) {
+        parsed = m.parsed;
+        break;
+      }
+    }
+  }
   // Defeat is registered (HP=0). When the defeat screen is closed, we show
   // "Retry / Menu" instead of combat buttons so the player can re-read the
   // journal or continue.
@@ -1198,7 +1243,7 @@ export default function SoloDnD() {
                 {t("negotiation.prompt", { name: leader.name })}
               </div>
               <button
-                onClick={() => void handleChoice(i18n.t("system.acceptSurrender", { name: leader.name }))}
+                onClick={() => void handleAcceptSurrender(leader.name)}
                 className="w-full py-3 rounded-xl font-bold text-stone-900 active:scale-95 transition-transform"
                 style={{ background: "linear-gradient(135deg,#d97706,#92400e)", fontFamily: "serif" }}>
                 🤝 {t("negotiation.accept")}
@@ -1210,7 +1255,7 @@ export default function SoloDnD() {
                 ⚔️ {t("negotiation.keepAttacking")}
               </button>
               <button
-                onClick={() => void handleChoice(i18n.t("system.letThemGo", { name: leader.name }))}
+                onClick={() => void handleLetThemGo(leader.name)}
                 className="w-full py-3 rounded-xl border border-stone-700 bg-stone-900 text-stone-300 font-bold active:scale-95 transition-transform"
                 style={{ fontFamily: "serif" }}>
                 🚪 {t("negotiation.letGo")}
