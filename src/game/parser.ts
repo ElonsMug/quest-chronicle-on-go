@@ -110,8 +110,12 @@ export function parseDMResponse(text: string) {
     combatEndType =
       t === "surrender" || t === "retreat" || t === "narrative" ? t : "victory";
   }
-  // [PLAYER_HP: N] — narrative HP restore after defeat
-  const hpRestore = text.match(/\[PLAYER_HP:\s*(\d+)\]/i);
+  // [PLAYER_HP: N] — narrative HP restore after defeat.
+  // Forgiving regex: accepts variants like [PLAYER_HP:8], [PLAYER_HP: 2/8],
+  // [PLAYER_HP: 5 HP] — we only need the first integer after the tag name.
+  // Without this, a stray `/8` or trailing word from the LLM would silently
+  // skip the HP restore and softlock the player at 0 HP.
+  const hpRestore = text.match(/\[PLAYER_HP[\s:=]+(\d+)/i);
   if (hpRestore) playerHpRestore = parseInt(hpRestore[1]);
   // [BEHAVIOR_SHIFT: surrender|flee|escalate] — DM signals a narrative beat where
   // the leader's behavior changes. The UI uses this to switch from combat
