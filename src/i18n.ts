@@ -67,4 +67,21 @@ export function getLocale(): Locale {
   return cur === "ru" ? "ru" : "en";
 }
 
+
+/**
+ * Mount this hook once near the root of the client tree (e.g. in the root
+ * route component). It applies the user's saved locale AFTER React has
+ * hydrated, which avoids SSR/client mismatches: the server always renders
+ * in DEFAULT_LOCALE, the client's first render also uses DEFAULT_LOCALE,
+ * and only then we switch (causing a single re-render — no hydration crash).
+ */
+export function useHydratedLocale() {
+  useEffect(() => {
+    const saved = readSavedLocale();
+    if (saved !== i18n.language) {
+      void i18n.changeLanguage(saved);
+    }
+  }, []);
+}
+
 export default i18n;
