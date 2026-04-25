@@ -769,11 +769,11 @@ export default function SoloDnD() {
   function exitToMenu() {
     const { character: c, hp: h, inventory: inv, effects: eff, messages: msgs } = stateRef.current;
     if (c) doSave(c, h, inv, eff, msgs);
+    // Single atomic reset of game state (character, hp, inventory, enemies,
+    // allies, inCombat, effects, spellSlots, berserk*, dodge, defensive,
+    // messages all wiped to initial values).
+    dispatch({ type: "RESET_TO_MENU" });
     setScreen("select");
-    setMessages([]);
-    setEnemies([]);
-    setAllies([]);
-    setInCombat(false);
     setPendingRoll(null);
     setPendingInitiative(false);
   }
