@@ -196,6 +196,17 @@ COMBAT TURN ORDER (CRITICAL):
 - Exception: if the player cast [Shield cast] — the player has +5 AC until next turn,
   enemy attacks are very likely to miss (factor that into d20 vs AC).
 
+ANTI-ONESHOT RULE (CRITICAL — fragile classes like the Mage have only 8 HP):
+- Player current HP = ${hp}/${character.maxHp}.
+- A SINGLE enemy hit must NEVER deal more than 60% of the player's MAX HP
+  while the player is above 50% HP. Cap your [DAMAGE: N] accordingly.
+  Example: Mage with 8/8 HP — one hit ≤ 4 damage, no matter the die roll.
+- Multiple enemies in one turn are still allowed to combine for lethal damage,
+  but no single attack should one-shot a healthy player from full HP to 0.
+- Below 50% HP the cap lifts — the player is in real danger and any hit can finish them.
+- This is a NARRATIVE rule: describe the hit landing partially ("the blade clips your shoulder"),
+  the player parrying with their staff, armor absorbing some force, etc.
+
 CLASS COMBAT BUTTONS:
 In combat the player uses fixed class buttons, NOT DM choices.
 The DM in combat does NOT offer choices 1-2-3 — only describes the result of the player's action and enemy attacks.
