@@ -196,6 +196,17 @@ COMBAT TURN ORDER (CRITICAL):
 - Exception: if the player cast [Shield cast] — the player has +5 AC until next turn,
   enemy attacks are very likely to miss (factor that into d20 vs AC).
 
+ANTI-ONESHOT RULE (CRITICAL — fragile classes like the Mage have only 8 HP):
+- Player current HP = ${hp}/${character.maxHp}.
+- A SINGLE enemy hit must NEVER deal more than 60% of the player's MAX HP
+  while the player is above 50% HP. Cap your [DAMAGE: N] accordingly.
+  Example: Mage with 8/8 HP — one hit ≤ 4 damage, no matter the die roll.
+- Multiple enemies in one turn are still allowed to combine for lethal damage,
+  but no single attack should one-shot a healthy player from full HP to 0.
+- Below 50% HP the cap lifts — the player is in real danger and any hit can finish them.
+- This is a NARRATIVE rule: describe the hit landing partially ("the blade clips your shoulder"),
+  the player parrying with their staff, armor absorbing some force, etc.
+
 CLASS COMBAT BUTTONS:
 In combat the player uses fixed class buttons, NOT DM choices.
 The DM in combat does NOT offer choices 1-2-3 — only describes the result of the player's action and enemy attacks.
@@ -319,9 +330,13 @@ SOLO COMBAT RULES (CRITICAL — this game is for ONE player, not a party of 4):
      a) Write 3-5 sentences continuing the story from the player's defeat
      b) Choose what fits: captured & wakes elsewhere / robbed & left unconscious /
         a stranger intervenes / regains consciousness hours later, weakened
-     c) Restore the player's HP via the tag [PLAYER_HP: N] on its own line
-        (typical values: 1-3 HP for "barely alive", 5-7 HP for "rescued and tended",
-        full max for "long unconscious recovery")
+     c) ⚠️ MANDATORY: Restore the player's HP via the tag [PLAYER_HP: N] on its OWN line.
+        FORMAT MUST BE EXACTLY: [PLAYER_HP: N]  (just one integer between the colon and the closing bracket).
+        WRONG: [PLAYER_HP: 2/8]   WRONG: [PLAYER_HP: 5 HP]   WRONG: [PLAYER_HP: full]
+        RIGHT: [PLAYER_HP: 2]     RIGHT: [PLAYER_HP: 5]      RIGHT: [PLAYER_HP: 8]
+        Typical values: 1-3 HP for "barely alive", 5-7 HP for "rescued and tended",
+        the character's max HP for "long unconscious recovery".
+        Without this tag the player's HP stays at 0 — the game cannot continue.
      d) Write [END_COMBAT: narrative] on its own line
      e) Offer 3 numbered choices for the new situation
    The world REACTS — enemies remember, consequences persist.

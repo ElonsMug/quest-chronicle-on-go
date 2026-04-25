@@ -28,6 +28,9 @@ export function parseDMResponse(text: string) {
 
   // English-tag parser. Tags are part of an internal contract between the DM
   // and the parser — they do not get translated when the UI language changes.
+  // The character class `[^\]]*` is intentionally permissive so a malformed
+  // tag (extra space, trailing text inside brackets) still gets stripped from
+  // the visible narrative even if its dedicated extractor regex doesn't fire.
   const TAG = /\[(ATTACK|ROLL|DAMAGE|ITEM|UPGRADE|ENEMY|ENEMY_DAMAGE|ALLY|ALLY_DAMAGE|EFFECT|INITIATIVE|END_COMBAT|PLAYER_HP|BEHAVIOR_SHIFT)[^\]]*\]/gi;
 
   const atk = text.match(/\[ATTACK:\s*([^,\]]+),\s*([^,\]]+),\s*([^,\]]+),\s*AC(\d+)\]/i);
@@ -110,8 +113,12 @@ export function parseDMResponse(text: string) {
     combatEndType =
       t === "surrender" || t === "retreat" || t === "narrative" ? t : "victory";
   }
-  // [PLAYER_HP: N] — narrative HP restore after defeat
-  const hpRestore = text.match(/\[PLAYER_HP:\s*(\d+)\]/i);
+  // [PLAYER_HP: N] — narrative HP restore after defeat.
+  // Forgiving regex: accepts variants like [PLAYER_HP:8], [PLAYER_HP: 2/8],
+  // [PLAYER_HP: 5 HP] — we only need the first integer after the tag name.
+  // Without this, a stray `/8` or trailing word from the LLM would silently
+  // skip the HP restore and softlock the player at 0 HP.
+  const hpRestore = text.match(/\[PLAYER_HP[\s:=]+(\d+)/i);
   if (hpRestore) playerHpRestore = parseInt(hpRestore[1]);
   // [BEHAVIOR_SHIFT: surrender|flee|escalate] — DM signals a narrative beat where
   // the leader's behavior changes. The UI uses this to switch from combat
@@ -122,12 +129,19 @@ export function parseDMResponse(text: string) {
     if (s === "surrender" || s === "flee" || s === "escalate") behaviorShift = s;
   }
 
-  for (const line of text.trim().split("\n")) {
+  // Build the narrative line-by-line:
+  //  - numbered "1. ..." lines become choices and are pulled out
+  //  - any [TAG: ...] occurrences inside a line are stripped INLINE
+  //    (not the whole line!) so prose mixed on the same line as a tag
+  //    survives and reaches the player. Empty leftover lines are dropped.
+  for (const rawLine of text.trim().split(/\r?\n/)) {
+    const line = rawLine.replace(/\r/g, "");
     const choiceMatch = line.trim().match(/^\*{0,2}(\d+)\.\s+(.+?)\*{0,2}$/);
     if (choiceMatch) { choices.push({ num: choiceMatch[1], text: choiceMatch[2].trim() }); continue; }
-    if (TAG.test(line)) { TAG.lastIndex = 0; continue; }
+    const stripped = line.replace(TAG, "").trim();
     TAG.lastIndex = 0;
-    narrativeLines.push(line);
+    if (stripped.length === 0) continue;
+    narrativeLines.push(stripped);
   }
 
   return {

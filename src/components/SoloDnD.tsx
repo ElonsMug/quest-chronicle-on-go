@@ -235,7 +235,17 @@ export default function SoloDnD() {
     let newEnemies = [...currentEnemies];
 
     if (parsed.damage) {
-      newHp = Math.max(0, newHp - parsed.damage);
+      // Anti-oneshot guard: while the player is above 50% HP, cap a single
+      // incoming damage value to 60% of maxHp. This protects fragile classes
+      // (Mage with 8 HP) from being killed in one die roll from full health.
+      // Below 50% the cap lifts — at low HP any blow can finish the player.
+      const ch = stateRef.current.character;
+      let incoming = parsed.damage;
+      if (ch && newHp > ch.maxHp * 0.5) {
+        const cap = Math.max(1, Math.floor(ch.maxHp * 0.6));
+        if (incoming > cap) incoming = cap;
+      }
+      newHp = Math.max(0, newHp - incoming);
       setHp(newHp);
       // Don't show the defeat screen immediately — let the DM finish narrating.
       // We just mark the defeat as "pending"; the effect above will pick up
@@ -249,6 +259,18 @@ export default function SoloDnD() {
       const ch = stateRef.current.character;
       const cap = ch ? ch.maxHp : parsed.playerHpRestore;
       newHp = Math.max(1, Math.min(cap, parsed.playerHpRestore));
+      setHp(newHp);
+      setDefeatPending(false);
+      setDefeatDismissed(false);
+      setShowDefeated(false);
+    } else if (newHp <= 0 && (parsed.combatEnd || parsed.combatEndType === "narrative")) {
+      // Safety net: the DM ended combat narratively (player defeated path) but
+      // forgot the [PLAYER_HP: N] tag. Without HP restore the player is stuck
+      // at 0 with no way to act. Default to 1 HP — the story continues, the
+      // player is "barely alive". Better than a softlock; matches the prompt's
+      // documented minimum for the rescue path.
+      const ch = stateRef.current.character;
+      newHp = ch ? Math.min(ch.maxHp, 1) : 1;
       setHp(newHp);
       setDefeatPending(false);
       setDefeatDismissed(false);
