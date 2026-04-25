@@ -148,5 +148,6 @@ export function parseDMResponse(text: string) {
     combatEnd,
     combatEndType,
     playerHpRestore,
+    behaviorShift,
   };
 }
