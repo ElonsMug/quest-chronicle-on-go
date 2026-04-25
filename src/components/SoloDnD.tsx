@@ -646,7 +646,26 @@ export default function SoloDnD() {
     }]);
   }
 
-  // Restart the fight — restore the snapshot
+  // Continue the story after defeat: ask the DM to narrate what happens
+  // next (capture, rescue, awakening) and to restore HP via [PLAYER_HP: N].
+  // Closes the defeat overlay and ends combat — control returns to the
+  // narrative flow.
+  async function handleContinueStory() {
+    setShowDefeated(false);
+    setDefeatPending(false);
+    setDefeatDismissed(true);
+    setSelectingTarget(false);
+    setPendingAction(null);
+    setShowSpellMini(false);
+    setPendingRoll(null);
+    setPendingInitiative(false);
+    // Clear the active combat — the player is down, the fight is over
+    // narratively. The DM will write the aftermath.
+    setEnemies([]);
+    setAllies([]);
+    setInCombat(false);
+    await handleChoice(i18n.t("system.playerDefeatedNarrative"));
+  }
   function handleDefeatedRetry() {
     const snap = combatStartSnapshotRef.current;
     const { character: c } = stateRef.current;
