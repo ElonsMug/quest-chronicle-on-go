@@ -6,7 +6,7 @@
 // parsed responses.
 // ─────────────────────────────────────────────────────────────────
 
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useReducer } from "react";
 import { useTranslation } from "react-i18next";
 import { initAnalytics, trackEvent } from "@/lib/analytics";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -30,6 +30,8 @@ import { parseDMResponse } from "@/game/parser";
 import { callDM } from "@/game/api";
 import { rollDice, parseDiceSides, PROFICIENCY_BONUS } from "@/game/dice";
 import { isPotion } from "@/game/inventory";
+import { gameReducer } from "@/game/reducer";
+import { initialGameState } from "@/game/state";
 
 // ─── UI components ───────────────────────────────────────────────
 import { EnemyHP } from "@/components/game/EnemyHP";
@@ -58,28 +60,16 @@ export default function SoloDnD() {
     return Array.isArray(list) ? (list as string[]) : [];
   }, [i18nInstance, i18nInstance.language]);
 
+  // ── UI / transient state (independent flags, kept as useState) ──
   const [screen, setScreen] = useState<"select" | "game">("select");
   const [selectedChar, setSelectedChar] = useState<Character | null>(null);
-  const [character, setCharacter] = useState<Character | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
-  const [hp, setHp] = useState(14);
-  const [inventory, setInventory] = useState<string[]>([]);
-  const [effects, setEffects] = useState<string[]>([]);
-  const [enemies, setEnemies] = useState<Enemy[]>([]);
-  const [allies, setAllies] = useState<Ally[]>([]);
-  const [inCombat, setInCombat] = useState(false);
   const [pendingRoll, setPendingRoll] = useState<PendingRoll | null>(null);
   const [pendingInitiative, setPendingInitiative] = useState(false);
   const [freeInput, setFreeInput] = useState(false);
   const [freeText, setFreeText] = useState("");
   const [showInventory, setShowInventory] = useState(false);
   const [showSpells, setShowSpells] = useState(false);
-  const [spellSlots, setSpellSlots] = useState<{ current: number; max: number } | null>(null);
-  const [berserkChargesLeft, setBerserkChargesLeft] = useState(0);
-  const [berserkUsedThisCombat, setBerserkUsedThisCombat] = useState(false);
-  const [didDodgeLastTurn, setDidDodgeLastTurn] = useState(false);
-  const [defensiveStance, setDefensiveStance] = useState(false);
   const [showSpellMini, setShowSpellMini] = useState(false);
   const [selectingTarget, setSelectingTarget] = useState(false);
   const [freeInputPlaceholder, setFreeInputPlaceholder] = useState("");
@@ -97,26 +87,77 @@ export default function SoloDnD() {
     next: "en" | "ru";
     resolve: (ok: boolean) => void;
   } | null>(null);
+
+  // ── Game state (single reducer — see src/game/state.ts) ─────────
+  // Everything that an async DM callback needs to read after-the-fact
+  // lives here. The reducer guarantees a consistent snapshot per action,
+  // and `stateRef` (below) keeps the same snapshot reachable from
+  // closures captured before the dispatch.
+  const [game, dispatch] = useReducer(gameReducer, initialGameState);
+  const {
+    character,
+    hp,
+    inventory,
+    effects,
+    enemies,
+    allies,
+    inCombat,
+    spellSlots,
+    berserkChargesLeft,
+    berserkUsedThisCombat,
+    didDodgeLastTurn,
+    defensiveStance,
+    messages,
+  } = game;
+
+  // ── Setter shims ────────────────────────────────────────────────
+  // Thin wrappers so existing call-sites keep their familiar
+  // `setX(value)` / `setX(prev => next)` shape. They forward to the
+  // reducer and remain the *only* way to mutate the game state.
+  const setHp = (v: number) => dispatch({ type: "SET_HP", hp: v });
+  const setInventory = (v: string[] | ((prev: string[]) => string[])) =>
+    typeof v === "function"
+      ? dispatch({ type: "UPDATE_INVENTORY", updater: v as (p: string[]) => string[] })
+      : dispatch({ type: "SET_INVENTORY", inventory: v });
+  const setEffects = (v: string[] | ((prev: string[]) => string[])) =>
+    typeof v === "function"
+      ? dispatch({ type: "UPDATE_EFFECTS", updater: v as (p: string[]) => string[] })
+      : dispatch({ type: "SET_EFFECTS", effects: v });
+  const setEnemies = (v: Enemy[]) => dispatch({ type: "SET_ENEMIES", enemies: v });
+  const setAllies = (v: Ally[] | ((prev: Ally[]) => Ally[])) =>
+    typeof v === "function"
+      ? dispatch({ type: "UPDATE_ALLIES", updater: v as (p: Ally[]) => Ally[] })
+      : dispatch({ type: "SET_ALLIES", allies: v });
+  const setMessages = (v: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) =>
+    typeof v === "function"
+      ? dispatch({ type: "UPDATE_MESSAGES", updater: v as (p: ChatMessage[]) => ChatMessage[] })
+      : dispatch({ type: "SET_MESSAGES", messages: v });
+  const setSpellSlots = (v: { current: number; max: number } | null) =>
+    dispatch({ type: "SET_SPELL_SLOTS", slots: v });
+  const setInCombat = (v: boolean) => dispatch({ type: "SET_IN_COMBAT", value: v });
+  const setBerserkChargesLeft = (v: number | ((prev: number) => number)) => {
+    const next = typeof v === "function" ? (v as (p: number) => number)(berserkChargesLeft) : v;
+    dispatch({ type: "SET_BERSERK_CHARGES", value: next });
+  };
+  const setBerserkUsedThisCombat = (v: boolean) =>
+    dispatch({ type: "SET_BERSERK_USED", value: v });
+  const setDidDodgeLastTurn = (v: boolean) =>
+    dispatch({ type: "SET_DID_DODGE", value: v });
+  const setDefensiveStance = (v: boolean) =>
+    dispatch({ type: "SET_DEFENSIVE_STANCE", value: v });
+
   const combatStartSnapshotRef = useRef<{ hp: number; enemies: Enemy[]; allies: Ally[] } | null>(null);
   // Bonus action "potion drunk" — accumulated here and attached to the next
   // main player action.
   const pendingPotionInfoRef = useRef<string | null>(null);
   const devTaps = useRef(0);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const stateRef = useRef<{
-    character: Character | null;
-    hp: number;
-    inventory: string[];
-    effects: string[];
-    enemies: Enemy[];
-    allies: Ally[];
-    messages: ChatMessage[];
-    spellSlots: { current: number; max: number } | null;
-    berserkChargesLeft: number;
-    didDodgeLastTurn: boolean;
-    defensiveStance: boolean;
-  }>({ character: null, hp: 0, inventory: [], effects: [], enemies: [], allies: [], messages: [], spellSlots: null, berserkChargesLeft: 0, didDodgeLastTurn: false, defensiveStance: false });
-  stateRef.current = { character, hp, inventory, effects, enemies, allies, messages, spellSlots, berserkChargesLeft, didDodgeLastTurn, defensiveStance };
+
+  // Mirror of `game` for closures captured by async DM callbacks.
+  // The reducer is the source of truth; this ref just makes the latest
+  // snapshot reachable without re-reading hooks inside async functions.
+  const stateRef = useRef(game);
+  stateRef.current = game;
 
   useEffect(() => { initAnalytics(); }, []);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, loading, pendingRoll, pendingInitiative]);
@@ -432,24 +473,14 @@ export default function SoloDnD() {
 
   // ── Game start ────────────────────────────────────────────────
   async function startGame(char: Character, customPrompt?: string) {
-    setCharacter(char);
-    setHp(char.hp);
     const startInv = [...char.startItems];
-    setInventory(startInv);
-    setEffects([]);
-    setEnemies([]);
-    setAllies([]);
-    setInCombat(false);
+    // Single atomic init — sets character, hp, inventory, spellSlots
+    // and resets effects/enemies/allies/inCombat/berserk/dodge/defensive/messages.
+    dispatch({ type: "START_GAME", character: char, startInventory: startInv });
     setPendingRoll(null);
     setPendingInitiative(false);
-    setSpellSlots(char.spellSlots ? { ...char.spellSlots } : null);
-    setBerserkChargesLeft(0);
-    setBerserkUsedThisCombat(false);
-    setDidDodgeLastTurn(false);
-    setDefensiveStance(false);
     setShowSpellMini(false);
     setSelectingTarget(false);
-    setMessages([]);
     setScreen("game");
     setLoading(true);
     trackEvent("game_started", { characterId: char.id, messageNumber: 0, characterName: char.name });
@@ -604,27 +635,23 @@ export default function SoloDnD() {
       setDefeatDismissed(false);
       return;
     }
-    // Clear first (fix: otherwise enemies/allies double up), then restore in the next tick
-    setEnemies([]);
-    setAllies([]);
+    // UI flags first…
     setShowDefeated(false);
     setDefeatPending(false);
     setDefeatDismissed(false);
-    setBerserkChargesLeft(0);
-    setBerserkUsedThisCombat(false);
-    setDidDodgeLastTurn(false);
-    setDefensiveStance(false);
     setSelectingTarget(false);
     setShowSpellMini(false);
     setPendingRoll(null);
     setPendingInitiative(false);
-    setTimeout(() => {
-      setHp(snap.hp);
-      setEnemies(snap.enemies.map(e => ({ ...e, hp: e.maxHp })));
-      setAllies(snap.allies ? snap.allies.map(a => ({ ...a })) : []);
-      setInCombat(true);
-      void handleChoice(i18n.t("system.retryCombat"));
-    }, 0);
+    // …then atomic snapshot restore (hp, enemies, allies, inCombat=true,
+    // and combat-flag reset all in one reducer transition — no double-up).
+    dispatch({
+      type: "RESTORE_SNAPSHOT",
+      hp: snap.hp,
+      enemies: snap.enemies.map(e => ({ ...e, hp: e.maxHp })),
+      allies: snap.allies ? snap.allies.map(a => ({ ...a })) : [],
+    });
+    void handleChoice(i18n.t("system.retryCombat"));
   }
 
   function handleShortRest() {
@@ -645,10 +672,12 @@ export default function SoloDnD() {
   function handleLongRest() {
     const { character: c } = stateRef.current;
     if (!c || inCombat) return;
-    setHp(c.maxHp);
-    if (c.spellSlots) setSpellSlots({ current: c.spellSlots.max, max: c.spellSlots.max });
-    setBerserkChargesLeft(0);
-    setBerserkUsedThisCombat(false);
+    // Atomic: hp=max, refill spell slots, reset berserk counters.
+    dispatch({
+      type: "LONG_REST",
+      hp: c.maxHp,
+      spellSlots: c.spellSlots ? { current: c.spellSlots.max, max: c.spellSlots.max } : null,
+    });
     setShowInventory(false);
     const text = t("combat.longRestNarrative");
     setMessages(prev => [...prev, {
@@ -667,7 +696,7 @@ export default function SoloDnD() {
     let mod = ch.stats[ch.weapon.stat] || 0;
     if (bcl > 0) {
       mod += 2;
-      setBerserkChargesLeft(prev => Math.max(0, prev - 1));
+      dispatch({ type: "DECREMENT_BERSERK_CHARGE" });
     }
     if (stateRef.current.defensiveStance) {
       setDefensiveStance(false);
@@ -680,10 +709,8 @@ export default function SoloDnD() {
   }
 
   async function handleBerserk() {
-    setBerserkChargesLeft(2);
-    setBerserkUsedThisCombat(true);
-    setDefensiveStance(false);
-    setDidDodgeLastTurn(false);
+    // Atomic: charges=2, used=true, defensive=false, didDodge=false.
+    dispatch({ type: "ACTIVATE_BERSERK" });
     setEffects(prev => [...prev, t("combat.berserkEffect")]);
     await handleChoice(i18n.t("system.berserkActivated"));
   }
@@ -738,11 +765,11 @@ export default function SoloDnD() {
   function exitToMenu() {
     const { character: c, hp: h, inventory: inv, effects: eff, messages: msgs } = stateRef.current;
     if (c) doSave(c, h, inv, eff, msgs);
+    // Single atomic reset of game state (character, hp, inventory, enemies,
+    // allies, inCombat, effects, spellSlots, berserk*, dodge, defensive,
+    // messages all wiped to initial values).
+    dispatch({ type: "RESET_TO_MENU" });
     setScreen("select");
-    setMessages([]);
-    setEnemies([]);
-    setAllies([]);
-    setInCombat(false);
     setPendingRoll(null);
     setPendingInitiative(false);
   }
