@@ -1,19 +1,22 @@
 // ─────────────────────────────────────────────────────────────────
 // DefeatedScreen — full-screen overlay when the player drops to 0 HP.
-// Offers: drink potion (if any), retry the fight, return to menu, close.
+// Hybrid model: the FIRST option is "Continue story" (DM narrates what
+// happens next — capture, rescue, awakening). Potion / Retry / Menu
+// remain as fallbacks for players who want a hard reset.
 // ─────────────────────────────────────────────────────────────────
 
 import { useTranslation } from "react-i18next";
 
 type Props = {
   hasPotion: boolean;
+  onContinueStory: () => void;
   onUsePotion: () => void;
   onRetry: () => void;
   onMenu: () => void;
   onClose: () => void;
 };
 
-export function DefeatedScreen({ hasPotion, onUsePotion, onRetry, onMenu, onClose }: Props) {
+export function DefeatedScreen({ hasPotion, onContinueStory, onUsePotion, onRetry, onMenu, onClose }: Props) {
   const { t } = useTranslation();
   return (
     <div
@@ -36,25 +39,33 @@ export function DefeatedScreen({ hasPotion, onUsePotion, onRetry, onMenu, onClos
         </div>
         <div className="text-stone-400 text-sm mb-6">{t("defeated.subtitle")}</div>
         <div className="space-y-3">
+          {/* Primary path — let the DM continue the story. */}
+          <button
+            onClick={onContinueStory}
+            className="w-full py-3 rounded-xl font-bold text-stone-900 active:scale-95 transition-transform"
+            style={{ background: "linear-gradient(135deg,#d97706,#92400e)", fontFamily: "serif" }}
+          >
+            📖 {t("defeated.continueStory")}
+          </button>
           {hasPotion && (
             <button
               onClick={onUsePotion}
-              className="w-full py-3 rounded-xl font-bold text-stone-900"
-              style={{ background: "linear-gradient(135deg,#d97706,#92400e)", fontFamily: "serif" }}
+              className="w-full py-3 rounded-xl border border-amber-900/60 bg-stone-900 text-amber-200 font-bold active:scale-95 transition-transform"
+              style={{ fontFamily: "serif" }}
             >
               🧪 {t("defeated.drinkPotion")}
             </button>
           )}
           <button
             onClick={onRetry}
-            className="w-full py-3 rounded-xl border border-stone-600 bg-stone-800 text-amber-100 font-bold"
+            className="w-full py-3 rounded-xl border border-stone-700 bg-stone-900 text-stone-300 text-sm font-bold"
             style={{ fontFamily: "serif" }}
           >
             ⚔️ {t("defeated.retry")}
           </button>
           <button
             onClick={onMenu}
-            className="w-full py-3 rounded-xl border border-stone-700 bg-stone-900 text-stone-400 text-sm"
+            className="w-full py-3 rounded-xl border border-stone-800 bg-stone-950 text-stone-500 text-sm"
             style={{ fontFamily: "serif" }}
           >
             ← {t("defeated.returnToMenu")}
