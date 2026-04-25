@@ -238,6 +238,18 @@ export default function SoloDnD() {
       if (newHp <= 0) { setDefeatPending(true); setDefeatDismissed(false); }
     }
 
+    // [PLAYER_HP: N] — narrative HP restore (after rescue/capture etc.).
+    // Clears the "defeated" overlay state since the story now continues.
+    if (parsed.playerHpRestore !== null && parsed.playerHpRestore !== undefined) {
+      const ch = stateRef.current.character;
+      const cap = ch ? ch.maxHp : parsed.playerHpRestore;
+      newHp = Math.max(1, Math.min(cap, parsed.playerHpRestore));
+      setHp(newHp);
+      setDefeatPending(false);
+      setDefeatDismissed(false);
+      setShowDefeated(false);
+    }
+
     if (parsed.newItems?.length) {
       newInv = [...newInv, ...parsed.newItems];
       setInventory(newInv);
