@@ -699,6 +699,7 @@ export default function SoloDnD() {
     const { character: ch, enemies: en, berserkChargesLeft: bcl } = stateRef.current;
     if (!ch) return;
     setSelectingTarget(false);
+    setPendingAction(null);
     setDidDodgeLastTurn(false);
     let mod = ch.stats[ch.weapon.stat] || 0;
     if (bcl > 0) {
@@ -733,21 +734,34 @@ export default function SoloDnD() {
     await handleChoice(i18n.t("system.dodge"));
   }
 
-  async function handleSpell(s: Spell) {
+  // Sneak attack — same target picker flow as a regular attack (rogue only).
+  async function handleSneak(targetName?: string) {
+    setSelectingTarget(false);
+    setPendingAction(null);
+    // Sneak is implemented as a normal attack; bonus damage is applied
+    // narratively by the DM (it sees the system message context).
+    await handleAttack(targetName);
+  }
+
+  async function handleSpell(s: Spell, targetName?: string) {
     const slots = stateRef.current.spellSlots;
     if (!slots || slots.current <= 0) return;
     const { character: ch, enemies: en } = stateRef.current;
     if (!ch) return;
     setShowSpells(false);
     setShowSpellMini(false);
+    setSelectingTarget(false);
+    setPendingAction(null);
     setSpellSlots({ current: slots.current - 1, max: slots.max });
     setDidDodgeLastTurn(false);
 
     if (s.type === "attack") {
-      // Fire Bolt — slot-based attack, auto-roll
+      // Fire Bolt — slot-based attack, auto-roll on a chosen target
       const statKey: Stat = s.stat ?? "int";
       const mod = ch.stats[statKey] || 0;
-      const target = en.find(e => e.hp > 0);
+      const target = targetName
+        ? en.find(e => e.hp > 0 && e.name === targetName)
+        : en.find(e => e.hp > 0);
       const ac = target?.ac ?? 12;
       await executeAttackRoll({ weapon: s.name, dice: s.dice ?? "d10", mod, ac, targetName: target?.name });
       return;
