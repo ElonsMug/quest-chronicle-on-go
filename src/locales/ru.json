@@ -166,12 +166,20 @@
   "defeated": {
     "title": "Ты повержен",
     "subtitle": "Силы покидают тебя. Тьма смыкается...",
+    "continueStory": "Продолжить историю",
     "drinkPotion": "Выпить зелье лечения",
     "retry": "Начать бой заново",
     "returnToMenu": "Вернуться в меню",
     "closeAria": "Закрыть",
     "closeTitle": "Закрыть и перечитать журнал",
     "footer": "💀 Ты повержен"
+  },
+  "negotiation": {
+    "prompt": "{{name}} сломлен. Что ты сделаешь?",
+    "accept": "Принять сдачу",
+    "keepAttacking": "Добить",
+    "letGo": "Отпустить",
+    "freeAction": "Сказать что-то своё..."
   },
   "free": {
     "placeholders": [

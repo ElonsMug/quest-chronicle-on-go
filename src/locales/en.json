@@ -166,12 +166,20 @@
   "defeated": {
     "title": "You are defeated",
     "subtitle": "Your strength fails you. The darkness closes in...",
+    "continueStory": "Continue the story",
     "drinkPotion": "Drink healing potion",
     "retry": "Restart the fight",
     "returnToMenu": "Return to menu",
     "closeAria": "Close",
     "closeTitle": "Close and re-read the journal",
     "footer": "💀 You are defeated"
+  },
+  "negotiation": {
+    "prompt": "{{name}} is broken. What do you do?",
+    "accept": "Accept their surrender",
+    "keepAttacking": "Finish them off",
+    "letGo": "Let them walk away",
+    "freeAction": "Say something else..."
   },
   "free": {
     "placeholders": [
