@@ -935,16 +935,32 @@ export default function SoloDnD() {
   // ── Behavior shift / negotiation moment ──────────────────────
   // Pick the leader: the enemy with the highest maxHp (matches how the prompt
   // declares ONE leader per encounter via [ENEMY:]). When that leader drops
-  // below 40% HP, the DM is instructed to pause and let the player choose
-  // surrender / continue / let go. We surface those choices as dedicated UI.
+  // below 40% HP AND the enemy side has lost its tactical advantage, the DM
+  // is instructed to pause and let the player choose surrender/continue/let go.
+  // We surface those choices as dedicated UI.
   const liveEnemies = enemies.filter(e => e.hp > 0);
   const leader = liveEnemies.length
     ? [...liveEnemies].sort((a, b) => b.maxHp - a.maxHp)[0]
     : null;
-  const leaderInShift = !!(leader && leader.hp / leader.maxHp < 0.4 && leader.hp > 0);
+  // Enemy side has tactical advantage when they outnumber player+allies.
+  // Player counts as 1; allies count as living allies.
+  const liveAllies = allies.filter(a => a.hp > 0).length;
+  const enemyHasAdvantage = liveEnemies.length > 1 + liveAllies;
+  const leaderInShift = !!(
+    leader && leader.hp / leader.maxHp < 0.4 && leader.hp > 0 && !enemyHasAdvantage
+  );
+  // Explicit DM signal beats client-side heuristic — surrender/flee always
+  // opens negotiation; escalate explicitly suppresses it.
+  const dmShift = parsed?.behaviorShift ?? null;
+  const negotiationActive =
+    dmShift === "surrender" || dmShift === "flee"
+      ? true
+      : dmShift === "escalate"
+        ? false
+        : leaderInShift;
   const showNegotiation =
     !loading && !freeInput && !pendingRoll && !pendingInitiative &&
-    !showDefeated && !defeatPending && inCombat && leaderInShift &&
+    !showDefeated && !defeatPending && inCombat && negotiationActive &&
     !negotiationDeclined && !!character;
 
   function openTargetPickerOr(
@@ -1067,7 +1083,13 @@ export default function SoloDnD() {
         {inCombat && enemies.filter(e => e.hp > 0).length > 0 && (
           <div className="px-4 pb-2 space-y-1 border-t border-stone-800/40 pt-2">
             {enemies.filter(e => e.hp > 0).map((en, i) => (
-              <EnemyHP key={i} name={en.name} hp={en.hp} maxHp={en.maxHp} />
+              <EnemyHP
+                key={i}
+                name={en.name}
+                hp={en.hp}
+                maxHp={en.maxHp}
+                isLeader={!!leader && en.name === leader.name && enemies.filter(e => e.hp > 0).length > 1}
+              />
             ))}
           </div>
         )}

@@ -24,10 +24,11 @@ export function parseDMResponse(text: string) {
   let combatEnd = false;
   let combatEndType: "victory" | "surrender" | "retreat" | "narrative" | null = null;
   let playerHpRestore: number | null = null;
+  let behaviorShift: "surrender" | "flee" | "escalate" | null = null;
 
   // English-tag parser. Tags are part of an internal contract between the DM
   // and the parser — they do not get translated when the UI language changes.
-  const TAG = /\[(ATTACK|ROLL|DAMAGE|ITEM|UPGRADE|ENEMY|ENEMY_DAMAGE|ALLY|ALLY_DAMAGE|EFFECT|INITIATIVE|END_COMBAT|PLAYER_HP)[^\]]*\]/gi;
+  const TAG = /\[(ATTACK|ROLL|DAMAGE|ITEM|UPGRADE|ENEMY|ENEMY_DAMAGE|ALLY|ALLY_DAMAGE|EFFECT|INITIATIVE|END_COMBAT|PLAYER_HP|BEHAVIOR_SHIFT)[^\]]*\]/gi;
 
   const atk = text.match(/\[ATTACK:\s*([^,\]]+),\s*([^,\]]+),\s*([^,\]]+),\s*AC(\d+)\]/i);
   if (atk) attackRequest = { weapon: atk[1].trim(), dice: atk[2].trim(), mod: parseInt(atk[3]) || 0, ac: parseInt(atk[4]) };
@@ -112,6 +113,14 @@ export function parseDMResponse(text: string) {
   // [PLAYER_HP: N] — narrative HP restore after defeat
   const hpRestore = text.match(/\[PLAYER_HP:\s*(\d+)\]/i);
   if (hpRestore) playerHpRestore = parseInt(hpRestore[1]);
+  // [BEHAVIOR_SHIFT: surrender|flee|escalate] — DM signals a narrative beat where
+  // the leader's behavior changes. The UI uses this to switch from combat
+  // buttons to negotiation choices (for surrender/flee), independent of HP %.
+  const shiftMatch = text.match(/\[BEHAVIOR_SHIFT:\s*(surrender|flee|escalate)\]/i);
+  if (shiftMatch) {
+    const s = shiftMatch[1].toLowerCase();
+    if (s === "surrender" || s === "flee" || s === "escalate") behaviorShift = s;
+  }
 
   for (const line of text.trim().split("\n")) {
     const choiceMatch = line.trim().match(/^\*{0,2}(\d+)\.\s+(.+?)\*{0,2}$/);
@@ -139,5 +148,6 @@ export function parseDMResponse(text: string) {
     combatEnd,
     combatEndType,
     playerHpRestore,
+    behaviorShift,
   };
 }
