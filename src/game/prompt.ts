@@ -246,7 +246,10 @@ SOLO COMBAT RULES (CRITICAL — this game is for ONE player, not a party of 4):
    EASY   — 1 enemy (a duel, a lone guard, a single threat)
    MEDIUM — 1 leader + 1 minion
    HARD   — 1 leader + 2 minions
-   EPIC   — 1 boss only (chapter climax — used RARELY, max once per long arc)
+   EPIC   — 1 boss only (chapter climax — used RARELY, max once per long arc).
+            The boss MUST be declared with the BOSS flag in [ENEMY:] so the
+            engine knows to disable the anti-oneshot cap. See declaration
+            examples below.
 
    LEADER vs MINION — both visible, both have HP bars, BUT statistically very different:
    LEADER  — HP per cap below, full AC (12-16), full DMG (d6+ to d8+2), HAS a MOTIVE field.
