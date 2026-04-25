@@ -22,10 +22,12 @@ export function parseDMResponse(text: string) {
   const newEffects: { name: string; duration: string }[] = [];
   let initiativeTrigger = false;
   let combatEnd = false;
+  let combatEndType: "victory" | "surrender" | "retreat" | "narrative" | null = null;
+  let playerHpRestore: number | null = null;
 
   // English-tag parser. Tags are part of an internal contract between the DM
   // and the parser — they do not get translated when the UI language changes.
-  const TAG = /\[(ATTACK|ROLL|DAMAGE|ITEM|UPGRADE|ENEMY|ENEMY_DAMAGE|ALLY|ALLY_DAMAGE|EFFECT|INITIATIVE|END_COMBAT)[^\]]*\]/gi;
+  const TAG = /\[(ATTACK|ROLL|DAMAGE|ITEM|UPGRADE|ENEMY|ENEMY_DAMAGE|ALLY|ALLY_DAMAGE|EFFECT|INITIATIVE|END_COMBAT|PLAYER_HP)[^\]]*\]/gi;
 
   const atk = text.match(/\[ATTACK:\s*([^,\]]+),\s*([^,\]]+),\s*([^,\]]+),\s*AC(\d+)\]/i);
   if (atk) attackRequest = { weapon: atk[1].trim(), dice: atk[2].trim(), mod: parseInt(atk[3]) || 0, ac: parseInt(atk[4]) };
@@ -99,7 +101,15 @@ export function parseDMResponse(text: string) {
   }
 
   if (/\[INITIATIVE\]/i.test(text)) initiativeTrigger = true;
-  if (/\[END_COMBAT\]/i.test(text)) combatEnd = true;
+  // [END_COMBAT] — bare or typed: [END_COMBAT: victory|surrender|retreat|narrative]
+  const endMatch = text.match(/\[END_COMBAT(?::\s*(victory|surrender|retreat|narrative))?\]/i);
+  if (endMatch) {
+    combatEnd = true;
+    combatEndType = (endMatch[1]?.toLowerCase() as typeof combatEndType) ?? "victory";
+  }
+  // [PLAYER_HP: N] — narrative HP restore after defeat
+  const hpRestore = text.match(/\[PLAYER_HP:\s*(\d+)\]/i);
+  if (hpRestore) playerHpRestore = parseInt(hpRestore[1]);
 
   for (const line of text.trim().split("\n")) {
     const choiceMatch = line.trim().match(/^\*{0,2}(\d+)\.\s+(.+?)\*{0,2}$/);
@@ -125,5 +135,7 @@ export function parseDMResponse(text: string) {
     newEffects,
     initiativeTrigger,
     combatEnd,
+    combatEndType,
+    playerHpRestore,
   };
 }
