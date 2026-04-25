@@ -61,6 +61,9 @@ export type Enemy = {
   ac: number;
   damage: string;
   isUndead?: boolean;
+  // EPIC chapter boss. Bosses are exempt from the anti-oneshot cap so their
+  // signature attacks can land for full damage and feel genuinely dangerous.
+  isBoss?: boolean;
 };
 
 export type Ally = { name: string; hp: number; maxHp: number };
