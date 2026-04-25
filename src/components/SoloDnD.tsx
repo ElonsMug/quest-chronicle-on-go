@@ -236,12 +236,18 @@ export default function SoloDnD() {
 
     if (parsed.damage) {
       // Anti-oneshot guard: while the player is above 50% HP, cap a single
-      // incoming damage value to 60% of maxHp. This protects fragile classes
-      // (Mage with 8 HP) from being killed in one die roll from full health.
+      // incoming damage value to 60% of maxHp. This protects ALL classes
+      // (especially fragile ones like the Mage with 8 HP) from being killed
+      // in one die roll from full health.
       // Below 50% the cap lifts — at low HP any blow can finish the player.
+      // EXCEPTION: if a boss is present in the current fight, the cap is
+      // disabled. Bosses are chapter climaxes and their signature attacks
+      // must be allowed to land for full lethal damage.
       const ch = stateRef.current.character;
       let incoming = parsed.damage;
-      if (ch && newHp > ch.maxHp * 0.5) {
+      const livingEnemies = currentEnemies.filter((e) => e.hp > 0);
+      const bossPresent = livingEnemies.some((e) => e.isBoss);
+      if (ch && !bossPresent && newHp > ch.maxHp * 0.5) {
         const cap = Math.max(1, Math.floor(ch.maxHp * 0.6));
         if (incoming > cap) incoming = cap;
       }
