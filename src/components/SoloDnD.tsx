@@ -954,7 +954,23 @@ export default function SoloDnD() {
   // GAME SCREEN
   // ─────────────────────────────────────────────────────────────
   const lastMsg = messages[messages.length - 1];
-  const parsed = lastMsg?.parsed;
+  // `parsed` is what the bottom action area binds to. Out-of-combat client-only
+  // events (drank a potion, took a short rest) append a synthetic assistant
+  // message with no choices — if we used that as `parsed`, the player would
+  // be stranded without buttons (softlock). Walk back to the most recent
+  // assistant message that actually carries choices, so the previous DM
+  // choices stay live until the DM speaks again.
+  let parsed = lastMsg?.parsed;
+  if (lastMsg?.role === "assistant" && (!parsed?.choices || parsed.choices.length === 0)) {
+    for (let i = messages.length - 2; i >= 0; i--) {
+      const m = messages[i];
+      if (m.role !== "assistant") continue;
+      if (m.parsed?.choices && m.parsed.choices.length > 0) {
+        parsed = m.parsed;
+        break;
+      }
+    }
+  }
   // Defeat is registered (HP=0). When the defeat screen is closed, we show
   // "Retry / Menu" instead of combat buttons so the player can re-read the
   // journal or continue.
