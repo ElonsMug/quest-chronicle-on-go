@@ -196,16 +196,25 @@ COMBAT TURN ORDER (CRITICAL):
 - Exception: if the player cast [Shield cast] — the player has +5 AC until next turn,
   enemy attacks are very likely to miss (factor that into d20 vs AC).
 
-ANTI-ONESHOT RULE (CRITICAL — fragile classes like the Mage have only 8 HP):
+ANTI-ONESHOT RULE (CRITICAL — applies to ALL hero classes, not just the Mage):
 - Player current HP = ${hp}/${character.maxHp}.
 - A SINGLE enemy hit must NEVER deal more than 60% of the player's MAX HP
   while the player is above 50% HP. Cap your [DAMAGE: N] accordingly.
-  Example: Mage with 8/8 HP — one hit ≤ 4 damage, no matter the die roll.
+  Examples:
+    Mage with 8/8 HP   — one hit ≤ 4 damage, no matter the die roll.
+    Warrior with 14/14 — one hit ≤ 8 damage from full health.
+    Rogue with 10/10   — one hit ≤ 6 damage from full health.
 - Multiple enemies in one turn are still allowed to combine for lethal damage,
   but no single attack should one-shot a healthy player from full HP to 0.
 - Below 50% HP the cap lifts — the player is in real danger and any hit can finish them.
-- This is a NARRATIVE rule: describe the hit landing partially ("the blade clips your shoulder"),
-  the player parrying with their staff, armor absorbing some force, etc.
+- BOSS EXCEPTION: this cap does NOT apply to fights against an EPIC boss
+  (a single enemy declared with the BOSS flag — see ENCOUNTER STRUCTURE).
+  Bosses are chapter climaxes; their signature blows are meant to be lethal
+  and the player should feel that danger. Cap is disabled while a living boss
+  is on the field.
+- This is a NARRATIVE rule: describe non-boss hits landing partially ("the blade
+  clips your shoulder"), the player parrying with their staff, armor absorbing
+  some force, etc. Boss hits land in full — describe them as devastating.
 
 CLASS COMBAT BUTTONS:
 In combat the player uses fixed class buttons, NOT DM choices.
@@ -228,7 +237,9 @@ Never use identical names for different enemies in the same fight — the system
 Examples of good names with proper leader/minion HP split:
    [ENEMY: Scarred Bandit, HP:12, AC:12, DMG:d6+1, MOTIVE:money]   ← leader
    [ENEMY: Skinny Lookout, HP:4, AC:10, DMG:d4]                    ← minion (no MOTIVE)
-Or ordinal: "First Bandit" (leader), "Second Bandit" (minion).
+Boss declaration (EPIC encounter only — chapter climax):
+   [ENEMY: Lich-Captain Vorr, HP:28, AC:15, DMG:d8+2, BOSS]        ← BOSS flag REQUIRED
+   [ENEMY: Iron Tyrant, HP:26, AC:16, DMG:d8+2, UNDEAD, BOSS]      ← flags can combine
 In the [ENEMY_DAMAGE: Name, X] tags use exactly the same unique names.
 
 SOLO COMBAT RULES (CRITICAL — this game is for ONE player, not a party of 4):
@@ -237,7 +248,10 @@ SOLO COMBAT RULES (CRITICAL — this game is for ONE player, not a party of 4):
    EASY   — 1 enemy (a duel, a lone guard, a single threat)
    MEDIUM — 1 leader + 1 minion
    HARD   — 1 leader + 2 minions
-   EPIC   — 1 boss only (chapter climax — used RARELY, max once per long arc)
+   EPIC   — 1 boss only (chapter climax — used RARELY, max once per long arc).
+            The boss MUST be declared with the BOSS flag in [ENEMY:] so the
+            engine knows to disable the anti-oneshot cap. See declaration
+            examples below.
 
    LEADER vs MINION — both visible, both have HP bars, BUT statistically very different:
    LEADER  — HP per cap below, full AC (12-16), full DMG (d6+ to d8+2), HAS a MOTIVE field.

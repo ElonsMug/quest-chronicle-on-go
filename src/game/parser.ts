@@ -15,7 +15,7 @@ export function parseDMResponse(text: string) {
   let newItem: string | null = null;
   const newItems: string[] = [];
   const upgrades: { from: string; to: string }[] = [];
-  const newEnemies: { name: string; maxHp: number; hp: number; ac: number; damage: string; isUndead?: boolean }[] = [];
+  const newEnemies: { name: string; maxHp: number; hp: number; ac: number; damage: string; isUndead?: boolean; isBoss?: boolean }[] = [];
   const newAllies: { name: string; maxHp: number; hp: number }[] = [];
   const allyDamages: { name: string; damage: number }[] = [];
   const enemyDamages: { name: string; damage: number }[] = [];
@@ -64,19 +64,33 @@ export function parseDMResponse(text: string) {
     upgrades.push({ from: um[1].trim(), to: um[2].trim() });
   }
 
-  // Extended [ENEMY: Name, HP:N, AC:N, DMG:dX+Y, UNDEAD]
-  const enemyRe = /\[ENEMY:\s*([^,\]]+),\s*HP:(\d+)(?:,\s*AC:(\d+))?(?:,\s*DMG:([^\],]+))?(?:,\s*(UNDEAD))?\]/gi;
+  // Extended [ENEMY: Name, HP:N, AC:N, DMG:dX+Y, UNDEAD, BOSS]
+  // UNDEAD and BOSS are optional flags and may appear in any order at the tail.
+  const enemyRe = /\[ENEMY:\s*([^,\]]+),\s*HP:(\d+)(?:,\s*AC:(\d+))?(?:,\s*DMG:([^\],]+))?((?:,\s*(?:UNDEAD|BOSS))*)\s*\]/gi;
   let em: RegExpExecArray | null;
   while ((em = enemyRe.exec(text)) !== null) {
     const hp = parseInt(em[2]);
+    const flags = (em[5] || "").toUpperCase();
+    const isUndead = /\bUNDEAD\b/.test(flags);
+    // Explicit BOSS flag from the DM, OR heuristic: a single solo enemy with
+    // HP > 20 (per the EPIC encounter cap) is treated as a boss as a safety
+    // net in case the DM forgets the tag.
+    const explicitBoss = /\bBOSS\b/.test(flags);
     newEnemies.push({
       name: em[1].trim(),
       maxHp: hp,
       hp,
       ac: em[3] ? parseInt(em[3]) : 12,
       damage: em[4] ? em[4].trim() : "d4+1",
-      isUndead: !!em[5],
+      isUndead,
+      isBoss: explicitBoss,
     });
+  }
+  // Heuristic boss promotion: if exactly one enemy was declared in this
+  // response and its HP exceeds the leader cap (20), mark it as a boss so the
+  // anti-oneshot guard correctly steps aside.
+  if (newEnemies.length === 1 && newEnemies[0].maxHp > 20) {
+    newEnemies[0].isBoss = true;
   }
 
   const allyRe = /\[ALLY:\s*([^,\]]+),\s*HP:(\d+)\]/gi;
