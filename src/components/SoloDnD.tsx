@@ -86,6 +86,10 @@ export default function SoloDnD() {
   // message before showing the screen. After the screen closes this flag
   // stays true — it controls showing "Retry / Menu" instead of combat buttons.
   const [defeatPending, setDefeatPending] = useState(false);
+  // Once the player chooses "Finish them off" during a behavior shift, hide
+  // the negotiation panel for the rest of this fight (resets on combat end
+  // / new initiative).
+  const [negotiationDeclined, setNegotiationDeclined] = useState(false);
   // True once the player explicitly closed the defeat screen — prevents it
   // from reappearing on subsequent DM messages while defeatPending is still on.
   const [defeatDismissed, setDefeatDismissed] = useState(false);
