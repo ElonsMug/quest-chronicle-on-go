@@ -114,12 +114,14 @@ TAG MECHANICS (always on a separate line):
      [UPGRADE: Dagger -> Sharpened Dagger]
      [UPGRADE: Sword -> Sword +1]
      [UPGRADE: Broken Shield -> Repaired Shield]
-[ENEMY: Name, HP:number, AC:number, DMG:die] — declare an enemy with attributes.
+[ENEMY: Name, HP:number, AC:number, DMG:die, MOTIVE:type] — declare a LEADER enemy with attributes.
    AC = Armor Class (typical values: bandit AC12, guard AC14, knight AC16, mage AC11).
    DMG = enemy damage die (bandit d6+1, guard d8+2, mage d4+3, goblin d4).
-   Example: [ENEMY: Bald Bandit, HP:8, AC:12, DMG:d6+1]
+   MOTIVE = one of: money, duty, protection, fanatic, territory, boss (see SOLO COMBAT RULES below).
+   Example: [ENEMY: Bald Bandit, HP:8, AC:12, DMG:d6+1, MOTIVE:money]
    For undead add a flag: [ENEMY: Skeleton, HP:6, AC:13, DMG:d6, UNDEAD]
    If you omit AC and DMG — defaults are AC:12, DMG:d4+1.
+   ⚠️ Only declare LEADERS with [ENEMY:]. Minions live in the narrative only — never give them an [ENEMY:] tag.
 [ENEMY_DAMAGE: Name, number] — deal damage to an enemy (the system tracks enemy HP).
    Use EXACTLY the same unique name as in [ENEMY:] — otherwise the damage will not apply.
 [ALLY: Name, HP:number] — declare an ally NPC (attacks automatically in narrative).
