@@ -237,7 +237,9 @@ Never use identical names for different enemies in the same fight — the system
 Examples of good names with proper leader/minion HP split:
    [ENEMY: Scarred Bandit, HP:12, AC:12, DMG:d6+1, MOTIVE:money]   ← leader
    [ENEMY: Skinny Lookout, HP:4, AC:10, DMG:d4]                    ← minion (no MOTIVE)
-Or ordinal: "First Bandit" (leader), "Second Bandit" (minion).
+Boss declaration (EPIC encounter only — chapter climax):
+   [ENEMY: Lich-Captain Vorr, HP:28, AC:15, DMG:d8+2, BOSS]        ← BOSS flag REQUIRED
+   [ENEMY: Iron Tyrant, HP:26, AC:16, DMG:d8+2, UNDEAD, BOSS]      ← flags can combine
 In the [ENEMY_DAMAGE: Name, X] tags use exactly the same unique names.
 
 SOLO COMBAT RULES (CRITICAL — this game is for ONE player, not a party of 4):
