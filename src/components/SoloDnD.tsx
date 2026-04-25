@@ -1094,7 +1094,37 @@ export default function SoloDnD() {
               </button>
             </>
           )}
-          {showCombatButtons && character && (
+          {showNegotiation && leader && (
+            <div className="space-y-2">
+              <div className="text-center text-xs text-amber-500/80 pb-1" style={{ fontFamily: "serif" }}>
+                {t("negotiation.prompt", { name: leader.name })}
+              </div>
+              <button
+                onClick={() => void handleChoice(i18n.t("system.acceptSurrender", { name: leader.name }))}
+                className="w-full py-3 rounded-xl font-bold text-stone-900 active:scale-95 transition-transform"
+                style={{ background: "linear-gradient(135deg,#d97706,#92400e)", fontFamily: "serif" }}>
+                🤝 {t("negotiation.accept")}
+              </button>
+              <button
+                onClick={() => void handleChoice(i18n.t("system.keepAttacking", { name: leader.name }))}
+                className="w-full py-3 rounded-xl border border-red-900/60 bg-stone-900 text-red-300 font-bold active:scale-95 transition-transform"
+                style={{ fontFamily: "serif" }}>
+                ⚔️ {t("negotiation.keepAttacking")}
+              </button>
+              <button
+                onClick={() => void handleChoice(i18n.t("system.letThemGo", { name: leader.name }))}
+                className="w-full py-3 rounded-xl border border-stone-700 bg-stone-900 text-stone-300 font-bold active:scale-95 transition-transform"
+                style={{ fontFamily: "serif" }}>
+                🚪 {t("negotiation.letGo")}
+              </button>
+              <button
+                onClick={() => void handleChoice(i18n.t("system.freeNegotiation", { name: leader.name }))}
+                className="w-full text-center px-3 py-2 text-xs text-stone-500 hover:text-stone-300 transition-colors">
+                ✍ {t("negotiation.freeAction")}
+              </button>
+            </div>
+          )}
+          {showCombatButtons && character && !showNegotiation && (
             <>
               <CombatPanel
                 character={character}
@@ -1103,17 +1133,13 @@ export default function SoloDnD() {
                 spellSlots={spellSlots}
                 showSpellMini={showSpellMini}
                 spells={character.spells}
-                onAttackClick={() => {
-                  const liveEnemies = stateRef.current.enemies.filter(e => e.hp > 0);
-                  if (liveEnemies.length > 1) {
-                    setSelectingTarget(true);
-                  } else {
-                    void handleAttack();
-                  }
-                }}
+                onAttackClick={() => openTargetPickerOr({ type: "attack" }, () => void handleAttack())}
                 onSpecial={() => {
                   if (character.id === "warrior") void handleBerserk();
-                  else if (character.id === "rogue") void handleAttack(); // sneak = attack after dodge
+                  else if (character.id === "rogue") {
+                    // Sneak attack — pick a target like a regular attack.
+                    openTargetPickerOr({ type: "sneak" }, () => void handleSneak());
+                  }
                   else if (character.id === "mage") setShowSpellMini(v => !v);
                 }}
                 onDefend={() => {
@@ -1121,25 +1147,39 @@ export default function SoloDnD() {
                   else void handleDodge();
                 }}
                 onToggleSpells={() => setShowSpellMini(v => !v)}
-                onCastSpell={handleSpell}
+                onCastSpell={(s) => {
+                  // Attacking spells (Fire Bolt) go through the same target picker.
+                  if (s.type === "attack") {
+                    openTargetPickerOr({ type: "spell", spell: s }, () => void handleSpell(s));
+                  } else {
+                    void handleSpell(s);
+                  }
+                }}
                 onFreeInput={() => {
                   trackEvent("free_input_used", { characterId: character.id, messageNumber: messages.length, inCombat: true });
                   setFreeInput(true);
                 }}
               />
-              {selectingTarget && (
+              {selectingTarget && pendingAction && (
                 <div className="space-y-1 pl-2 border-l-2 border-amber-900/60">
                   <div className="text-xs text-stone-500 px-2">{t("combat.selectTarget")}</div>
                   {enemies.filter(e => e.hp > 0).map((en, i) => (
                     <button key={i}
-                      onClick={() => { setSelectingTarget(false); void handleAttack(en.name); }}
+                      onClick={() => {
+                        const action = pendingAction;
+                        setSelectingTarget(false);
+                        setPendingAction(null);
+                        if (action.type === "attack") void handleAttack(en.name);
+                        else if (action.type === "sneak") void handleSneak(en.name);
+                        else if (action.type === "spell") void handleSpell(action.spell, en.name);
+                      }}
                       className="w-full text-left px-3 py-2 rounded-lg bg-stone-900 border border-stone-700 hover:border-amber-700 text-amber-100 text-sm transition-colors"
                       style={{ fontFamily: "serif" }}>
                       {en.name}
                       <span className="text-stone-500 text-xs ml-2">{en.hp}/{en.maxHp} HP</span>
                     </button>
                   ))}
-                  <button onClick={() => setSelectingTarget(false)}
+                  <button onClick={() => { setSelectingTarget(false); setPendingAction(null); }}
                     className="w-full text-center px-3 py-1.5 text-xs text-stone-500 hover:text-stone-300 transition-colors">
                     {t("common.cancel")}
                   </button>
