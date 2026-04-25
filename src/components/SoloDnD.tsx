@@ -473,24 +473,14 @@ export default function SoloDnD() {
 
   // ── Game start ────────────────────────────────────────────────
   async function startGame(char: Character, customPrompt?: string) {
-    setCharacter(char);
-    setHp(char.hp);
     const startInv = [...char.startItems];
-    setInventory(startInv);
-    setEffects([]);
-    setEnemies([]);
-    setAllies([]);
-    setInCombat(false);
+    // Single atomic init — sets character, hp, inventory, spellSlots
+    // and resets effects/enemies/allies/inCombat/berserk/dodge/defensive/messages.
+    dispatch({ type: "START_GAME", character: char, startInventory: startInv });
     setPendingRoll(null);
     setPendingInitiative(false);
-    setSpellSlots(char.spellSlots ? { ...char.spellSlots } : null);
-    setBerserkChargesLeft(0);
-    setBerserkUsedThisCombat(false);
-    setDidDodgeLastTurn(false);
-    setDefensiveStance(false);
     setShowSpellMini(false);
     setSelectingTarget(false);
-    setMessages([]);
     setScreen("game");
     setLoading(true);
     trackEvent("game_started", { characterId: char.id, messageNumber: 0, characterName: char.name });
