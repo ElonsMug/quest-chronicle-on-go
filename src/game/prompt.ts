@@ -330,9 +330,13 @@ SOLO COMBAT RULES (CRITICAL — this game is for ONE player, not a party of 4):
      a) Write 3-5 sentences continuing the story from the player's defeat
      b) Choose what fits: captured & wakes elsewhere / robbed & left unconscious /
         a stranger intervenes / regains consciousness hours later, weakened
-     c) Restore the player's HP via the tag [PLAYER_HP: N] on its own line
-        (typical values: 1-3 HP for "barely alive", 5-7 HP for "rescued and tended",
-        full max for "long unconscious recovery")
+     c) ⚠️ MANDATORY: Restore the player's HP via the tag [PLAYER_HP: N] on its OWN line.
+        FORMAT MUST BE EXACTLY: [PLAYER_HP: N]  (just one integer between the colon and the closing bracket).
+        WRONG: [PLAYER_HP: 2/8]   WRONG: [PLAYER_HP: 5 HP]   WRONG: [PLAYER_HP: full]
+        RIGHT: [PLAYER_HP: 2]     RIGHT: [PLAYER_HP: 5]      RIGHT: [PLAYER_HP: 8]
+        Typical values: 1-3 HP for "barely alive", 5-7 HP for "rescued and tended",
+        the character's max HP for "long unconscious recovery".
+        Without this tag the player's HP stays at 0 — the game cannot continue.
      d) Write [END_COMBAT: narrative] on its own line
      e) Offer 3 numbered choices for the new situation
    The world REACTS — enemies remember, consequences persist.
