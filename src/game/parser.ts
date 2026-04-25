@@ -15,7 +15,7 @@ export function parseDMResponse(text: string) {
   let newItem: string | null = null;
   const newItems: string[] = [];
   const upgrades: { from: string; to: string }[] = [];
-  const newEnemies: { name: string; maxHp: number; hp: number; ac: number; damage: string; isUndead?: boolean }[] = [];
+  const newEnemies: { name: string; maxHp: number; hp: number; ac: number; damage: string; isUndead?: boolean; isBoss?: boolean }[] = [];
   const newAllies: { name: string; maxHp: number; hp: number }[] = [];
   const allyDamages: { name: string; damage: number }[] = [];
   const enemyDamages: { name: string; damage: number }[] = [];
