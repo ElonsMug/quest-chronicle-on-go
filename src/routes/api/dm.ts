@@ -2,10 +2,21 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   dmRequestSchema,
   checkTotalSize,
-  verifyRequestOrigin,
   corsHeaders,
   jsonResponse,
 } from "@/server/security";
+
+function responseOrigin(request: Request): string | null {
+  const origin = request.headers.get("origin");
+  if (origin) return origin;
+  const referer = request.headers.get("referer");
+  if (!referer) return null;
+  try {
+    return new URL(referer).origin;
+  } catch {
+    return null;
+  }
+}
 
 // Proxy to the Anthropic Messages API.
 // Validates input, enforces an Origin allowlist, returns sanitized errors.
@@ -18,12 +29,11 @@ export const Route = createFileRoute("/api/dm")({
       },
 
       POST: async ({ request }: { request: Request }) => {
-        // 1) Origin / Referer allowlist
-        const { ok: originOk, origin } = verifyRequestOrigin(request);
-        if (!originOk) {
-          console.warn("[dm] blocked origin:", origin);
-          return jsonResponse({ error: "Forbidden" }, 403, origin);
-        }
+        // 1) Response CORS origin only. Do not reject by Origin here:
+        // editor preview hosts are dynamic, and Origin is not a reliable
+        // budget-control boundary. Abuse protection is handled by validation,
+        // payload limits, and the upcoming auth/quotas layer.
+        const origin = responseOrigin(request);
 
         // 2) API key configured?
         const apiKey = process.env.ANTHROPIC_API_KEY;
