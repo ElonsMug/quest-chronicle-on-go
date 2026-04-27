@@ -134,6 +134,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         ? { ...state, arc: { ...state.arc, bossDefeated: true } }
         : state;
 
+    case "SET_SURPRISE":
+      return { ...state, surpriseAdvantage: action.value };
+
     default:
       // Exhaustiveness check: action is `never` here if all cases are handled.
       return state;
