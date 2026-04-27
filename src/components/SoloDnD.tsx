@@ -579,9 +579,14 @@ export default function SoloDnD() {
   async function startGame(char: Character, customPrompt?: string) {
     const startInv = [...char.startItems];
     // Pick a random narrative arc skeleton for this hero's class.
-    // (Step 5 will replace this with LLM-flavored variation behind a loading screen.)
     const template = pickRandomTemplate(char.id);
-    const arc = createArcFromTemplate(template);
+    setScreen("game");
+    setPreparingArc(true);
+    setArcCompletedDismissed(false);
+    // Block on LLM-flavored arc variation (≈2-3s). Fallback to bare
+    // template on any failure — game must never softlock here.
+    const arc = await varyArcWithLLM(template, char, language);
+    setPreparingArc(false);
     // Single atomic init — sets character, hp, inventory, spellSlots, arc
     // and resets effects/enemies/allies/inCombat/berserk/dodge/defensive/messages.
     dispatch({ type: "START_GAME", character: char, startInventory: startInv, arc });
@@ -589,18 +594,44 @@ export default function SoloDnD() {
     setPendingInitiative(false);
     setShowSpellMini(false);
     setSelectingTarget(false);
-    setScreen("game");
     setLoading(true);
-    trackEvent("game_started", { characterId: char.id, messageNumber: 0, characterName: char.name });
+    trackEvent("game_started", {
+      characterId: char.id,
+      messageNumber: 0,
+      characterName: char.name,
+      arcTemplateId: template.id,
+    });
     const prompt = customPrompt || t("dm.startPrompt");
     try {
-      const reply = await callAPI(char, char.hp, startInv, [], [], prompt);
+      // stateRef still mirrors the PREVIOUS game state at this microtask;
+      // pass the freshly-built arc explicitly via callDM so the very first
+      // scene already sees the arc context.
+      const reply = await callDM({
+        character: char,
+        hp: char.hp,
+        inventory: startInv,
+        effects: [],
+        history: [],
+        userMessage: prompt,
+        spellSlots: char.spellSlots ?? null,
+        language,
+        arc,
+        silentFallback: t("dm.silent"),
+      });
       await processAndSetMessages(char, char.hp, startInv, [], [], reply, []);
     } catch {
       const errText = t("dm.connectionError");
       setMessages([{ role: "assistant", content: errText, parsed: parseDMResponse(errText) }]);
     }
     setLoading(false);
+  }
+
+  // Start a fresh arc for the SAME hero — used by the ArcCompletedScreen.
+  async function handleStartNewArc() {
+    const ch = stateRef.current.character;
+    if (!ch) return;
+    setArcCompletedDismissed(true);
+    await startGame(ch);
   }
 
   // ── Choice handling ───────────────────────────────────────────
