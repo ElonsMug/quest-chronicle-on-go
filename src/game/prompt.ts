@@ -10,6 +10,8 @@
 // ─────────────────────────────────────────────────────────────────
 
 import type { Character } from "./types";
+import type { Arc } from "./arcs";
+import { PHASE_LABELS } from "./arcs";
 
 export function buildSystemPrompt(
   character: Character,
@@ -18,6 +20,7 @@ export function buildSystemPrompt(
   effects: string[],
   spellSlots: { current: number; max: number } | null,
   language: "en" | "ru",
+  arc: Arc | null = null,
 ): string {
   const inv = inventory.length ? inventory.join(", ") : language === "ru" ? "пусто" : "empty";
   const eff = effects.length ? effects.join(", ") : language === "ru" ? "нет" : "none";
@@ -75,9 +78,68 @@ YOU MUST:
     ? `СЕТТИНГ: тёмное фэнтези, портовый город под названием «Серый Берег» (используй ИМЕННО это написание кириллицей, никогда не "Grey Shore"). Будь лаконичен — игра идёт на мобильном, в метро.`
     : `SETTING: a dark fantasy harbor city called "Grey Shore". Be concise — mobile, on the metro.`;
 
+  // ARC CONTEXT — current narrative arc the DM is steering toward.
+  // Phases:
+  //   1 Hook       — introduce the goal, no combat unless flavor demands
+  //   2 Investigation — leads, NPCs, scenes around the goal
+  //   3 Mid-boss   — REQUIRED combat with the named mid-boss this scene
+  //   4 Preparation — gather strength before the finale
+  //   5 Final boss — REQUIRED combat with the antagonist using BOSS flag
+  // The phase value is set deterministically by the engine — the DM does
+  // not advance phases on its own. Phase directives below tell the DM
+  // what kind of scene to write for the CURRENT phase.
+  const arcBlock = arc
+    ? (() => {
+        const phaseLabel = PHASE_LABELS[arc.phase];
+        const phaseDirective = (() => {
+          if (language === "ru") {
+            switch (arc.phase) {
+              case 1: return `ФАЗА 1 — Завязка. Введи героя в арку: намекни на главную цель и злодея, но без боя. Закончи 3 вариантами действий.`;
+              case 2: return `ФАЗА 2 — Расследование. Игрок собирает зацепки и встречает второстепенных NPC, ведущих к мини-боссу «${arc.midBossName}». Бой возможен, но не обязателен.`;
+              case 3: return `ФАЗА 3 — Мини-босс. ⚠️ В ЭТОЙ ИЛИ СЛЕДУЮЩЕЙ СЦЕНЕ организуй встречу с «${arc.midBossName}» и начни бой через [ENEMY:] + [INITIATIVE]. Это ключевой бой арки. Не используй флаг BOSS — это ещё не финал.`;
+              case 4: return `ФАЗА 4 — Подготовка к финалу. Мини-босс мёртв. Игрок собирается с силами, ищет последние зацепки о «${arc.antagonist}». Бой не обязателен.`;
+              case 5: return `ФАЗА 5 — ФИНАЛ. ⚠️ В ЭТОЙ СЦЕНЕ организуй финальный бой с «${arc.antagonist}». Объяви его через [ENEMY: <Имя>, HP:28, AC:15, DMG:d8+2, MOTIVE:boss, BOSS] (флаг BOSS обязателен), затем [INITIATIVE]. Это кульминация арки.`;
+            }
+          } else {
+            switch (arc.phase) {
+              case 1: return `PHASE 1 — Hook. Introduce the hero to the arc: hint at the main goal and villain, no combat. End with 3 choices.`;
+              case 2: return `PHASE 2 — Investigation. Player gathers leads and meets supporting NPCs that point toward the mid-boss "${arc.midBossName}". Combat possible but not required.`;
+              case 3: return `PHASE 3 — Mid-boss. ⚠️ IN THIS OR THE NEXT SCENE stage the encounter with "${arc.midBossName}" and start combat with [ENEMY:] + [INITIATIVE]. This is the arc's key fight. Do NOT use the BOSS flag — this is not the finale.`;
+              case 4: return `PHASE 4 — Preparation. The mid-boss is dead. The player gathers strength and final clues about "${arc.antagonist}". Combat optional.`;
+              case 5: return `PHASE 5 — FINAL. ⚠️ IN THIS SCENE stage the final fight with "${arc.antagonist}". Declare them via [ENEMY: <Name>, HP:28, AC:15, DMG:d8+2, MOTIVE:boss, BOSS] (BOSS flag REQUIRED), then [INITIATIVE]. This is the climax.`;
+            }
+          }
+        })();
+        return language === "ru"
+          ? `
+
+КОНТЕКСТ АРКИ (текущее приключение):
+- Цель героя: ${arc.goal}
+- Главный злодей: ${arc.antagonist}
+- Место действия: ${arc.setting}
+- Мини-босс арки: ${arc.midBossName}
+- Текущая фаза: ${arc.phase}/5 — ${phaseLabel} (сцена ${arc.sceneCount + 1})
+
+${phaseDirective}
+`
+          : `
+
+ARC CONTEXT (current adventure):
+- Hero goal: ${arc.goal}
+- Main villain: ${arc.antagonist}
+- Setting: ${arc.setting}
+- Arc mid-boss: ${arc.midBossName}
+- Current phase: ${arc.phase}/5 — ${phaseLabel} (scene ${arc.sceneCount + 1})
+
+${phaseDirective}
+`;
+      })()
+    : "";
+
   return `You are the Dungeon Master of a solo text RPG (simplified D&D 5e). One player.
 
 ${langInstruction}
+${arcBlock}
 
 CHARACTER:
 Class: ${character.name} | HP: ${hp}/${character.maxHp}

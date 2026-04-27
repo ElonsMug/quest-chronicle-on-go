@@ -33,7 +33,10 @@ import { rollDice, parseDiceSides, PROFICIENCY_BONUS } from "@/game/dice";
 import { isPotion } from "@/game/inventory";
 import { gameReducer } from "@/game/reducer";
 import { initialGameState } from "@/game/state";
-import { pickRandomTemplate, createArcFromTemplate } from "@/game/arcs";
+import { pickRandomTemplate, computeNextArc } from "@/game/arcs";
+import { varyArcWithLLM } from "@/game/arcVariation";
+import { ArcCompletedScreen } from "@/components/game/ArcCompletedScreen";
+import { ArcProgressBar } from "@/components/game/ArcProgressBar";
 
 // ─── UI components ───────────────────────────────────────────────
 import { EnemyHP } from "@/components/game/EnemyHP";
@@ -100,6 +103,13 @@ export default function SoloDnD() {
     next: "en" | "ru";
     resolve: (ok: boolean) => void;
   } | null>(null);
+  // True while the LLM is generating a flavored arc variation before the
+  // very first scene of a new adventure. Shows a dedicated full-screen
+  // loader so the player understands the wait.
+  const [preparingArc, setPreparingArc] = useState(false);
+  // True once the player has dismissed the arc-completed screen (so it
+  // doesn't keep re-opening if the arc.completed flag is still true).
+  const [arcCompletedDismissed, setArcCompletedDismissed] = useState(false);
 
   // ── Game state (single reducer — see src/game/state.ts) ─────────
   // Everything that an async DM callback needs to read after-the-fact
@@ -121,6 +131,7 @@ export default function SoloDnD() {
     didDodgeLastTurn,
     defensiveStance,
     messages,
+    arc,
   } = game;
 
   // ── Setter shims ────────────────────────────────────────────────
@@ -224,6 +235,7 @@ export default function SoloDnD() {
       userMessage,
       spellSlots: stateRef.current.spellSlots,
       language,
+      arc: stateRef.current.arc,
       silentFallback: t("dm.silent"),
     });
   }
@@ -476,8 +488,41 @@ export default function SoloDnD() {
     // narrative. Helps catch prompt regressions before they ship.
     reportLanguageLeaks(parsed.narrative, language, parsed.narrative);
     const newMsgs: ChatMessage[] = [...prevMessages, { role: "assistant", content: reply, parsed }];
-    const { newHp, newInv, newEff } = applyParsed(parsed, currentHp, currentInv, currentEff, currentEnemies);
+    const { newHp, newInv, newEff, newEnemies } = applyParsed(parsed, currentHp, currentInv, currentEff, currentEnemies);
     setMessages(newMsgs);
+
+    // ── Arc progression ────────────────────────────────────────
+    // Detect bosses that died THIS scene by diffing live-before vs. after.
+    // Phase 3 → any enemy kill is treated as the mid-boss (the prompt forces
+    //          a single mid-boss combat in this phase).
+    // Phase 5 → only enemies flagged isBoss count as the final-boss kill.
+    const currentArc = stateRef.current.arc;
+    if (currentArc && !currentArc.completed) {
+      const liveBefore = new Set(
+        currentEnemies.filter((e) => e.hp > 0).map((e) => e.name.toLowerCase()),
+      );
+      const killedThisScene = newEnemies.filter(
+        (e) => e.hp <= 0 && liveBefore.has(e.name.toLowerCase()),
+      );
+      let arcAfterKills = currentArc;
+      if (currentArc.phase === 3 && killedThisScene.length > 0 && !arcAfterKills.midBossDefeated) {
+        arcAfterKills = { ...arcAfterKills, midBossDefeated: true };
+        dispatch({ type: "MARK_MIDBOSS_DEFEATED" });
+      }
+      if (
+        currentArc.phase === 5 &&
+        killedThisScene.some((e) => e.isBoss) &&
+        !arcAfterKills.bossDefeated
+      ) {
+        arcAfterKills = { ...arcAfterKills, bossDefeated: true };
+        dispatch({ type: "MARK_BOSS_DEFEATED" });
+      }
+      // Compute next phase deterministically (same response = +1 scene).
+      const nextArc = computeNextArc(arcAfterKills, parsed, stateRef.current.inCombat);
+      if (nextArc !== arcAfterKills || nextArc !== currentArc) {
+        dispatch({ type: "SET_ARC", arc: nextArc });
+      }
+    }
 
     // Snapshot the start of every fight — used by the "Restart fight" button
     if (parsed.initiativeTrigger) {
@@ -535,9 +580,14 @@ export default function SoloDnD() {
   async function startGame(char: Character, customPrompt?: string) {
     const startInv = [...char.startItems];
     // Pick a random narrative arc skeleton for this hero's class.
-    // (Step 5 will replace this with LLM-flavored variation behind a loading screen.)
     const template = pickRandomTemplate(char.id);
-    const arc = createArcFromTemplate(template);
+    setScreen("game");
+    setPreparingArc(true);
+    setArcCompletedDismissed(false);
+    // Block on LLM-flavored arc variation (≈2-3s). Fallback to bare
+    // template on any failure — game must never softlock here.
+    const arc = await varyArcWithLLM(template, char, language);
+    setPreparingArc(false);
     // Single atomic init — sets character, hp, inventory, spellSlots, arc
     // and resets effects/enemies/allies/inCombat/berserk/dodge/defensive/messages.
     dispatch({ type: "START_GAME", character: char, startInventory: startInv, arc });
@@ -545,18 +595,44 @@ export default function SoloDnD() {
     setPendingInitiative(false);
     setShowSpellMini(false);
     setSelectingTarget(false);
-    setScreen("game");
     setLoading(true);
-    trackEvent("game_started", { characterId: char.id, messageNumber: 0, characterName: char.name });
+    trackEvent("game_started", {
+      characterId: char.id,
+      messageNumber: 0,
+      characterName: char.name,
+      arcTemplateId: template.id,
+    });
     const prompt = customPrompt || t("dm.startPrompt");
     try {
-      const reply = await callAPI(char, char.hp, startInv, [], [], prompt);
+      // stateRef still mirrors the PREVIOUS game state at this microtask;
+      // pass the freshly-built arc explicitly via callDM so the very first
+      // scene already sees the arc context.
+      const reply = await callDM({
+        character: char,
+        hp: char.hp,
+        inventory: startInv,
+        effects: [],
+        history: [],
+        userMessage: prompt,
+        spellSlots: char.spellSlots ?? null,
+        language,
+        arc,
+        silentFallback: t("dm.silent"),
+      });
       await processAndSetMessages(char, char.hp, startInv, [], [], reply, []);
     } catch {
       const errText = t("dm.connectionError");
       setMessages([{ role: "assistant", content: errText, parsed: parseDMResponse(errText) }]);
     }
     setLoading(false);
+  }
+
+  // Start a fresh arc for the SAME hero — used by the ArcCompletedScreen.
+  async function handleStartNewArc() {
+    const ch = stateRef.current.character;
+    if (!ch) return;
+    setArcCompletedDismissed(true);
+    await startGame(ch);
   }
 
   // ── Choice handling ───────────────────────────────────────────
@@ -1096,6 +1172,29 @@ export default function SoloDnD() {
           onClose={() => { setShowDefeated(false); setDefeatDismissed(true); }}
         />
       )}
+      {arc?.completed && !arcCompletedDismissed && !preparingArc && (
+        <ArcCompletedScreen
+          arc={arc}
+          onStartNewArc={() => void handleStartNewArc()}
+          onMenu={() => { setArcCompletedDismissed(true); exitToMenu(); }}
+        />
+      )}
+      {preparingArc && (
+        <div className="fixed inset-0 z-[70] flex flex-col items-center justify-center px-6" style={{ background: "linear-gradient(180deg,#0c0a09 0%,#1c1917 100%)" }}>
+          <div className="text-amber-600 text-xs tracking-[0.4em] uppercase mb-3">{t("arc.preparing.tagline")}</div>
+          <div className="text-amber-200 text-xl font-bold text-center mb-4 max-w-sm leading-relaxed" style={{ fontFamily: "serif" }}>
+            {t("arc.preparing.title")}
+          </div>
+          <div className="flex gap-1.5 items-center">
+            {[0, 1, 2].map(i => (
+              <span key={i} className="w-1.5 h-1.5 bg-amber-600 rounded-full animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
+            ))}
+          </div>
+          <div className="text-stone-500 text-xs mt-6 max-w-sm text-center leading-relaxed">
+            {t("arc.preparing.subtitle")}
+          </div>
+        </div>
+      )}
 
       {pendingLanguageSwitch && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center px-4" style={{ background: "rgba(0,0,0,0.85)" }}>
@@ -1188,6 +1287,7 @@ export default function SoloDnD() {
             ))}
           </div>
         )}
+        {arc && !arc.completed && <ArcProgressBar arc={arc} />}
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3" style={{ paddingBottom: "280px" }}>
