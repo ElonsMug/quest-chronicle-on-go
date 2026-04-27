@@ -25,13 +25,16 @@ export function parseDMResponse(text: string) {
   let combatEndType: "victory" | "surrender" | "retreat" | "narrative" | null = null;
   let playerHpRestore: number | null = null;
   let behaviorShift: "surrender" | "flee" | "escalate" | null = null;
+  // [SURPRISE: player] — DM grants the player a free attack round before
+  // [INITIATIVE]. During this round enemies do NOT retaliate.
+  let surprise: "player" | "enemies" | null = null;
 
   // English-tag parser. Tags are part of an internal contract between the DM
   // and the parser — they do not get translated when the UI language changes.
   // The character class `[^\]]*` is intentionally permissive so a malformed
   // tag (extra space, trailing text inside brackets) still gets stripped from
   // the visible narrative even if its dedicated extractor regex doesn't fire.
-  const TAG = /\[(ATTACK|ROLL|DAMAGE|ITEM|UPGRADE|ENEMY|ENEMY_DAMAGE|ALLY|ALLY_DAMAGE|EFFECT|INITIATIVE|END_COMBAT|PLAYER_HP|BEHAVIOR_SHIFT)[^\]]*\]/gi;
+  const TAG = /\[(ATTACK|ROLL|DAMAGE|ITEM|UPGRADE|ENEMY|ENEMY_DAMAGE|ALLY|ALLY_DAMAGE|EFFECT|INITIATIVE|END_COMBAT|PLAYER_HP|BEHAVIOR_SHIFT|SURPRISE)[^\]]*\]/gi;
 
   const atk = text.match(/\[ATTACK:\s*([^,\]]+),\s*([^,\]]+),\s*([^,\]]+),\s*AC(\d+)\]/i);
   if (atk) attackRequest = { weapon: atk[1].trim(), dice: atk[2].trim(), mod: parseInt(atk[3]) || 0, ac: parseInt(atk[4]) };
@@ -142,6 +145,11 @@ export function parseDMResponse(text: string) {
     const s = shiftMatch[1].toLowerCase();
     if (s === "surrender" || s === "flee" || s === "escalate") behaviorShift = s;
   }
+  const surpriseMatch = text.match(/\[SURPRISE:\s*(player|enemies)\]/i);
+  if (surpriseMatch) {
+    const s = surpriseMatch[1].toLowerCase();
+    if (s === "player" || s === "enemies") surprise = s;
+  }
 
   // Build the narrative line-by-line:
   //  - numbered "1. ..." lines become choices and are pulled out
@@ -177,5 +185,6 @@ export function parseDMResponse(text: string) {
     combatEndType,
     playerHpRestore,
     behaviorShift,
+    surprise,
   };
 }
