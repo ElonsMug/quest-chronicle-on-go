@@ -1197,6 +1197,7 @@ export default function SoloDnD() {
       )}
 
       {pendingLanguageSwitch && (
+      {pendingLanguageSwitch && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center px-4" style={{ background: "rgba(0,0,0,0.85)" }}>
           <div className="max-w-sm w-full bg-stone-900 border border-stone-700 rounded-2xl p-6">
             <div className="text-amber-200 font-bold text-lg mb-2" style={{ fontFamily: "serif" }}>
