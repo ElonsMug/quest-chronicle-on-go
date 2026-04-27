@@ -674,9 +674,15 @@ export default function SoloDnD() {
     const potionInfo = pendingPotionInfoRef.current;
     pendingPotionInfoRef.current = null;
     const choiceWithPotion = potionInfo ? `${potionInfo}\n${choiceText}` : choiceText;
-    const apiMessage = (inCombat || en.length > 0) && !isInitiativeWin && !isNarrativeDefeat
-      ? `${choiceWithPotion}\n\n${i18n.t("system.combatTurnReminder")}`
-      : choiceWithPotion;
+    // Surprise round: this player action is "free" — enemies do NOT retaliate.
+    // Send a different system reminder and clear the flag immediately.
+    const surpriseActive = stateRef.current.surpriseAdvantage === "player";
+    if (surpriseActive) setSurpriseAdvantage(null);
+    const apiMessage = surpriseActive
+      ? `${choiceWithPotion}\n\n${i18n.t("system.surpriseRoundReminder")}`
+      : (inCombat || en.length > 0) && !isInitiativeWin && !isNarrativeDefeat
+        ? `${choiceWithPotion}\n\n${i18n.t("system.combatTurnReminder")}`
+        : choiceWithPotion;
     try {
       const reply = await callAPI(c, h, inv, eff, msgs, apiMessage);
       await processAndSetMessages(c, h, inv, eff, en, reply, newMsgs);
