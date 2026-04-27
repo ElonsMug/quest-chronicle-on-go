@@ -1172,8 +1172,30 @@ export default function SoloDnD() {
           onClose={() => { setShowDefeated(false); setDefeatDismissed(true); }}
         />
       )}
+      {arc?.completed && !arcCompletedDismissed && !preparingArc && (
+        <ArcCompletedScreen
+          arc={arc}
+          onStartNewArc={() => void handleStartNewArc()}
+          onMenu={() => { setArcCompletedDismissed(true); exitToMenu(); }}
+        />
+      )}
+      {preparingArc && (
+        <div className="fixed inset-0 z-[70] flex flex-col items-center justify-center px-6" style={{ background: "linear-gradient(180deg,#0c0a09 0%,#1c1917 100%)" }}>
+          <div className="text-amber-600 text-xs tracking-[0.4em] uppercase mb-3">{t("arc.preparing.tagline")}</div>
+          <div className="text-amber-200 text-xl font-bold text-center mb-4 max-w-sm leading-relaxed" style={{ fontFamily: "serif" }}>
+            {t("arc.preparing.title")}
+          </div>
+          <div className="flex gap-1.5 items-center">
+            {[0, 1, 2].map(i => (
+              <span key={i} className="w-1.5 h-1.5 bg-amber-600 rounded-full animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
+            ))}
+          </div>
+          <div className="text-stone-500 text-xs mt-6 max-w-sm text-center leading-relaxed">
+            {t("arc.preparing.subtitle")}
+          </div>
+        </div>
+      )}
 
-      {pendingLanguageSwitch && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center px-4" style={{ background: "rgba(0,0,0,0.85)" }}>
           <div className="max-w-sm w-full bg-stone-900 border border-stone-700 rounded-2xl p-6">
             <div className="text-amber-200 font-bold text-lg mb-2" style={{ fontFamily: "serif" }}>
