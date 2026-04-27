@@ -1,51 +1,63 @@
 import { createFileRoute } from "@tanstack/react-router";
+import {
+  dmRequestSchema,
+  checkTotalSize,
+  verifyRequestOrigin,
+  corsHeaders,
+  jsonResponse,
+} from "@/server/security";
 
 // Proxy to the Anthropic Messages API.
-// Accepts { system: string, messages: [{role, content}] }, returns { text: string }.
+// Validates input, enforces an Origin allowlist, returns sanitized errors.
 export const Route = createFileRoute("/api/dm")({
   server: {
     handlers: {
+      OPTIONS: async ({ request }: { request: Request }) => {
+        const origin = request.headers.get("origin");
+        return new Response(null, { status: 204, headers: corsHeaders(origin) });
+      },
+
       POST: async ({ request }: { request: Request }) => {
+        // 1) Origin / Referer allowlist
+        const { ok: originOk, origin } = verifyRequestOrigin(request);
+        if (!originOk) {
+          console.warn("[dm] blocked origin:", origin);
+          return jsonResponse({ error: "Forbidden" }, 403, origin);
+        }
+
+        // 2) API key configured?
         const apiKey = process.env.ANTHROPIC_API_KEY;
         if (!apiKey) {
-          return new Response(
-            JSON.stringify({ error: "ANTHROPIC_API_KEY is not configured" }),
-            { status: 500, headers: { "Content-Type": "application/json" } },
+          console.error("[dm] ANTHROPIC_API_KEY missing");
+          return jsonResponse(
+            { error: "Service unavailable" },
+            503,
+            origin,
           );
         }
 
-        let body: { system?: string; messages?: Array<{ role: string; content: string }> };
+        // 3) Parse & validate body
+        let raw: unknown;
         try {
-          body = await request.json();
+          raw = await request.json();
         } catch {
-          return new Response(JSON.stringify({ error: "Invalid JSON" }), {
-            status: 400,
-            headers: { "Content-Type": "application/json" },
-          });
+          return jsonResponse({ error: "Invalid JSON" }, 400, origin);
         }
 
-        const system = typeof body.system === "string" ? body.system : "";
-        const messages = Array.isArray(body.messages) ? body.messages : [];
-
-        if (!messages.length) {
-          return new Response(
-            JSON.stringify({ error: "messages must be a non-empty array" }),
-            { status: 400, headers: { "Content-Type": "application/json" } },
-          );
+        const parsed = dmRequestSchema.safeParse(raw);
+        if (!parsed.success) {
+          // Don't leak schema details to the browser, log them for us.
+          console.warn("[dm] schema rejected:", parsed.error.issues.slice(0, 3));
+          return jsonResponse({ error: "Invalid request" }, 400, origin);
         }
 
-        // Basic validation and normalization
-        const safeMessages = messages
-          .filter(
-            (m) =>
-              m &&
-              (m.role === "user" || m.role === "assistant") &&
-              typeof m.content === "string" &&
-              m.content.length > 0 &&
-              m.content.length < 20000,
-          )
-          .map((m) => ({ role: m.role, content: m.content }));
+        const sizeErr = checkTotalSize(parsed.data);
+        if (sizeErr) {
+          console.warn("[dm] payload too large:", sizeErr);
+          return jsonResponse({ error: "Request too large" }, 413, origin);
+        }
 
+        // 4) Call Anthropic
         try {
           const res = await fetch("https://api.anthropic.com/v1/messages", {
             method: "POST",
@@ -57,17 +69,20 @@ export const Route = createFileRoute("/api/dm")({
             body: JSON.stringify({
               model: "claude-haiku-4-5-20251001",
               max_tokens: 1000,
-              system,
-              messages: safeMessages,
+              system: parsed.data.system,
+              messages: parsed.data.messages,
             }),
           });
 
           if (!res.ok) {
+            // Log the upstream details on our side, but don't return them
+            // to the client (they may contain org IDs, model names, etc.)
             const errText = await res.text();
-            console.error("Anthropic error:", res.status, errText);
-            return new Response(
-              JSON.stringify({ error: "Upstream error", status: res.status, details: errText }),
-              { status: 502, headers: { "Content-Type": "application/json" } },
+            console.error("[dm] anthropic error:", res.status, errText);
+            return jsonResponse(
+              { error: "The Master is silent for a moment..." },
+              502,
+              origin,
             );
           }
 
@@ -76,15 +91,13 @@ export const Route = createFileRoute("/api/dm")({
           };
           const text = data.content?.[0]?.text ?? "The Master is silent...";
 
-          return new Response(JSON.stringify({ text }), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          });
+          return jsonResponse({ text }, 200, origin);
         } catch (err) {
-          console.error("DM proxy failed:", err);
-          return new Response(
-            JSON.stringify({ error: "Connection to Master failed" }),
-            { status: 502, headers: { "Content-Type": "application/json" } },
+          console.error("[dm] proxy failed:", err);
+          return jsonResponse(
+            { error: "Connection to Master failed" },
+            502,
+            origin,
           );
         }
       },
