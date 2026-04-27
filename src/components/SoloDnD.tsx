@@ -132,6 +132,7 @@ export default function SoloDnD() {
     defensiveStance,
     messages,
     arc,
+    surpriseAdvantage,
   } = game;
 
   // ── Setter shims ────────────────────────────────────────────────
@@ -169,6 +170,8 @@ export default function SoloDnD() {
     dispatch({ type: "SET_DID_DODGE", value: v });
   const setDefensiveStance = (v: boolean) =>
     dispatch({ type: "SET_DEFENSIVE_STANCE", value: v });
+  const setSurpriseAdvantage = (v: "player" | null) =>
+    dispatch({ type: "SET_SURPRISE", value: v });
 
   const combatStartSnapshotRef = useRef<{ hp: number; enemies: Enemy[]; allies: Ally[] } | null>(null);
   // Bonus action "potion drunk" — accumulated here and attached to the next
@@ -421,6 +424,16 @@ export default function SoloDnD() {
       }
     }
 
+    // [SURPRISE: player] — DM granted a free attack round. Mark combat as
+    // active (without [INITIATIVE]) and remember the advantage so the next
+    // player action skips the enemy retaliation reminder.
+    if (parsed.surprise === "player") {
+      if (newEnemies.length > 0 && !stateRef.current.inCombat) {
+        setInCombat(true);
+      }
+      setSurpriseAdvantage("player");
+    }
+
     let finalEffects = newEff;
     if (parsed.newEffects?.length) {
       const labels = parsed.newEffects.map(e => e.duration ? `${e.name} (${e.duration})` : e.name);
@@ -661,9 +674,15 @@ export default function SoloDnD() {
     const potionInfo = pendingPotionInfoRef.current;
     pendingPotionInfoRef.current = null;
     const choiceWithPotion = potionInfo ? `${potionInfo}\n${choiceText}` : choiceText;
-    const apiMessage = (inCombat || en.length > 0) && !isInitiativeWin && !isNarrativeDefeat
-      ? `${choiceWithPotion}\n\n${i18n.t("system.combatTurnReminder")}`
-      : choiceWithPotion;
+    // Surprise round: this player action is "free" — enemies do NOT retaliate.
+    // Send a different system reminder and clear the flag immediately.
+    const surpriseActive = stateRef.current.surpriseAdvantage === "player";
+    if (surpriseActive) setSurpriseAdvantage(null);
+    const apiMessage = surpriseActive
+      ? `${choiceWithPotion}\n\n${i18n.t("system.surpriseRoundReminder")}`
+      : (inCombat || en.length > 0) && !isInitiativeWin && !isNarrativeDefeat
+        ? `${choiceWithPotion}\n\n${i18n.t("system.combatTurnReminder")}`
+        : choiceWithPotion;
     try {
       const reply = await callAPI(c, h, inv, eff, msgs, apiMessage);
       await processAndSetMessages(c, h, inv, eff, en, reply, newMsgs);
@@ -1263,6 +1282,11 @@ export default function SoloDnD() {
 
         {inCombat && enemies.filter(e => e.hp > 0).length > 0 && (
           <div className="px-4 pb-2 space-y-1 border-t border-stone-800/40 pt-2">
+            {surpriseAdvantage === "player" && (
+              <div className="text-amber-400 text-[10px] uppercase tracking-widest font-bold mb-1">
+                ⚡ {t("combat.surpriseRound", { defaultValue: "Surprise round" })}
+              </div>
+            )}
             {enemies.filter(e => e.hp > 0).map((en, i) => (
               <EnemyHP
                 key={i}

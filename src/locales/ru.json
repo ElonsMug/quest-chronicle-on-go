@@ -116,6 +116,7 @@
     "noSlots": "Нет слотов"
   },
   "combat": {
+    "surpriseRound": "Раунд засады",
     "attack": "Атака",
     "berserk": "Берсерк",
     "berserkUsed": "Использован в этом бою",
@@ -238,6 +239,7 @@
   "system": {
     "potionBonusAction": "[Bonus action before main attack: the player drinks a healing potion, +{{heal}} HP ({{hp}}/{{max}}). Describe the gulp of the potion in ONE sentence, then immediately describe the player's main action described below.]",
     "combatTurnReminder": "[SYSTEM RULE: After describing the result of the player's action — the leader acts according to their behavior state. AGGRESSIVE/TACTICAL/DEFENSIVE → attack with [DAMAGE: X] on hit. RETREATING → narrate the disengage, no attack required. If leader is below 40% HP → trigger the motive-based behavior shift (surrender/flee/escalate). Minions add pressure in the narrative without their own turn. Do not offer choices 1-2-3 unless combat is ending.]",
+    "surpriseRoundReminder": "[SYSTEM RULE: SURPRISE ROUND — the player just used their free ambush action. Enemies are STILL surprised this turn — DO NOT attack the player, DO NOT write [DAMAGE:]. Describe the result of the surprise action (kill, wound, missed swing). If enemies still live, NOW write [INITIATIVE] on its own line — normal combat starts on the next turn. Do not offer choices 1-2-3.]",
     "berserkActivated": "[Berserk activated: +2 damage and -2 AC for 2 turns]",
     "defendStance": "[Defensive stance: +2 AC until next turn]",
     "dodge": "[Dodge: enemy attacks at disadvantage (two rolls, take the lower)]",

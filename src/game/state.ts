@@ -32,6 +32,10 @@ export type GameState = {
   // Narrative arc — the current adventure's structure and progress.
   // Null until START_GAME provides one (so old menu screens stay safe).
   arc: Arc | null;
+  // [SURPRISE: player] sets this to "player". While set, the next player
+  // action does NOT trigger an enemy retaliation turn (no combatTurnReminder).
+  // Cleared automatically after that one action is sent.
+  surpriseAdvantage: "player" | null;
 };
 
 export const initialGameState: GameState = {
@@ -49,6 +53,7 @@ export const initialGameState: GameState = {
   defensiveStance: false,
   messages: [],
   arc: null,
+  surpriseAdvantage: null,
 };
 
 // ─────────────────────────────────────────────────────────────────
@@ -106,7 +111,8 @@ export type GameAction =
   // have to clone the arc by hand.
   | { type: "SET_ARC"; arc: Arc }
   | { type: "MARK_MIDBOSS_DEFEATED" }
-  | { type: "MARK_BOSS_DEFEATED" };
+  | { type: "MARK_BOSS_DEFEATED" }
+  | { type: "SET_SURPRISE"; value: "player" | null };
 
 // Re-export ArcPhase for convenience of consumers importing from state.
 export type { ArcPhase };
