@@ -10,6 +10,8 @@
 // ─────────────────────────────────────────────────────────────────
 
 import type { Character } from "./types";
+import type { Arc } from "./arcs";
+import { PHASE_LABELS } from "./arcs";
 
 export function buildSystemPrompt(
   character: Character,
@@ -18,6 +20,7 @@ export function buildSystemPrompt(
   effects: string[],
   spellSlots: { current: number; max: number } | null,
   language: "en" | "ru",
+  arc: Arc | null = null,
 ): string {
   const inv = inventory.length ? inventory.join(", ") : language === "ru" ? "пусто" : "empty";
   const eff = effects.length ? effects.join(", ") : language === "ru" ? "нет" : "none";
