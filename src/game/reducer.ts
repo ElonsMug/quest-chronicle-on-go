@@ -19,6 +19,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         spellSlots: action.character.spellSlots
           ? { ...action.character.spellSlots }
           : null,
+        arc: action.arc,
       };
 
     case "RESET_TO_MENU":
