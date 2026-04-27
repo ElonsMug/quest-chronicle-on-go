@@ -48,6 +48,7 @@ export const initialGameState: GameState = {
   didDodgeLastTurn: false,
   defensiveStance: false,
   messages: [],
+  arc: null,
 };
 
 // ─────────────────────────────────────────────────────────────────
@@ -60,7 +61,12 @@ export const initialGameState: GameState = {
 
 export type GameAction =
   // Lifecycle
-  | { type: "START_GAME"; character: Character; startInventory: string[] }
+  | {
+      type: "START_GAME";
+      character: Character;
+      startInventory: string[];
+      arc: Arc;
+    }
   | { type: "RESET_TO_MENU" }
 
   // Direct setters (used when an external function already computed the value)
@@ -90,4 +96,17 @@ export type GameAction =
   // Composite resets
   | { type: "RESET_COMBAT_FLAGS" } // berserk*, didDodge, defensive — used at combat end
   | { type: "RESTORE_SNAPSHOT"; hp: number; enemies: Enemy[]; allies: Ally[] }
-  | { type: "LONG_REST"; hp: number; spellSlots: SpellSlots | null };
+  | { type: "LONG_REST"; hp: number; spellSlots: SpellSlots | null }
+
+  // ── Arc progression ───────────────────────────────────────────
+  // Replaces the entire arc snapshot. The reducer is dumb on purpose:
+  // the next-arc value is computed by computeNextArc() in arcs.ts and
+  // passed in. Phase-flag mutations (midBossDefeated, bossDefeated) go
+  // through MARK_MIDBOSS_DEFEATED / MARK_BOSS_DEFEATED so callers don't
+  // have to clone the arc by hand.
+  | { type: "SET_ARC"; arc: Arc }
+  | { type: "MARK_MIDBOSS_DEFEATED" }
+  | { type: "MARK_BOSS_DEFEATED" };
+
+// Re-export ArcPhase for convenience of consumers importing from state.
+export type { ArcPhase };
