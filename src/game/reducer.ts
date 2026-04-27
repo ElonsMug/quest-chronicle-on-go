@@ -120,6 +120,20 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         berserkUsedThisCombat: false,
       };
 
+    // ── Arc ──────────────────────────────────────────────────
+    case "SET_ARC":
+      return { ...state, arc: action.arc };
+
+    case "MARK_MIDBOSS_DEFEATED":
+      return state.arc
+        ? { ...state, arc: { ...state.arc, midBossDefeated: true } }
+        : state;
+
+    case "MARK_BOSS_DEFEATED":
+      return state.arc
+        ? { ...state, arc: { ...state.arc, bossDefeated: true } }
+        : state;
+
     default:
       // Exhaustiveness check: action is `never` here if all cases are handled.
       return state;
