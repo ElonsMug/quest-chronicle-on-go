@@ -103,6 +103,13 @@ export default function SoloDnD() {
     next: "en" | "ru";
     resolve: (ok: boolean) => void;
   } | null>(null);
+  // True while the LLM is generating a flavored arc variation before the
+  // very first scene of a new adventure. Shows a dedicated full-screen
+  // loader so the player understands the wait.
+  const [preparingArc, setPreparingArc] = useState(false);
+  // True once the player has dismissed the arc-completed screen (so it
+  // doesn't keep re-opening if the arc.completed flag is still true).
+  const [arcCompletedDismissed, setArcCompletedDismissed] = useState(false);
 
   // ── Game state (single reducer — see src/game/state.ts) ─────────
   // Everything that an async DM callback needs to read after-the-fact
