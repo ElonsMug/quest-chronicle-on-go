@@ -10,9 +10,9 @@ import { z } from "zod";
 // ── Input limits ─────────────────────────────────────────────────
 // Conservative caps to keep Anthropic billing predictable.
 export const LIMITS = {
-  systemMaxChars: 8_000,
+  systemMaxChars: 40_000,
   messagesMax: 80,
-  messageContentMax: 4_000,
+  messageContentMax: 20_000,
   totalContentMax: 50_000,
 } as const;
 
@@ -46,6 +46,8 @@ export function checkTotalSize(payload: DMRequest): string | null {
 // ── Origin allowlist ─────────────────────────────────────────────
 // Strict list of domains allowed to call the AI proxy.
 // Add custom domains here when they go live.
+const PROJECT_ID = "4ffc9a2d-14fa-4181-a41a-6ff83f90fe63";
+
 const ALLOWED_HOSTS = new Set([
   // Production
   "quest-chronicle-on-go.lovable.app",
@@ -63,11 +65,18 @@ const ALLOWED_HOSTS = new Set([
 export function isAllowedOrigin(origin: string | null): boolean {
   if (!origin) return false;
   try {
-    const url = new URL(origin);
+    const url = new URL(origin.trim());
     if (url.protocol === "http:" && ["localhost", "127.0.0.1"].includes(url.hostname)) {
       return true;
     }
-    return url.protocol === "https:" && ALLOWED_HOSTS.has(url.hostname);
+    if (url.protocol !== "https:") return false;
+
+    const host = url.hostname.toLowerCase();
+    return (
+      ALLOWED_HOSTS.has(host) ||
+      (host.endsWith(".lovable.app") && host.includes(PROJECT_ID)) ||
+      (host.endsWith(".lovableproject.com") && host.includes(PROJECT_ID))
+    );
   } catch {
     return false;
   }
