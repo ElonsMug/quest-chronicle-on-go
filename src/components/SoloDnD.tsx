@@ -33,7 +33,10 @@ import { rollDice, parseDiceSides, PROFICIENCY_BONUS } from "@/game/dice";
 import { isPotion } from "@/game/inventory";
 import { gameReducer } from "@/game/reducer";
 import { initialGameState } from "@/game/state";
-import { pickRandomTemplate, createArcFromTemplate } from "@/game/arcs";
+import { pickRandomTemplate, createArcFromTemplate, computeNextArc, PHASE_LABELS } from "@/game/arcs";
+import { varyArcWithLLM } from "@/game/arcVariation";
+import { ArcCompletedScreen } from "@/components/game/ArcCompletedScreen";
+import { ArcProgressBar } from "@/components/game/ArcProgressBar";
 
 // ─── UI components ───────────────────────────────────────────────
 import { EnemyHP } from "@/components/game/EnemyHP";
@@ -224,6 +227,7 @@ export default function SoloDnD() {
       userMessage,
       spellSlots: stateRef.current.spellSlots,
       language,
+      arc: stateRef.current.arc,
       silentFallback: t("dm.silent"),
     });
   }
