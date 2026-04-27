@@ -132,6 +132,7 @@ export default function SoloDnD() {
     defensiveStance,
     messages,
     arc,
+    surpriseAdvantage,
   } = game;
 
   // ── Setter shims ────────────────────────────────────────────────
@@ -169,6 +170,8 @@ export default function SoloDnD() {
     dispatch({ type: "SET_DID_DODGE", value: v });
   const setDefensiveStance = (v: boolean) =>
     dispatch({ type: "SET_DEFENSIVE_STANCE", value: v });
+  const setSurpriseAdvantage = (v: "player" | null) =>
+    dispatch({ type: "SET_SURPRISE", value: v });
 
   const combatStartSnapshotRef = useRef<{ hp: number; enemies: Enemy[]; allies: Ally[] } | null>(null);
   // Bonus action "potion drunk" — accumulated here and attached to the next
