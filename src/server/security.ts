@@ -52,6 +52,9 @@ const ALLOWED_ORIGIN_PATTERNS: RegExp[] = [
   // Preview / id-preview / project--<id> domains for THIS project
   /^https:\/\/(id-)?preview--4ffc9a2d-14fa-4181-a41a-6ff83f90fe63\.lovable\.app$/,
   /^https:\/\/project--4ffc9a2d-14fa-4181-a41a-6ff83f90fe63(-dev)?\.lovable\.app$/,
+  // Sandbox preview (lovableproject.com) — used inside the editor preview iframe
+  /^https:\/\/4ffc9a2d-14fa-4181-a41a-6ff83f90fe63\.lovableproject\.com$/,
+  /^https:\/\/(id-)?preview--4ffc9a2d-14fa-4181-a41a-6ff83f90fe63\.lovableproject\.com$/,
   // Local development
   /^http:\/\/localhost(:\d+)?$/,
   /^http:\/\/127\.0\.0\.1(:\d+)?$/,
