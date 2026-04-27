@@ -1,4 +1,5 @@
 import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 
 import "@/i18n"; // bootstrap i18next once at app init
 import { useHydratedLocale } from "@/i18n";
@@ -71,6 +72,12 @@ function RootShell({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   useHydratedLocale();
-  return <Outlet />;
+  return mounted ? <Outlet /> : null;
 }
