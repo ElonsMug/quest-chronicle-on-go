@@ -533,9 +533,13 @@ export default function SoloDnD() {
   // ── Game start ────────────────────────────────────────────────
   async function startGame(char: Character, customPrompt?: string) {
     const startInv = [...char.startItems];
-    // Single atomic init — sets character, hp, inventory, spellSlots
+    // Pick a random narrative arc skeleton for this hero's class.
+    // (Step 5 will replace this with LLM-flavored variation behind a loading screen.)
+    const template = pickRandomTemplate(char.id);
+    const arc = createArcFromTemplate(template);
+    // Single atomic init — sets character, hp, inventory, spellSlots, arc
     // and resets effects/enemies/allies/inCombat/berserk/dodge/defensive/messages.
-    dispatch({ type: "START_GAME", character: char, startInventory: startInv });
+    dispatch({ type: "START_GAME", character: char, startInventory: startInv, arc });
     setPendingRoll(null);
     setPendingInitiative(false);
     setShowSpellMini(false);
