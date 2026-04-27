@@ -131,6 +131,7 @@ export default function SoloDnD() {
     didDodgeLastTurn,
     defensiveStance,
     messages,
+    arc,
   } = game;
 
   // ── Setter shims ────────────────────────────────────────────────
