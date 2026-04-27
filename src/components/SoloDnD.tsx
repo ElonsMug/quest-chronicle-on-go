@@ -1282,6 +1282,11 @@ export default function SoloDnD() {
 
         {inCombat && enemies.filter(e => e.hp > 0).length > 0 && (
           <div className="px-4 pb-2 space-y-1 border-t border-stone-800/40 pt-2">
+            {surpriseAdvantage === "player" && (
+              <div className="text-amber-400 text-[10px] uppercase tracking-widest font-bold mb-1">
+                ⚡ {t("combat.surpriseRound", { defaultValue: "Surprise round" })}
+              </div>
+            )}
             {enemies.filter(e => e.hp > 0).map((en, i) => (
               <EnemyHP
                 key={i}
