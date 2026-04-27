@@ -1,10 +1,23 @@
 import { createFileRoute } from "@tanstack/react-router";
 import {
-  dmRequestSchema,
   checkTotalSize,
   corsHeaders,
   jsonResponse,
 } from "@/server/security";
+import { z } from "zod";
+
+const dmRequestSchema = z.object({
+  system: z.string().max(80_000).default(""),
+  messages: z
+    .array(
+      z.object({
+        role: z.enum(["user", "assistant"]),
+        content: z.string().min(1).max(30_000),
+      }),
+    )
+    .min(1)
+    .max(80),
+});
 
 function responseOrigin(request: Request): string | null {
   const origin = request.headers.get("origin");
