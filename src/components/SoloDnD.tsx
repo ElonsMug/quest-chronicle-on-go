@@ -424,6 +424,16 @@ export default function SoloDnD() {
       }
     }
 
+    // [SURPRISE: player] — DM granted a free attack round. Mark combat as
+    // active (without [INITIATIVE]) and remember the advantage so the next
+    // player action skips the enemy retaliation reminder.
+    if (parsed.surprise === "player") {
+      if (newEnemies.length > 0 && !stateRef.current.inCombat) {
+        setInCombat(true);
+      }
+      setSurpriseAdvantage("player");
+    }
+
     let finalEffects = newEff;
     if (parsed.newEffects?.length) {
       const labels = parsed.newEffects.map(e => e.duration ? `${e.name} (${e.duration})` : e.name);
