@@ -11,6 +11,7 @@
 // ─────────────────────────────────────────────────────────────────
 
 import type { Character, Enemy, Ally, ChatMessage } from "./types";
+import type { Arc, ArcPhase } from "./arcs";
 
 export type SpellSlots = { current: number; max: number };
 
@@ -28,6 +29,9 @@ export type GameState = {
   didDodgeLastTurn: boolean;
   defensiveStance: boolean;
   messages: ChatMessage[];
+  // Narrative arc — the current adventure's structure and progress.
+  // Null until START_GAME provides one (so old menu screens stay safe).
+  arc: Arc | null;
 };
 
 export const initialGameState: GameState = {
