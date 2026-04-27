@@ -33,6 +33,7 @@ import { rollDice, parseDiceSides, PROFICIENCY_BONUS } from "@/game/dice";
 import { isPotion } from "@/game/inventory";
 import { gameReducer } from "@/game/reducer";
 import { initialGameState } from "@/game/state";
+import { pickRandomTemplate, createArcFromTemplate } from "@/game/arcs";
 
 // ─── UI components ───────────────────────────────────────────────
 import { EnemyHP } from "@/components/game/EnemyHP";
