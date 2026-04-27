@@ -1264,6 +1264,7 @@ export default function SoloDnD() {
             ))}
           </div>
         )}
+        {arc && !arc.completed && <ArcProgressBar arc={arc} />}
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3" style={{ paddingBottom: "280px" }}>
