@@ -49,9 +49,9 @@ export const Route = createFileRoute("/api/dm")({
         const origin = responseOrigin(request);
 
         // 2) API key configured?
-        const apiKey = process.env.ANTHROPIC_API_KEY;
+        const apiKey = process.env.LOVABLE_API_KEY;
         if (!apiKey) {
-          console.error("[dm] ANTHROPIC_API_KEY missing");
+          console.error("[dm] LOVABLE_API_KEY missing");
           return jsonResponse(
             { error: "Service unavailable" },
             503,
@@ -80,28 +80,46 @@ export const Route = createFileRoute("/api/dm")({
           return jsonResponse({ error: "Request too large" }, 413, origin);
         }
 
-        // 4) Call Anthropic
+        // 4) Call Lovable AI Gateway (Gemini 3 Flash — fast, OpenAI-compatible)
         try {
-          const res = await fetch("https://api.anthropic.com/v1/messages", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-api-key": apiKey,
-              "anthropic-version": "2023-06-01",
+          const res = await fetch(
+            "https://ai.gateway.lovable.dev/v1/chat/completions",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${apiKey}`,
+              },
+              body: JSON.stringify({
+                model: "google/gemini-3-flash-preview",
+                messages: [
+                  ...(parsed.data.system
+                    ? [{ role: "system", content: parsed.data.system }]
+                    : []),
+                  ...parsed.data.messages,
+                ],
+                max_tokens: 800,
+              }),
             },
-            body: JSON.stringify({
-              model: "claude-haiku-4-5-20251001",
-              max_tokens: 1000,
-              system: parsed.data.system,
-              messages: parsed.data.messages,
-            }),
-          });
+          );
 
           if (!res.ok) {
-            // Log the upstream details on our side, but don't return them
-            // to the client (they may contain org IDs, model names, etc.)
             const errText = await res.text();
-            console.error("[dm] anthropic error:", res.status, errText);
+            console.error("[dm] gateway error:", res.status, errText);
+            if (res.status === 429) {
+              return jsonResponse(
+                { error: "The Master is overwhelmed. Try again in a moment." },
+                429,
+                origin,
+              );
+            }
+            if (res.status === 402) {
+              return jsonResponse(
+                { error: "AI credits exhausted. Add funds in Workspace settings." },
+                402,
+                origin,
+              );
+            }
             return jsonResponse(
               { error: "The Master is silent for a moment..." },
               502,
@@ -110,9 +128,10 @@ export const Route = createFileRoute("/api/dm")({
           }
 
           const data = (await res.json()) as {
-            content?: Array<{ text?: string }>;
+            choices?: Array<{ message?: { content?: string } }>;
           };
-          const text = data.content?.[0]?.text ?? "The Master is silent...";
+          const text =
+            data.choices?.[0]?.message?.content ?? "The Master is silent...";
 
           return jsonResponse({ text }, 200, origin);
         } catch (err) {
