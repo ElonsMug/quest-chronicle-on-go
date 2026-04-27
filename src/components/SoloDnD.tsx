@@ -487,8 +487,41 @@ export default function SoloDnD() {
     // narrative. Helps catch prompt regressions before they ship.
     reportLanguageLeaks(parsed.narrative, language, parsed.narrative);
     const newMsgs: ChatMessage[] = [...prevMessages, { role: "assistant", content: reply, parsed }];
-    const { newHp, newInv, newEff } = applyParsed(parsed, currentHp, currentInv, currentEff, currentEnemies);
+    const { newHp, newInv, newEff, newEnemies } = applyParsed(parsed, currentHp, currentInv, currentEff, currentEnemies);
     setMessages(newMsgs);
+
+    // ── Arc progression ────────────────────────────────────────
+    // Detect bosses that died THIS scene by diffing live-before vs. after.
+    // Phase 3 → any enemy kill is treated as the mid-boss (the prompt forces
+    //          a single mid-boss combat in this phase).
+    // Phase 5 → only enemies flagged isBoss count as the final-boss kill.
+    const currentArc = stateRef.current.arc;
+    if (currentArc && !currentArc.completed) {
+      const liveBefore = new Set(
+        currentEnemies.filter((e) => e.hp > 0).map((e) => e.name.toLowerCase()),
+      );
+      const killedThisScene = newEnemies.filter(
+        (e) => e.hp <= 0 && liveBefore.has(e.name.toLowerCase()),
+      );
+      let arcAfterKills = currentArc;
+      if (currentArc.phase === 3 && killedThisScene.length > 0 && !arcAfterKills.midBossDefeated) {
+        arcAfterKills = { ...arcAfterKills, midBossDefeated: true };
+        dispatch({ type: "MARK_MIDBOSS_DEFEATED" });
+      }
+      if (
+        currentArc.phase === 5 &&
+        killedThisScene.some((e) => e.isBoss) &&
+        !arcAfterKills.bossDefeated
+      ) {
+        arcAfterKills = { ...arcAfterKills, bossDefeated: true };
+        dispatch({ type: "MARK_BOSS_DEFEATED" });
+      }
+      // Compute next phase deterministically (same response = +1 scene).
+      const nextArc = computeNextArc(arcAfterKills, parsed, stateRef.current.inCombat);
+      if (nextArc !== arcAfterKills || nextArc !== currentArc) {
+        dispatch({ type: "SET_ARC", arc: nextArc });
+      }
+    }
 
     // Snapshot the start of every fight — used by the "Restart fight" button
     if (parsed.initiativeTrigger) {
