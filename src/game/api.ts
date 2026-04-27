@@ -6,6 +6,7 @@
 // ─────────────────────────────────────────────────────────────────
 
 import type { Character, ChatMessage } from "./types";
+import type { Arc } from "./arcs";
 import { buildSystemPrompt } from "./prompt";
 
 export type DMRequestArgs = {
@@ -17,6 +18,9 @@ export type DMRequestArgs = {
   userMessage: string;
   spellSlots: { current: number; max: number } | null;
   language: "en" | "ru";
+  /** Current narrative arc — fed into the system prompt so the DM
+   *  knows the goal, the phase, and what kind of scene to write. */
+  arc: Arc | null;
   /** Fallback text when the API returns an empty body. */
   silentFallback: string;
 };
@@ -24,7 +28,7 @@ export type DMRequestArgs = {
 export async function callDM(args: DMRequestArgs): Promise<string> {
   const {
     character, hp, inventory, effects, history, userMessage,
-    spellSlots, language, silentFallback,
+    spellSlots, language, arc, silentFallback,
   } = args;
 
   const slotsForPrompt = character.id === "mage"
@@ -35,7 +39,7 @@ export async function callDM(args: DMRequestArgs): Promise<string> {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      system: buildSystemPrompt(character, hp, inventory, effects, slotsForPrompt, language),
+      system: buildSystemPrompt(character, hp, inventory, effects, slotsForPrompt, language, arc),
       messages: [...history, { role: "user", content: userMessage }]
         .map((m) => ({ role: m.role, content: m.content })),
     }),
