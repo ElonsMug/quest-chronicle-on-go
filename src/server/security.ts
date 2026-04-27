@@ -46,23 +46,31 @@ export function checkTotalSize(payload: DMRequest): string | null {
 // ── Origin allowlist ─────────────────────────────────────────────
 // Strict list of domains allowed to call the AI proxy.
 // Add custom domains here when they go live.
-const ALLOWED_ORIGIN_PATTERNS: RegExp[] = [
+const ALLOWED_HOSTS = new Set([
   // Production
-  /^https:\/\/quest-chronicle-on-go\.lovable\.app$/,
-  // Preview / id-preview / project--<id> domains for THIS project
-  /^https:\/\/(id-)?preview--4ffc9a2d-14fa-4181-a41a-6ff83f90fe63\.lovable\.app$/,
-  /^https:\/\/project--4ffc9a2d-14fa-4181-a41a-6ff83f90fe63(-dev)?\.lovable\.app$/,
-  // Sandbox preview (lovableproject.com) — used inside the editor preview iframe
-  /^https:\/\/4ffc9a2d-14fa-4181-a41a-6ff83f90fe63\.lovableproject\.com$/,
-  /^https:\/\/(id-)?preview--4ffc9a2d-14fa-4181-a41a-6ff83f90fe63\.lovableproject\.com$/,
-  // Local development
-  /^http:\/\/localhost(:\d+)?$/,
-  /^http:\/\/127\.0\.0\.1(:\d+)?$/,
-];
+  "quest-chronicle-on-go.lovable.app",
+  // Preview / stable project domains for THIS project
+  "id-preview--4ffc9a2d-14fa-4181-a41a-6ff83f90fe63.lovable.app",
+  "preview--4ffc9a2d-14fa-4181-a41a-6ff83f90fe63.lovable.app",
+  "project--4ffc9a2d-14fa-4181-a41a-6ff83f90fe63.lovable.app",
+  "project--4ffc9a2d-14fa-4181-a41a-6ff83f90fe63-dev.lovable.app",
+  // Sandbox preview — used inside the editor preview iframe
+  "4ffc9a2d-14fa-4181-a41a-6ff83f90fe63.lovableproject.com",
+  "id-preview--4ffc9a2d-14fa-4181-a41a-6ff83f90fe63.lovableproject.com",
+  "preview--4ffc9a2d-14fa-4181-a41a-6ff83f90fe63.lovableproject.com",
+]);
 
 export function isAllowedOrigin(origin: string | null): boolean {
   if (!origin) return false;
-  return ALLOWED_ORIGIN_PATTERNS.some((re) => re.test(origin));
+  try {
+    const url = new URL(origin);
+    if (url.protocol === "http:" && ["localhost", "127.0.0.1"].includes(url.hostname)) {
+      return true;
+    }
+    return url.protocol === "https:" && ALLOWED_HOSTS.has(url.hostname);
+  } catch {
+    return false;
+  }
 }
 
 /**
