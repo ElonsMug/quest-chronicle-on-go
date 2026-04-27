@@ -191,6 +191,20 @@
       "Shout to draw their attention..."
     ]
   },
+  "arc": {
+    "label": "Arc",
+    "preparing": {
+      "tagline": "Grey Shore",
+      "title": "The Master is preparing your adventure...",
+      "subtitle": "Crafting your story — choosing the villain, the place, and the mid-boss's fate."
+    }
+  },
+  "arcCompleted": {
+    "title": "Arc complete!",
+    "subtitle": "{{antagonist}} has fallen. Grey Shore breathes easier.",
+    "newArc": "New adventure",
+    "returnToMenu": "Return to menu"
+  },
   "dev": {
     "title": "Dev Mode",
     "subtitle": "Teleports into a scene without playing through",
