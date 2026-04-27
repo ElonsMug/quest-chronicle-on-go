@@ -7,6 +7,23 @@ import {
   jsonResponse,
 } from "@/server/security";
 
+const PROJECT_ID = "4ffc9a2d-14fa-4181-a41a-6ff83f90fe63";
+
+function isProjectPreviewOrigin(origin: string | null): boolean {
+  if (!origin) return false;
+  try {
+    const { hostname, protocol } = new URL(origin.trim());
+    const host = hostname.toLowerCase();
+    return (
+      protocol === "https:" &&
+      host.includes(PROJECT_ID) &&
+      (host.endsWith(".lovableproject.com") || host.endsWith(".lovable.app"))
+    );
+  } catch {
+    return false;
+  }
+}
+
 // Proxy to the Anthropic Messages API.
 // Validates input, enforces an Origin allowlist, returns sanitized errors.
 export const Route = createFileRoute("/api/dm")({
@@ -20,7 +37,7 @@ export const Route = createFileRoute("/api/dm")({
       POST: async ({ request }: { request: Request }) => {
         // 1) Origin / Referer allowlist
         const { ok: originOk, origin } = verifyRequestOrigin(request);
-        if (!originOk) {
+        if (!originOk && !isProjectPreviewOrigin(origin)) {
           console.warn("[dm] blocked origin:", origin);
           return jsonResponse({ error: "Forbidden" }, 403, origin);
         }
