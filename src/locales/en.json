@@ -116,6 +116,7 @@
     "noSlots": "No slots"
   },
   "combat": {
+    "surpriseRound": "Surprise round",
     "attack": "Attack",
     "berserk": "Berserk",
     "berserkUsed": "Used this fight",

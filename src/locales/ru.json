@@ -116,6 +116,7 @@
     "noSlots": "Нет слотов"
   },
   "combat": {
+    "surpriseRound": "Раунд засады",
     "attack": "Атака",
     "berserk": "Берсерк",
     "berserkUsed": "Использован в этом бою",
