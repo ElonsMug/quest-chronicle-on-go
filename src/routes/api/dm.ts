@@ -49,9 +49,9 @@ export const Route = createFileRoute("/api/dm")({
         const origin = responseOrigin(request);
 
         // 2) API key configured?
-        const apiKey = process.env.ANTHROPIC_API_KEY;
+        const apiKey = process.env.LOVABLE_API_KEY;
         if (!apiKey) {
-          console.error("[dm] ANTHROPIC_API_KEY missing");
+          console.error("[dm] LOVABLE_API_KEY missing");
           return jsonResponse(
             { error: "Service unavailable" },
             503,
