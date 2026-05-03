@@ -1551,6 +1551,10 @@ export default function SoloDnD() {
           )}
         </div>
       </div>
+      </>)}
+
+      <BottomNav active={activeTab} onChange={setActiveTab} t={t} />
     </div>
   );
 }
+
