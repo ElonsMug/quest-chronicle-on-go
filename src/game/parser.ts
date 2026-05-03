@@ -22,12 +22,12 @@ export function parseDMResponse(text: string) {
   const choices: { num: string; text: string }[] = [];
   const narrativeLines: string[] = [];
   let attackRequest: { weapon: string; dice: string; mod: number; ac: number } | null = null;
-  let rollRequest: { stat: string; dc: number } | null = null;
+  let rollRequest: { stat: Stat; dc: number } | null = null;
   let damage: number | null = null;
   let newItem: string | null = null;
   const newItems: string[] = [];
   const upgrades: { from: string; to: string }[] = [];
-  const newEnemies: { name: string; maxHp: number; hp: number; ac: number; damage: string; isUndead?: boolean; isBoss?: boolean }[] = [];
+  const newEnemies: { name: string; maxHp: number; hp: number; ac: number; damage: string; attackBonus: number; wisBonus: number; isUndead?: boolean; isBoss?: boolean; isMidBoss?: boolean }[] = [];
   const newAllies: { name: string; maxHp: number; hp: number }[] = [];
   const allyDamages: { name: string; damage: number }[] = [];
   const enemyDamages: { name: string; damage: number }[] = [];
