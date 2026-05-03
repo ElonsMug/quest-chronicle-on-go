@@ -51,6 +51,10 @@ export function parseDMResponse(text: string) {
   }
   if (totalDamage > 0) damage = totalDamage;
 
+  let goldChange: number | null = null;
+  const goldMatch = text.match(/\[GOLD:\s*([+-]?\d+)\]/i);
+  if (goldMatch) goldChange = parseInt(goldMatch[1]);
+
   const itemRe = /\[ITEM:\s*([^\]]+)\]/gi;
   let im: RegExpExecArray | null;
   while ((im = itemRe.exec(text)) !== null) {
