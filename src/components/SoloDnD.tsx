@@ -301,6 +301,10 @@ export default function SoloDnD() {
       setShowDefeated(false);
     }
 
+    if (parsed.goldChange != null) {
+      dispatch({ type: "ADD_GOLD", amount: parsed.goldChange });
+    }
+
     if (parsed.newItems?.length) {
       newInv = [...newInv, ...parsed.newItems];
       setInventory(newInv);
