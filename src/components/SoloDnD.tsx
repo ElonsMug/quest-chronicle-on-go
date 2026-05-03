@@ -310,7 +310,7 @@ useEffect(() => {
     if (devTaps.current >= 5) {
       devTaps.current = 0;
       const { character: c, hp: h, inventory: inv, effects: eff, messages: msgs } = stateRef.current;
-      if (c) doSave(c, h, inv, eff, msgs);
+      if (c) session.doSave(c, h, inv, eff, msgs);
       setShowDev(true);
     }
   }
