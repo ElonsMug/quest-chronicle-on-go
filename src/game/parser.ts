@@ -167,6 +167,15 @@ export function parseDMResponse(text: string) {
     if (s === "player" || s === "enemies") surprise = s;
   }
 
+  const enemyAttacks: string[] = [];
+  const enemyAttackRe = /\[ENEMY_ATTACK:\s*([^\]]+)\]/gi;
+  let ea: RegExpExecArray | null;
+  while ((ea = enemyAttackRe.exec(text)) !== null) {
+    enemyAttacks.push(ea[1].trim());
+  }
+
+  const artifactMatch = text.match(/\[ARTIFACT:\s*([+-]?\d+)\]/i);
+  const artifactBonus = artifactMatch ? parseInt(artifactMatch[1]) : null;
   // Build the narrative line-by-line:
   //  - numbered "1. ..." lines become choices and are pulled out
   //  - any [TAG: ...] occurrences inside a line are stripped INLINE
