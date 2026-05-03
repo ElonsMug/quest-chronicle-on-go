@@ -335,6 +335,13 @@ export default function SoloDnD() {
         }
       }
       if (changed) setInventory(newInv);
+      for (const up of parsed.upgrades) {
+        const acMatch = up.to.match(/\(\s*(?:AC|КД)\s*(\d+)\s*\)/i);
+        if (acMatch) {
+          const newAc = parseInt(acMatch[1]);
+          dispatch({ type: "SET_CHARACTER_AC", ac: newAc, armorName: up.to });
+        }
+      }
     }
 
     if (parsed.newEnemies?.length) {
