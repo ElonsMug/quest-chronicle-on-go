@@ -67,7 +67,7 @@ export function BottomNav({
 function categorize(item: string): InvFilter {
   if (isPotion(item)) return "consumables";
   if (/sword|dagger|staff|bow|axe|blade|меч|кинжал|посох|лук|топор/i.test(item)) return "weapons";
-  if (/armor|shield|helm|cloak|mail|кольчуга|броня|щит|шлем|плащ/i.test(item)) return "armor";
+  if (/armor|shield|helm|cloak|mail|robes|кольчуга|броня|щит|шлем|плащ|мантия|доспех/i.test(item)) return "armor";
   return "quest";
 }
 
