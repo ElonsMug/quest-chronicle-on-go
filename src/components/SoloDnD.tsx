@@ -1628,5 +1628,6 @@ export default function SoloDnD() {
       <BottomNav active={activeTab} onChange={setActiveTab} t={t} />
     </div>
   );
-}
+  }
 
+  async function processAndSetMessages(char: Character, currentHp: number, currentInv: string[], currentEff: string[], currentEnemies: Enemy[], reply: string, prevMessages: ChatMessage[]) {
