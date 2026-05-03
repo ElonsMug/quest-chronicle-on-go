@@ -582,6 +582,27 @@ export default function SoloDnD() {
     const { newHp, newInv, newEff, newEnemies } = applyParsed(parsed, currentHp, currentInv, currentEff, currentEnemies);
     setMessages(newMsgs);
 
+    if (parsed.artifactBonus !== null && parsed.artifactBonus !== undefined) {
+      setArtifactBonus(parsed.artifactBonus);
+    }
+    if (parsed.enemyAttacks && parsed.enemyAttacks.length > 0) {
+      const ch = stateRef.current.character;
+      if (ch) {
+        const attackLog = await executeEnemyAttacks(
+          parsed.enemyAttacks,
+          newEnemies.length > 0 ? newEnemies : currentEnemies,
+          ch.ac,
+        );
+        if (attackLog) {
+          setMessages(prev => [...prev, {
+            role: "assistant" as const,
+            content: attackLog,
+            parsed: parseDMResponse(attackLog),
+          }]);
+        }
+      }
+    }
+
     // ── Arc progression ────────────────────────────────────────
     // Detect bosses that died THIS scene by diffing live-before vs. after.
     // Phase 3 → any enemy kill is treated as the mid-boss (the prompt forces
