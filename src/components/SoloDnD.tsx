@@ -1599,7 +1599,7 @@ export default function SoloDnD() {
                   </button>
                 </div>
               )}
-              {character && !heroicSurgeUsed && enemies.some(e => e.isBoss) && (
+              {character && !heroicSurgeUsed && enemies.some(e => e.isBoss) && hp < (character.maxHp * 0.5) && (
                 <button
                   onClick={async () => {
                     useHeroicSurge();
