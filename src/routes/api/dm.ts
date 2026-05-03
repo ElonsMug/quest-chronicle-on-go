@@ -20,18 +20,6 @@ const dmRequestSchema = z.object({
     .max(80),
 });
 
-function responseOrigin(request: Request): string | null {
-  const origin = request.headers.get("origin");
-  if (origin) return origin;
-  const referer = request.headers.get("referer");
-  if (!referer) return null;
-  try {
-    return new URL(referer).origin;
-  } catch {
-    return null;
-  }
-}
-
 // Proxy to the Anthropic Messages API.
 // Validates input, enforces an Origin allowlist, returns sanitized errors.
 export const Route = createFileRoute("/api/dm")({
