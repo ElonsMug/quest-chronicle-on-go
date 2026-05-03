@@ -51,8 +51,8 @@ export function parseDMResponse(text: string) {
   const atk = text.match(/\[ATTACK:\s*([^,\]]+),\s*([^,\]]+),\s*([^,\]]+),\s*AC(\d+)\]/i);
   if (atk) attackRequest = { weapon: atk[1].trim(), dice: atk[2].trim(), mod: parseInt(atk[3]) || 0, ac: parseInt(atk[4]) };
 
-  const rol = text.match(/\[ROLL:\s*([^,\]]+)(?:,\s*DC(\d+))?\]/i);
-  if (rol) rollRequest = { stat: rol[1].trim(), dc: parseInt(rol[2] || "15") };
+  const rol = text.match(/\[ROLL:\s*([^,\]]+)(?:,\s*DC[=:]?(\d+))?\]/i);
+  if (rol) rollRequest = { stat: mapStatToKey(rol[1].trim()), dc: parseInt(rol[2] || "15") };
 
   // Sum every [DAMAGE: X] in the response
   const dmgRe = /\[DAMAGE:\s*(\d+)\]/gi;
