@@ -43,7 +43,7 @@ import { EnemyHP } from "@/components/game/EnemyHP";
 import { InitiativeBlock } from "@/components/game/InitiativeBlock";
 import { RollBlock } from "@/components/game/RollBlock";
 import { CharacterCard } from "@/components/game/CharacterCard";
-import { InventoryPanel } from "@/components/game/InventoryPanel";
+// InventoryPanel removed — inventory is now a tab.
 import { SpellPanel } from "@/components/game/SpellPanel";
 import { DevPanel } from "@/components/game/DevPanel";
 import { DefeatedScreen } from "@/components/game/DefeatedScreen";
