@@ -41,7 +41,8 @@ export type Character = {
   spellSlots?: { current: number; max: number };
   spellSaveDC?: number;
   spells?: Spell[];
-  classAbility?: ClassAbility;
+  ac: number;
+  armorName: string;
   startGold: number;
 };
 
