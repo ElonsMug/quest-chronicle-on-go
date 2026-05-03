@@ -63,10 +63,24 @@ export type Enemy = {
   maxHp: number;
   ac: number;
   damage: string;
+  attackBonus: number;
+  wisBonus: number;
   isUndead?: boolean;
+  isMidBoss?: boolean;
   // EPIC chapter boss. Bosses are exempt from the anti-oneshot cap so their
   // signature attacks can land for full damage and feel genuinely dangerous.
   isBoss?: boolean;
+};
+
+export type EnemyArchetype = {
+  name: string;
+  hp: number;
+  ac: number;
+  attackBonus: number;
+  damage: string;
+  wisBonus: number;
+  isUndead?: boolean;
+  motive: string;
 };
 
 export type Ally = { name: string; hp: number; maxHp: number };
