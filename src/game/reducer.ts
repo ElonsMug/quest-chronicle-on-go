@@ -110,6 +110,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         berserkUsedThisCombat: false,
         didDodgeLastTurn: false,
         defensiveStance: false,
+        heroicSurgeUsed: false,
       };
 
     case "LONG_REST":
