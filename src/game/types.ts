@@ -42,6 +42,7 @@ export type Character = {
   spellSaveDC?: number;
   spells?: Spell[];
   classAbility?: ClassAbility;
+  startGold: number;
 };
 
 // Result of parsing one DM response. The shape is inferred from the parser
