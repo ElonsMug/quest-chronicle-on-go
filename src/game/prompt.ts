@@ -183,6 +183,8 @@ TAG MECHANICS (always on a separate line):
      Reward → [ITEM: 10 gold]
      Looted from enemy → [ITEM: Bandit's Dagger]
    Several items = several tags, each on its own line.
+[GOLD: +N] — player gains N gold coins. [GOLD: -N] — player spends N gold coins.
+   Always use [GOLD:] when money changes hands for any reason (rewards, purchases, theft, bribes).
 [UPGRADE: old_name -> new_name] — when the player upgrades, repairs,
    enchants or modifies an existing item. The system finds the item with the
    old name in the inventory and replaces it with the new one.
