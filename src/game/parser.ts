@@ -212,5 +212,7 @@ export function parseDMResponse(text: string) {
     behaviorShift,
     surprise,
     goldChange,
+    enemyAttacks,
+    artifactBonus,
   };
 }
