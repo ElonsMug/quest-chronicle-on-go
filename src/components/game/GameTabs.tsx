@@ -139,11 +139,23 @@ export function CharacterTab({
       </div>
 
       <div className={cardCls} style={cardStyle}>
+        <div className="text-stone-400 text-xs uppercase tracking-widest mb-1" style={{ fontFamily: "sans-serif" }}>
+          {t("stats.ac")}
+        </div>
+        <div className="text-amber-400 font-bold" style={{ fontSize: 28, fontFamily: "serif", lineHeight: 1 }}>
+          {character.ac}
+        </div>
+        <div className="text-stone-500 text-xs mt-1" style={{ fontFamily: "sans-serif" }}>
+          {character.armorName}
+        </div>
+      </div>
+
+      <div className={cardCls} style={cardStyle}>
         <div className="text-stone-400 text-xs uppercase tracking-widest mb-3" style={{ fontFamily: "sans-serif" }}>
           {t("character.stats")}
         </div>
         <div className="grid grid-cols-3 gap-2">
-          {(["str", "dex", "int"] as const).map((k) => {
+          {(["str", "dex", "con", "int", "wis", "cha"] as const).map((k) => {
             const v = character.stats[k];
             return (
               <div key={k} className="text-center rounded-lg py-2" style={{ background: "#0c0a09" }}>
