@@ -136,7 +136,19 @@
     "longRest": "Long Rest",
     "longRestSubtitle": "Full HP · All spell slots restored",
     "noRestInCombat": "Cannot rest during combat",
-    "potionInCombatHint": "A potion can only be drunk on your turn — before your main action"
+    "potionInCombatHint": "A potion can only be drunk on your turn — before your main action",
+    "wallet": "Wallet",
+    "gold": "gp",
+    "filterAll": "All",
+    "filterWeapons": "Weapons",
+    "filterArmor": "Armor",
+    "filterConsumables": "Potions",
+    "filterQuest": "Quest",
+    "usePotion": "Drink",
+    "categoryWeapon": "Weapon",
+    "categoryArmor": "Armor",
+    "categoryPotion": "Potion",
+    "categoryQuest": "Quest item"
   },
   "spells": {
     "title": "Spells",
