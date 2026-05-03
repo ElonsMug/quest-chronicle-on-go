@@ -1168,18 +1168,6 @@ export default function SoloDnD() {
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(180deg,#0c0a09 0%,#1c1917 100%)", fontFamily: "serif" }}>
 
-      {showInventory && (
-        <InventoryPanel
-          inventory={inventory}
-          effects={effects}
-          onUseItem={handleUseItem}
-          onShortRest={handleShortRest}
-          onLongRest={handleLongRest}
-          inCombat={inCombat}
-          canUsePotion={showCombatButtons && !pendingPotionInfoRef.current}
-          onClose={() => setShowInventory(false)}
-        />
-      )}
       {showSpells && character && spellSlots && (
         <SpellPanel
           character={character}
