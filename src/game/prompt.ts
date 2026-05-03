@@ -21,6 +21,7 @@ export function buildSystemPrompt(
   spellSlots: { current: number; max: number } | null,
   language: "en" | "ru",
   arc: Arc | null = null,
+  gold: number = 0,
 ): string {
   const inv = inventory.length ? inventory.join(", ") : language === "ru" ? "пусто" : "empty";
   const eff = effects.length ? effects.join(", ") : language === "ru" ? "нет" : "none";
