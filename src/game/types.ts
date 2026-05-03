@@ -7,7 +7,7 @@
 
 import type { parseDMResponse } from "./parser";
 
-export type Stat = "str" | "dex" | "int";
+export type Stat = "str" | "dex" | "con" | "int" | "wis" | "cha";
 export type SpellType = "attack" | "defense" | "control";
 export type SpellId = "fireBolt" | "shield" | "sleep";
 export type CharacterId = "warrior" | "rogue" | "mage";
