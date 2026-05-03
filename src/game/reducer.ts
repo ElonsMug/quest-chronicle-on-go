@@ -138,6 +138,12 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case "SET_SURPRISE":
       return { ...state, surpriseAdvantage: action.value };
 
+    case "SET_GOLD":
+      return { ...state, gold: action.gold };
+
+    case "ADD_GOLD":
+      return { ...state, gold: Math.max(0, state.gold + action.amount) };
+
     default:
       // Exhaustiveness check: action is `never` here if all cases are handled.
       return state;
