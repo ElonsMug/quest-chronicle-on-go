@@ -190,5 +190,6 @@ export function parseDMResponse(text: string) {
     playerHpRestore,
     behaviorShift,
     surprise,
+    goldChange,
   };
 }
