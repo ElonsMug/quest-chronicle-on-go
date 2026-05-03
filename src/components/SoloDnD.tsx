@@ -242,6 +242,8 @@ export default function SoloDnD() {
       language,
       arc: stateRef.current.arc,
       gold: stateRef.current.gold,
+      ac: char.ac,
+      artifactBonus: stateRef.current.artifactBonus,
       silentFallback: t("dm.silent"),
     });
   }
@@ -361,7 +363,7 @@ export default function SoloDnD() {
           const key = `${name.toLowerCase()}|${maxHp}`;
           if (name && maxHp > 0 && !seen.has(key)) {
             seen.add(key);
-            inferred.push({ name, hp: enemyHp, maxHp, ac: 12, damage: "d4+1" });
+            inferred.push({ name, hp: enemyHp, maxHp, ac: 12, damage: "d4+1", attackBonus: 3, wisBonus: 0 });
           }
         }
         if (inferred.length) {
@@ -638,6 +640,8 @@ export default function SoloDnD() {
         language,
         arc,
         gold: char.startGold,
+        ac: char.ac,
+        artifactBonus: 0,
         silentFallback: t("dm.silent"),
       });
       await processAndSetMessages(char, char.hp, startInv, [], [], reply, []);

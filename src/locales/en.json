@@ -64,8 +64,21 @@
   "stats": {
     "str": "STR",
     "dex": "DEX",
+    "con": "CON",
     "int": "INT",
+    "wis": "WIS",
+    "cha": "CHA",
+    "ac": "AC",
     "hp": "HP"
+  },
+  "combat_log": {
+    "enemyAttackHit": "{{name}} attacks — d20({{roll}})+{{atk}}={{total}} vs AC{{ac}} → HIT → {{dmg}} damage",
+    "enemyAttackMiss": "{{name}} attacks — d20({{roll}})+{{atk}}={{total}} vs AC{{ac}} → MISS",
+    "enemyAttackCrit": "{{name}} attacks — d20(20) CRIT → {{dmg}} damage",
+    "heroicSurge": "Heroic Surge activated — extra action this round!",
+    "heroicSurgeUsed": "Used this fight",
+    "artifactBonus": "Artifact bonus: +{{bonus}} damage vs boss",
+    "socialCheck": "Social check: {{stat}} d20({{roll}})+{{mod}}={{total}} vs WIS DC{{dc}}"
   },
   "characters": {
     "warrior": {
@@ -78,8 +91,10 @@
       "items": {
         "shortSword": "Short Sword",
         "leatherArmor": "Leather Armor",
-        "healingPotion": "Healing Potion (d6+2 HP)"
-      }
+        "healingPotion": "Healing Potion (d6+2 HP)",
+        "rope": "Rope"
+      },
+      "armor": "Leather Armor"
     },
     "rogue": {
       "name": "Rogue",
@@ -91,8 +106,10 @@
       "items": {
         "dagger": "Dagger",
         "lockpicks": "Lockpicks",
-        "healingPotion": "Healing Potion (d6+2 HP)"
-      }
+        "healingPotion": "Healing Potion (d6+2 HP)",
+        "darkCloak": "Dark Cloak (AC 12)"
+      },
+      "armor": "Dark Cloak"
     },
     "mage": {
       "name": "Mage",
@@ -104,8 +121,10 @@
       "items": {
         "staff": "Staff",
         "healingPotion": "Healing Potion (d6+2 HP)",
-        "fireBoltScroll": "Scroll of Fire Bolt"
+        "fireBoltScroll": "Scroll of Fire Bolt",
+        "robes": "Mage Robes (AC 11)"
       },
+      "armor": "Mage Robes",
       "spells": {
         "fireBolt": {
           "name": "Fire Bolt",

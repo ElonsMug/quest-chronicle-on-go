@@ -22,6 +22,8 @@ export function buildSystemPrompt(
   language: "en" | "ru",
   arc: Arc | null = null,
   gold: number = 0,
+  ac: number = 10,
+  artifactBonus: number = 0,
 ): string {
   const inv = inventory.length ? inventory.join(", ") : language === "ru" ? "пусто" : "empty";
   const eff = effects.length ? effects.join(", ") : language === "ru" ? "нет" : "none";
@@ -144,10 +146,68 @@ ${arcBlock}
 
 CHARACTER:
 Class: ${character.name} | HP: ${hp}/${character.maxHp}
-Strength ${s(character.stats.str)} | Dexterity ${s(character.stats.dex)} | Intelligence ${s(character.stats.int)}
+STR ${s(character.stats.str)} | DEX ${s(character.stats.dex)} | CON ${s(character.stats.con)} | INT ${s(character.stats.int)} | WIS ${s(character.stats.wis)} | CHA ${s(character.stats.cha)}
+AC: ${ac} (armor)
 Weapon: ${character.weapon.name} (${character.weapon.dice}+${s(character.stats[character.weapon.stat])})
-Gold: ${gold} gp
+Gold: ${gold} gp${artifactBonus > 0 ? `\nArtifact bonus vs final boss: +${artifactBonus} damage` : ""}
 ${spellsBlock}Inventory: ${inv} | Effects: ${eff}
+
+ENEMY ARCHETYPES — use these stats exactly, do not invent your own:
+(${language === "ru" ? "Используй русские имена в нарративе" : "Use English names in narrative"})
+
+| Archetype      | HP | AC | ATK | DMG    | WIS | Tag             |
+|----------------|----|----|-----|--------|-----|-----------------|
+| Goblin         |  7 | 15 | +4  | d6+2   |  +0 | MOTIVE:territory|
+| Bandit         | 11 | 12 | +3  | d6+1   |  +0 | MOTIVE:money    |
+| Guard          | 11 | 16 | +3  | d8+1   |  +1 | MOTIVE:duty     |
+| Cultist        |  9 | 12 | +3  | d6+1   |  +1 | MOTIVE:fanatic  |
+| Skeleton       | 13 | 13 | +4  | d6+2   |  -2 | UNDEAD          |
+| Zombie         | 22 |  8 | +3  | d6+1   |  -4 | UNDEAD          |
+| Thug           | 32 | 14 | +4  | d8+2   |  +1 | MOTIVE:money    |
+| Bandit Captain | 65 | 15 | +4  | d8+2   |  +2 | MOTIVE:money    |
+| Knight         | 52 | 18 | +5  | d8+3   |  +1 | MOTIVE:duty     |
+| Ogre           | 59 | 11 | +6  | 2d8+4  |  -2 | MOTIVE:territory|
+| Mid-boss       | 22 | 14 | +4  | d8+2   |  +2 | MIDBOSS         |
+| Final Boss     | 32 | 16 | +5  | d8+3   |  +3 | BOSS            |
+
+ALWAYS declare enemies using these exact stats via [ENEMY:] tag including ATK and WIS:
+  [ENEMY: Name, HP:11, AC:12, ATK:+3, DMG:d6+1, WIS:+0, MOTIVE:money]
+  [ENEMY: Boss Name, HP:32, AC:16, ATK:+5, DMG:d8+3, WIS:+3, BOSS]
+  [ENEMY: Mid-boss Name, HP:22, AC:14, ATK:+4, DMG:d8+2, WIS:+2, MIDBOSS]
+
+ENEMY ATTACKS — CRITICAL CHANGE:
+The client now handles enemy attack rolls. After every player action in combat:
+- Write [ENEMY_ATTACK: EnemyName] for each living enemy that attacks.
+- Do NOT write [DAMAGE: N] for enemy attacks — the client rolls d20+ATK vs player AC.
+- The client will send back the attack result. Then you describe the outcome.
+- ONLY write [DAMAGE: N] for non-attack damage (traps, spells, AoE, environmental).
+
+SOCIAL CHECKS — stat mapping:
+  Persuasion / Deception → [ROLL: Charisma, DC=N]
+  Intimidation → [ROLL: Charisma, DC=N] OR [ROLL: Strength, DC=N]
+  Perception / Survival → [ROLL: Wisdom, DC=N]
+  Stealth / Acrobatics → [ROLL: Dexterity, DC=N]
+  Athletics / Force → [ROLL: Strength, DC=N]
+  Arcana / History / Investigation → [ROLL: Intelligence, DC=N]
+  Constitution / Concentration → [ROLL: Constitution, DC=N]
+
+SOCIAL CHECK vs ENEMY in combat:
+  If player tries to intimidate/persuade an enemy during combat:
+  DC = 10 + enemy.wisBonus + (enemy HP > 50% ? 4 : 0)
+  On success per MOTIVE:
+    money/duty → [BEHAVIOR_SHIFT: surrender]
+    fanatic/boss → [BEHAVIOR_SHIFT: escalate] (immune)
+    territory → [BEHAVIOR_SHIFT: flee]
+
+ARMOR UPGRADES:
+  When player finds/buys better armor, use [UPGRADE: OldArmor -> NewArmor (AC N)]
+  The client parses the new AC from the item name pattern "AC N" or "КД N".
+
+ARTIFACT (after mid-boss defeated):
+  After the mid-boss is defeated, grant one artifact relevant to the final boss.
+  Write [ARTIFACT: 3] to give +3 damage bonus vs the final boss.
+  Describe the artifact vividly — it should feel earned and meaningful.
+  The bonus persists for the entire final boss fight.
 
 RESPONSE FORMAT:
 - 3–5 sentences of second-person narrative.

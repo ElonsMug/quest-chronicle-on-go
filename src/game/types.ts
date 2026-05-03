@@ -7,7 +7,7 @@
 
 import type { parseDMResponse } from "./parser";
 
-export type Stat = "str" | "dex" | "int";
+export type Stat = "str" | "dex" | "con" | "int" | "wis" | "cha";
 export type SpellType = "attack" | "defense" | "control";
 export type SpellId = "fireBolt" | "shield" | "sleep";
 export type CharacterId = "warrior" | "rogue" | "mage";
@@ -42,6 +42,8 @@ export type Character = {
   spellSaveDC?: number;
   spells?: Spell[];
   classAbility?: ClassAbility;
+  ac: number;
+  armorName: string;
   startGold: number;
 };
 
@@ -61,10 +63,24 @@ export type Enemy = {
   maxHp: number;
   ac: number;
   damage: string;
+  attackBonus: number;
+  wisBonus: number;
   isUndead?: boolean;
+  isMidBoss?: boolean;
   // EPIC chapter boss. Bosses are exempt from the anti-oneshot cap so their
   // signature attacks can land for full damage and feel genuinely dangerous.
   isBoss?: boolean;
+};
+
+export type EnemyArchetype = {
+  name: string;
+  hp: number;
+  ac: number;
+  attackBonus: number;
+  damage: string;
+  wisBonus: number;
+  isUndead?: boolean;
+  motive: string;
 };
 
 export type Ally = { name: string; hp: number; maxHp: number };

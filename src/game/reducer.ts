@@ -110,6 +110,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         berserkUsedThisCombat: false,
         didDodgeLastTurn: false,
         defensiveStance: false,
+        heroicSurgeUsed: false,
       };
 
     case "LONG_REST":
@@ -143,6 +144,15 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
     case "ADD_GOLD":
       return { ...state, gold: Math.max(0, state.gold + action.amount) };
+
+    case "USE_HEROIC_SURGE":
+      return { ...state, heroicSurgeUsed: true };
+
+    case "SET_ARTIFACT_BONUS":
+      return { ...state, artifactBonus: action.bonus };
+
+    case "RESET_BOSS_FLAGS":
+      return { ...state, heroicSurgeUsed: false };
 
     default:
       // Exhaustiveness check: action is `never` here if all cases are handled.

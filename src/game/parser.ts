@@ -6,16 +6,28 @@
 // when the narrative is written in another language.
 // ─────────────────────────────────────────────────────────────────
 
+import type { Stat } from "./types";
+
+function mapStatToKey(s: string): Stat {
+  const l = s.toLowerCase();
+  if (l.includes("str") || l.includes("сил") || l.includes("strength")) return "str";
+  if (l.includes("dex") || l.includes("лов") || l.includes("dexterity")) return "dex";
+  if (l.includes("con") || l.includes("вын") || l.includes("constitution")) return "con";
+  if (l.includes("wis") || l.includes("мдр") || l.includes("wisdom")) return "wis";
+  if (l.includes("cha") || l.includes("хар") || l.includes("charisma")) return "cha";
+  return "int";
+}
+
 export function parseDMResponse(text: string) {
   const choices: { num: string; text: string }[] = [];
   const narrativeLines: string[] = [];
   let attackRequest: { weapon: string; dice: string; mod: number; ac: number } | null = null;
-  let rollRequest: { stat: string; dc: number } | null = null;
+  let rollRequest: { stat: Stat; dc: number } | null = null;
   let damage: number | null = null;
   let newItem: string | null = null;
   const newItems: string[] = [];
   const upgrades: { from: string; to: string }[] = [];
-  const newEnemies: { name: string; maxHp: number; hp: number; ac: number; damage: string; isUndead?: boolean; isBoss?: boolean }[] = [];
+  const newEnemies: { name: string; maxHp: number; hp: number; ac: number; damage: string; attackBonus: number; wisBonus: number; isUndead?: boolean; isBoss?: boolean; isMidBoss?: boolean }[] = [];
   const newAllies: { name: string; maxHp: number; hp: number }[] = [];
   const allyDamages: { name: string; damage: number }[] = [];
   const enemyDamages: { name: string; damage: number }[] = [];
@@ -34,13 +46,13 @@ export function parseDMResponse(text: string) {
   // The character class `[^\]]*` is intentionally permissive so a malformed
   // tag (extra space, trailing text inside brackets) still gets stripped from
   // the visible narrative even if its dedicated extractor regex doesn't fire.
-  const TAG = /\[(ATTACK|ROLL|DAMAGE|ITEM|UPGRADE|ENEMY|ENEMY_DAMAGE|ALLY|ALLY_DAMAGE|EFFECT|INITIATIVE|END_COMBAT|PLAYER_HP|BEHAVIOR_SHIFT|SURPRISE|GOLD)[^\]]*\]/gi;
+  const TAG = /\[(ATTACK|ROLL|DAMAGE|ITEM|UPGRADE|ENEMY|ENEMY_DAMAGE|ENEMY_ATTACK|ALLY|ALLY_DAMAGE|EFFECT|INITIATIVE|END_COMBAT|PLAYER_HP|BEHAVIOR_SHIFT|SURPRISE|GOLD|ARTIFACT)[^\]]*\]/gi;
 
   const atk = text.match(/\[ATTACK:\s*([^,\]]+),\s*([^,\]]+),\s*([^,\]]+),\s*AC(\d+)\]/i);
   if (atk) attackRequest = { weapon: atk[1].trim(), dice: atk[2].trim(), mod: parseInt(atk[3]) || 0, ac: parseInt(atk[4]) };
 
-  const rol = text.match(/\[ROLL:\s*([^,\]]+)(?:,\s*DC(\d+))?\]/i);
-  if (rol) rollRequest = { stat: rol[1].trim(), dc: parseInt(rol[2] || "15") };
+  const rol = text.match(/\[ROLL:\s*([^,\]]+)(?:,\s*DC[=:]?(\d+))?\]/i);
+  if (rol) rollRequest = { stat: mapStatToKey(rol[1].trim()), dc: parseInt(rol[2] || "15") };
 
   // Sum every [DAMAGE: X] in the response
   const dmgRe = /\[DAMAGE:\s*(\d+)\]/gi;
@@ -71,26 +83,26 @@ export function parseDMResponse(text: string) {
     upgrades.push({ from: um[1].trim(), to: um[2].trim() });
   }
 
-  // Extended [ENEMY: Name, HP:N, AC:N, DMG:dX+Y, UNDEAD, BOSS]
-  // UNDEAD and BOSS are optional flags and may appear in any order at the tail.
-  const enemyRe = /\[ENEMY:\s*([^,\]]+),\s*HP:(\d+)(?:,\s*AC:(\d+))?(?:,\s*DMG:([^\],]+))?((?:,\s*(?:UNDEAD|BOSS))*)\s*\]/gi;
+  // Extended [ENEMY: Name, HP:N, AC:N, ATK:+N, DMG:dX+Y, WIS:+N, UNDEAD, BOSS, MIDBOSS]
+  const enemyRe = /\[ENEMY:\s*([^,\]]+),\s*HP:(\d+)(?:,\s*AC:(\d+))?(?:,\s*ATK:([+-]?\d+))?(?:,\s*DMG:([^\],]+))?(?:,\s*WIS:([+-]?\d+))?((?:,\s*(?:UNDEAD|BOSS|MIDBOSS))*)\s*\]/gi;
   let em: RegExpExecArray | null;
   while ((em = enemyRe.exec(text)) !== null) {
     const hp = parseInt(em[2]);
-    const flags = (em[5] || "").toUpperCase();
+    const flags = (em[7] || "").toUpperCase();
     const isUndead = /\bUNDEAD\b/.test(flags);
-    // Explicit BOSS flag from the DM, OR heuristic: a single solo enemy with
-    // HP > 20 (per the EPIC encounter cap) is treated as a boss as a safety
-    // net in case the DM forgets the tag.
     const explicitBoss = /\bBOSS\b/.test(flags);
+    const isMidBoss = /\bMIDBOSS\b/.test(flags);
     newEnemies.push({
       name: em[1].trim(),
       maxHp: hp,
       hp,
       ac: em[3] ? parseInt(em[3]) : 12,
-      damage: em[4] ? em[4].trim() : "d4+1",
+      attackBonus: em[4] ? parseInt(em[4]) : 3,
+      damage: em[5] ? em[5].trim() : "d6+1",
+      wisBonus: em[6] ? parseInt(em[6]) : 0,
       isUndead,
       isBoss: explicitBoss,
+      isMidBoss,
     });
   }
   // Heuristic boss promotion: if exactly one enemy was declared in this
@@ -155,6 +167,15 @@ export function parseDMResponse(text: string) {
     if (s === "player" || s === "enemies") surprise = s;
   }
 
+  const enemyAttacks: string[] = [];
+  const enemyAttackRe = /\[ENEMY_ATTACK:\s*([^\]]+)\]/gi;
+  let ea: RegExpExecArray | null;
+  while ((ea = enemyAttackRe.exec(text)) !== null) {
+    enemyAttacks.push(ea[1].trim());
+  }
+
+  const artifactMatch = text.match(/\[ARTIFACT:\s*([+-]?\d+)\]/i);
+  const artifactBonus = artifactMatch ? parseInt(artifactMatch[1]) : null;
   // Build the narrative line-by-line:
   //  - numbered "1. ..." lines become choices and are pulled out
   //  - any [TAG: ...] occurrences inside a line are stripped INLINE
@@ -191,5 +212,7 @@ export function parseDMResponse(text: string) {
     behaviorShift,
     surprise,
     goldChange,
+    enemyAttacks,
+    artifactBonus,
   };
 }

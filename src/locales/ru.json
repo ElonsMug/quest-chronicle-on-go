@@ -64,8 +64,21 @@
   "stats": {
     "str": "СИЛ",
     "dex": "ЛОВ",
+    "con": "ВЫН",
     "int": "ИНТ",
+    "wis": "МДР",
+    "cha": "ХАР",
+    "ac": "КД",
     "hp": "HP"
+  },
+  "combat_log": {
+    "enemyAttackHit": "{{name}} атакует — d20({{roll}})+{{atk}}={{total}} vs КД{{ac}} → ПОПАЛ → {{dmg}} урона",
+    "enemyAttackMiss": "{{name}} атакует — d20({{roll}})+{{atk}}={{total}} vs КД{{ac}} → МИМО",
+    "enemyAttackCrit": "{{name}} атакует — d20(20) КРИТ → {{dmg}} урона",
+    "heroicSurge": "Героический порыв — дополнительное действие в этом раунде!",
+    "heroicSurgeUsed": "Использован в этом бою",
+    "artifactBonus": "Бонус артефакта: +{{bonus}} урона по боссу",
+    "socialCheck": "Социальная проверка: {{stat}} d20({{roll}})+{{mod}}={{total}} vs МДР DC{{dc}}"
   },
   "characters": {
     "warrior": {
@@ -78,8 +91,10 @@
       "items": {
         "shortSword": "Короткий меч",
         "leatherArmor": "Кожаный доспех",
-        "healingPotion": "Зелье лечения (d6+2 HP)"
-      }
+        "healingPotion": "Зелье лечения (d6+2 HP)",
+        "rope": "Верёвка"
+      },
+      "armor": "Кожаный доспех"
     },
     "rogue": {
       "name": "Плут",
@@ -91,8 +106,10 @@
       "items": {
         "dagger": "Кинжал",
         "lockpicks": "Отмычки",
-        "healingPotion": "Зелье лечения (d6+2 HP)"
-      }
+        "healingPotion": "Зелье лечения (d6+2 HP)",
+        "darkCloak": "Тёмный плащ (КД 12)"
+      },
+      "armor": "Тёмный плащ"
     },
     "mage": {
       "name": "Маг",
@@ -104,8 +121,10 @@
       "items": {
         "staff": "Посох",
         "healingPotion": "Зелье лечения (d6+2 HP)",
-        "fireBoltScroll": "Свиток Огненного Болта"
+        "fireBoltScroll": "Свиток Огненного Болта",
+        "robes": "Мантия мага (КД 11)"
       },
+      "armor": "Мантия мага",
       "spells": {
         "fireBolt": {
           "name": "Огненный болт",
