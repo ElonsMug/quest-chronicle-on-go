@@ -751,7 +751,7 @@ export default function SoloDnD() {
     const newHp = Math.min(c.maxHp, h + heal);
     setHp(newHp);
     setInventory(prev => prev.filter((_, i) => i !== idx));
-    setShowInventory(false);
+    
     if (inCombat) {
       // Bonus action: do NOT call the DM now, otherwise enemies attack right after the potion.
       // Apply the effect locally, show a grey system message, and the potion info is
@@ -849,7 +849,7 @@ export default function SoloDnD() {
     const heal = rollDice(6);
     const newHp = Math.min(c.maxHp, h + heal);
     setHp(newHp);
-    setShowInventory(false);
+    
     const text = t("combat.shortRestNarrative", { heal, hp: newHp, max: c.maxHp });
     setMessages(prev => [...prev, {
       role: "assistant",
@@ -867,7 +867,7 @@ export default function SoloDnD() {
       hp: c.maxHp,
       spellSlots: c.spellSlots ? { current: c.spellSlots.max, max: c.spellSlots.max } : null,
     });
-    setShowInventory(false);
+    
     const text = t("combat.longRestNarrative");
     setMessages(prev => [...prev, {
       role: "assistant",
@@ -1262,7 +1262,7 @@ export default function SoloDnD() {
           <div className="text-center cursor-pointer select-none" onClick={handleDevTap}>
             <div className="text-amber-200 text-sm font-bold">{character?.emoji} {character?.name}</div>
             <button
-              onClick={e => { e.stopPropagation(); setShowInventory(true); }}
+              onClick={e => { e.stopPropagation(); setActiveTab("inventory"); }}
               className="text-stone-500 text-xs hover:text-amber-400 transition-colors"
             >
               🎒 {t("header.items", { count: inventory.length })}
