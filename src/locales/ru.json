@@ -64,8 +64,21 @@
   "stats": {
     "str": "СИЛ",
     "dex": "ЛОВ",
+    "con": "ВЫН",
     "int": "ИНТ",
+    "wis": "МДР",
+    "cha": "ХАР",
+    "ac": "КД",
     "hp": "HP"
+  },
+  "combat_log": {
+    "enemyAttackHit": "{{name}} атакует — d20({{roll}})+{{atk}}={{total}} vs КД{{ac}} → ПОПАЛ → {{dmg}} урона",
+    "enemyAttackMiss": "{{name}} атакует — d20({{roll}})+{{atk}}={{total}} vs КД{{ac}} → МИМО",
+    "enemyAttackCrit": "{{name}} атакует — d20(20) КРИТ → {{dmg}} урона",
+    "heroicSurge": "Героический порыв — дополнительное действие в этом раунде!",
+    "heroicSurgeUsed": "Использован в этом бою",
+    "artifactBonus": "Бонус артефакта: +{{bonus}} урона по боссу",
+    "socialCheck": "Социальная проверка: {{stat}} d20({{roll}})+{{mod}}={{total}} vs МДР DC{{dc}}"
   },
   "characters": {
     "warrior": {
