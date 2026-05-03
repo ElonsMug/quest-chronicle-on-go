@@ -640,6 +640,8 @@ export default function SoloDnD() {
         language,
         arc,
         gold: char.startGold,
+        ac: char.ac,
+        artifactBonus: 0,
         silentFallback: t("dm.silent"),
       });
       await processAndSetMessages(char, char.hp, startInv, [], [], reply, []);
