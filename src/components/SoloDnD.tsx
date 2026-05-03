@@ -14,29 +14,28 @@ import i18n from "@/i18n";
 
 // ─── Pure game logic ─────────────────────────────────────────────
 import type {
-  Stat,
   Spell,
   Character,
   ChatMessage,
   Enemy,
   Ally,
   PendingRoll,
-  RollResult,
-  Parsed,
 } from "@/game/types";
 import { buildCharacters } from "@/game/characters";
 import { buildDevScenes } from "@/game/devScenes";
 import { parseDMResponse } from "@/game/parser";
-import { reportLanguageLeaks } from "@/game/langGuard";
 import { callDM } from "@/game/api";
-import { rollDice, parseDiceSides, PROFICIENCY_BONUS } from "@/game/dice";
 import { isPotion } from "@/game/inventory";
 import { gameReducer } from "@/game/reducer";
 import { initialGameState } from "@/game/state";
-import { pickRandomTemplate, computeNextArc } from "@/game/arcs";
-import { varyArcWithLLM } from "@/game/arcVariation";
 import { ArcCompletedScreen } from "@/components/game/ArcCompletedScreen";
 import { ArcProgressBar } from "@/components/game/ArcProgressBar";
+
+// ─── Extracted hooks ─────────────────────────────────────────────
+import type { GameDeps, PendingAction } from "@/hooks/useGameDeps";
+import { useNarrative } from "@/hooks/useNarrative";
+import { useCombat } from "@/hooks/useCombat";
+import { useGameSession } from "@/hooks/useGameSession";
 
 // ─── UI components ───────────────────────────────────────────────
 import { EnemyHP } from "@/components/game/EnemyHP";
