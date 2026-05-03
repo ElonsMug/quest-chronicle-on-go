@@ -146,6 +146,7 @@ CHARACTER:
 Class: ${character.name} | HP: ${hp}/${character.maxHp}
 Strength ${s(character.stats.str)} | Dexterity ${s(character.stats.dex)} | Intelligence ${s(character.stats.int)}
 Weapon: ${character.weapon.name} (${character.weapon.dice}+${s(character.stats[character.weapon.stat])})
+Gold: ${gold} gp
 ${spellsBlock}Inventory: ${inv} | Effects: ${eff}
 
 RESPONSE FORMAT:
