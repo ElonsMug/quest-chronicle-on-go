@@ -240,6 +240,7 @@ export default function SoloDnD() {
       spellSlots: stateRef.current.spellSlots,
       language,
       arc: stateRef.current.arc,
+      gold: stateRef.current.gold,
       silentFallback: t("dm.silent"),
     });
   }
