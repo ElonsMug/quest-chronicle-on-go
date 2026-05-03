@@ -91,8 +91,10 @@
       "items": {
         "shortSword": "Short Sword",
         "leatherArmor": "Leather Armor",
-        "healingPotion": "Healing Potion (d6+2 HP)"
-      }
+        "healingPotion": "Healing Potion (d6+2 HP)",
+        "rope": "Rope"
+      },
+      "armor": "Leather Armor"
     },
     "rogue": {
       "name": "Rogue",
