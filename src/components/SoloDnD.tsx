@@ -73,7 +73,8 @@ export default function SoloDnD() {
   const [pendingInitiative, setPendingInitiative] = useState(false);
   const [freeInput, setFreeInput] = useState(false);
   const [freeText, setFreeText] = useState("");
-  const [showInventory, setShowInventory] = useState(false);
+  const [activeTab, setActiveTab] = useState<"story" | "character" | "inventory" | "journal">("story");
+  const [invFilter, setInvFilter] = useState<"all" | "weapons" | "armor" | "consumables" | "quest">("all");
   const [showSpells, setShowSpells] = useState(false);
   const [showSpellMini, setShowSpellMini] = useState(false);
   const [selectingTarget, setSelectingTarget] = useState(false);
