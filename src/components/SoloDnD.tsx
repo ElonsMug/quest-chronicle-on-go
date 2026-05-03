@@ -1497,13 +1497,13 @@ export default function SoloDnD() {
               {parsed.choices
                 .filter(choice => !/free\s*(choice|action)|свой\s*вариант/i.test(choice.text))
                 .map((choice, i) => (
-                <button key={i} onClick={() => handleChoice(choice.text)}
+                <button key={i} onClick={() => handleChoice(choice.text)} disabled={loading}
                   className="w-full text-left px-4 py-3 rounded-xl border border-stone-700 bg-stone-900/95 text-amber-100 text-sm leading-snug transition-all active:scale-[0.98] hover:border-amber-700/50 hover:bg-stone-800"
                   style={{ fontFamily: "serif", overflowWrap: "break-word", wordBreak: "break-word" }}>
                   <span className="text-amber-600 font-bold mr-2">{choice.num}.</span>{choice.text}
                 </button>
               ))}
-              <button onClick={() => {
+              <button disabled={loading} onClick={() => {
                 trackEvent("free_input_used", {
                   characterId: stateRef.current.character?.id,
                   messageNumber: stateRef.current.messages.length,
@@ -1525,7 +1525,7 @@ export default function SoloDnD() {
                 className="w-full px-4 py-3 rounded-xl border border-stone-600 bg-stone-900 text-amber-100 text-sm leading-relaxed resize-none outline-none focus:border-amber-700 transition-colors"
                 style={{ fontFamily: "serif" }} />
               <div className="flex gap-2">
-                <button onClick={() => { setFreeInput(false); setFreeText(""); }}
+                <button disabled={loading} onClick={() => { setFreeInput(false); setFreeText(""); }}
                   className="flex-1 py-2.5 rounded-xl border border-stone-700 bg-stone-900 text-stone-400 text-sm hover:text-stone-300 transition-colors">
                   {t("common.cancel")}
                 </button>
