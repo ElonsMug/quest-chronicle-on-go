@@ -3,6 +3,7 @@ import {
   checkTotalSize,
   corsHeaders,
   jsonResponse,
+  verifyRequestOrigin,
 } from "@/server/security";
 import { z } from "zod";
 
