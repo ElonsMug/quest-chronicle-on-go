@@ -154,6 +154,11 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case "RESET_BOSS_FLAGS":
       return { ...state, heroicSurgeUsed: false };
 
+    case "SET_CHARACTER_AC":
+      return state.character
+        ? { ...state, character: { ...state.character, ac: action.ac, armorName: action.armorName } }
+        : state;
+
     default:
       // Exhaustiveness check: action is `never` here if all cases are handled.
       return state;
