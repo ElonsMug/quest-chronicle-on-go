@@ -43,7 +43,7 @@ import { EnemyHP } from "@/components/game/EnemyHP";
 import { InitiativeBlock } from "@/components/game/InitiativeBlock";
 import { RollBlock } from "@/components/game/RollBlock";
 import { CharacterCard } from "@/components/game/CharacterCard";
-import { InventoryPanel } from "@/components/game/InventoryPanel";
+import { BottomNav, CharacterTab, InventoryTab, JournalTab } from "@/components/game/GameTabs";
 import { SpellPanel } from "@/components/game/SpellPanel";
 import { DevPanel } from "@/components/game/DevPanel";
 import { DefeatedScreen } from "@/components/game/DefeatedScreen";
@@ -73,7 +73,8 @@ export default function SoloDnD() {
   const [pendingInitiative, setPendingInitiative] = useState(false);
   const [freeInput, setFreeInput] = useState(false);
   const [freeText, setFreeText] = useState("");
-  const [showInventory, setShowInventory] = useState(false);
+  const [activeTab, setActiveTab] = useState<"story" | "character" | "inventory" | "journal">("story");
+  const [invFilter, setInvFilter] = useState<"all" | "weapons" | "armor" | "consumables" | "quest">("all");
   const [showSpells, setShowSpells] = useState(false);
   const [showSpellMini, setShowSpellMini] = useState(false);
   const [selectingTarget, setSelectingTarget] = useState(false);
@@ -133,6 +134,7 @@ export default function SoloDnD() {
     messages,
     arc,
     surpriseAdvantage,
+    gold,
   } = game;
 
   // ── Setter shims ────────────────────────────────────────────────
@@ -239,6 +241,7 @@ export default function SoloDnD() {
       spellSlots: stateRef.current.spellSlots,
       language,
       arc: stateRef.current.arc,
+      gold: stateRef.current.gold,
       silentFallback: t("dm.silent"),
     });
   }
@@ -297,6 +300,10 @@ export default function SoloDnD() {
       setDefeatPending(false);
       setDefeatDismissed(false);
       setShowDefeated(false);
+    }
+
+    if (parsed.goldChange != null) {
+      dispatch({ type: "ADD_GOLD", amount: parsed.goldChange });
     }
 
     if (parsed.newItems?.length) {
@@ -630,6 +637,7 @@ export default function SoloDnD() {
         spellSlots: char.spellSlots ?? null,
         language,
         arc,
+        gold: char.startGold,
         silentFallback: t("dm.silent"),
       });
       await processAndSetMessages(char, char.hp, startInv, [], [], reply, []);
@@ -743,7 +751,7 @@ export default function SoloDnD() {
     const newHp = Math.min(c.maxHp, h + heal);
     setHp(newHp);
     setInventory(prev => prev.filter((_, i) => i !== idx));
-    setShowInventory(false);
+    
     if (inCombat) {
       // Bonus action: do NOT call the DM now, otherwise enemies attack right after the potion.
       // Apply the effect locally, show a grey system message, and the potion info is
@@ -841,7 +849,7 @@ export default function SoloDnD() {
     const heal = rollDice(6);
     const newHp = Math.min(c.maxHp, h + heal);
     setHp(newHp);
-    setShowInventory(false);
+    
     const text = t("combat.shortRestNarrative", { heal, hp: newHp, max: c.maxHp });
     setMessages(prev => [...prev, {
       role: "assistant",
@@ -859,7 +867,7 @@ export default function SoloDnD() {
       hp: c.maxHp,
       spellSlots: c.spellSlots ? { current: c.spellSlots.max, max: c.spellSlots.max } : null,
     });
-    setShowInventory(false);
+    
     const text = t("combat.longRestNarrative");
     setMessages(prev => [...prev, {
       role: "assistant",
@@ -1160,18 +1168,6 @@ export default function SoloDnD() {
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(180deg,#0c0a09 0%,#1c1917 100%)", fontFamily: "serif" }}>
 
-      {showInventory && (
-        <InventoryPanel
-          inventory={inventory}
-          effects={effects}
-          onUseItem={handleUseItem}
-          onShortRest={handleShortRest}
-          onLongRest={handleLongRest}
-          inCombat={inCombat}
-          canUsePotion={showCombatButtons && !pendingPotionInfoRef.current}
-          onClose={() => setShowInventory(false)}
-        />
-      )}
       {showSpells && character && spellSlots && (
         <SpellPanel
           character={character}
@@ -1253,34 +1249,21 @@ export default function SoloDnD() {
 
           <div className="text-center cursor-pointer select-none" onClick={handleDevTap}>
             <div className="text-amber-200 text-sm font-bold">{character?.emoji} {character?.name}</div>
-            <button
-              onClick={e => { e.stopPropagation(); setShowInventory(true); }}
-              className="text-stone-500 text-xs hover:text-amber-400 transition-colors"
-            >
-              🎒 {t("header.items", { count: inventory.length })}
-            </button>
           </div>
 
           <div className="flex items-center gap-2 min-w-[60px] justify-end">
-            {character?.id === "mage" && spellSlots && (
-              <button
-                onClick={() => setShowSpells(true)}
-                className="text-sm tracking-widest hover:opacity-80 transition-opacity"
-                style={{ color: "#60a5fa", fontFamily: "serif" }}
-                title={t("header.spellSlotsTitle", { current: spellSlots.current, max: spellSlots.max })}
-              >
-                {Array.from({ length: spellSlots.max }, (_, i) => i < spellSlots.current ? "✦" : "◇").join("")}
-              </button>
-            )}
             <div className="flex items-center gap-1.5">
               <div className="text-xs text-stone-500">{t("stats.hp")}</div>
-              <div className="font-bold text-sm" style={{ color: character && hp / character.maxHp > 0.5 ? "#f87171" : character && hp / character.maxHp > 0.25 ? "#fbbf24" : "#ef4444" }}>{hp}</div>
+              <div className="font-bold text-sm" style={{ color: character && hp / character.maxHp > 0.5 ? "#4ade80" : character && hp / character.maxHp > 0.25 ? "#fbbf24" : "#ef4444" }}>{hp}</div>
               <div className="text-stone-600 text-xs">/{character?.maxHp}</div>
+            </div>
+            <div className="flex items-center gap-1 text-amber-400 text-sm font-bold" title={t("inventory.wallet")}>
+              🪙<span>{gold}</span>
             </div>
           </div>
         </div>
 
-        {inCombat && enemies.filter(e => e.hp > 0).length > 0 && (
+        {activeTab === "story" && inCombat && enemies.filter(e => e.hp > 0).length > 0 && (
           <div className="px-4 pb-2 space-y-1 border-t border-stone-800/40 pt-2">
             {surpriseAdvantage === "player" && (
               <div className="text-amber-400 text-[10px] uppercase tracking-widest font-bold mb-1">
@@ -1298,7 +1281,7 @@ export default function SoloDnD() {
             ))}
           </div>
         )}
-        {inCombat && allies.filter(a => a.hp > 0).length > 0 && (
+        {activeTab === "story" && inCombat && allies.filter(a => a.hp > 0).length > 0 && (
           <div className="px-4 pb-2 space-y-1">
             {allies.filter(a => a.hp > 0).map((ally, i) => (
               <div key={i} className="flex items-center gap-2">
@@ -1311,8 +1294,33 @@ export default function SoloDnD() {
             ))}
           </div>
         )}
-        {arc && !arc.completed && <ArcProgressBar arc={arc} />}
       </div>
+
+      {activeTab === "character" && character && (
+        <CharacterTab
+          character={character}
+          hp={hp}
+          spellSlots={spellSlots}
+          effects={effects}
+        />
+      )}
+      {activeTab === "inventory" && (
+        <InventoryTab
+          inventory={inventory}
+          effects={effects}
+          gold={gold}
+          inCombat={inCombat}
+          canUsePotion={showCombatButtons && !pendingPotionInfoRef.current}
+          filter={invFilter}
+          onFilterChange={setInvFilter}
+          onUseItem={handleUseItem}
+          onShortRest={handleShortRest}
+          onLongRest={handleLongRest}
+        />
+      )}
+      {activeTab === "journal" && <JournalTab arc={arc} />}
+
+      {activeTab === "story" && (<>
 
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3" style={{ paddingBottom: "280px" }}>
         {messages.map((msg, i) => {
@@ -1368,8 +1376,8 @@ export default function SoloDnD() {
         <div ref={bottomRef} />
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 z-10" style={{ background: "linear-gradient(0deg,#0c0a09 60%,transparent 100%)" }}>
-        <div className="px-4 pb-6 pt-3 max-w-md mx-auto space-y-2">
+      <div className="fixed left-0 right-0 z-10" style={{ bottom: "56px", background: "linear-gradient(0deg,#0c0a09 60%,transparent 100%)" }}>
+        <div className="px-4 pb-4 pt-3 max-w-md mx-auto space-y-2">
           {showDefeatActions && (
             <>
               <div className="text-center text-xs text-stone-500 pb-1" style={{ fontFamily: "serif" }}>
@@ -1543,6 +1551,10 @@ export default function SoloDnD() {
           )}
         </div>
       </div>
+      </>)}
+
+      <BottomNav active={activeTab} onChange={setActiveTab} t={t} />
     </div>
   );
 }
+

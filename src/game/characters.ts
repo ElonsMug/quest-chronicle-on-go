@@ -30,6 +30,7 @@ export function buildCharacters(t: (k: string) => string): Character[] {
         t("characters.warrior.items.healingPotion"),
       ],
       classAbility: { name: t("characters.warrior.ability"), type: "berserk" },
+      startGold: 10,
     },
     {
       id: "rogue",
@@ -50,6 +51,7 @@ export function buildCharacters(t: (k: string) => string): Character[] {
         t("characters.rogue.items.healingPotion"),
       ],
       classAbility: { name: t("characters.rogue.ability"), type: "sneak" },
+      startGold: 15,
     },
     {
       id: "mage",
@@ -71,6 +73,7 @@ export function buildCharacters(t: (k: string) => string): Character[] {
       ],
       spellSlots: { current: 3, max: 3 },
       spellSaveDC: 14,
+      startGold: 8,
       spells: [
         {
           id: "fireBolt",

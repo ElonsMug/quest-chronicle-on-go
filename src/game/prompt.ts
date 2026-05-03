@@ -21,6 +21,7 @@ export function buildSystemPrompt(
   spellSlots: { current: number; max: number } | null,
   language: "en" | "ru",
   arc: Arc | null = null,
+  gold: number = 0,
 ): string {
   const inv = inventory.length ? inventory.join(", ") : language === "ru" ? "пусто" : "empty";
   const eff = effects.length ? effects.join(", ") : language === "ru" ? "нет" : "none";
@@ -145,6 +146,7 @@ CHARACTER:
 Class: ${character.name} | HP: ${hp}/${character.maxHp}
 Strength ${s(character.stats.str)} | Dexterity ${s(character.stats.dex)} | Intelligence ${s(character.stats.int)}
 Weapon: ${character.weapon.name} (${character.weapon.dice}+${s(character.stats[character.weapon.stat])})
+Gold: ${gold} gp
 ${spellsBlock}Inventory: ${inv} | Effects: ${eff}
 
 RESPONSE FORMAT:
@@ -181,6 +183,8 @@ TAG MECHANICS (always on a separate line):
      Reward → [ITEM: 10 gold]
      Looted from enemy → [ITEM: Bandit's Dagger]
    Several items = several tags, each on its own line.
+[GOLD: +N] — player gains N gold coins. [GOLD: -N] — player spends N gold coins.
+   Always use [GOLD:] when money changes hands for any reason (rewards, purchases, theft, bribes).
 [UPGRADE: old_name -> new_name] — when the player upgrades, repairs,
    enchants or modifies an existing item. The system finds the item with the
    old name in the inventory and replaces it with the new one.

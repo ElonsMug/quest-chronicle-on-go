@@ -36,6 +36,7 @@ export type GameState = {
   // action does NOT trigger an enemy retaliation turn (no combatTurnReminder).
   // Cleared automatically after that one action is sent.
   surpriseAdvantage: "player" | null;
+  gold: number;
 };
 
 export const initialGameState: GameState = {
@@ -54,6 +55,7 @@ export const initialGameState: GameState = {
   messages: [],
   arc: null,
   surpriseAdvantage: null,
+  gold: 0,
 };
 
 // ─────────────────────────────────────────────────────────────────
@@ -112,7 +114,9 @@ export type GameAction =
   | { type: "SET_ARC"; arc: Arc }
   | { type: "MARK_MIDBOSS_DEFEATED" }
   | { type: "MARK_BOSS_DEFEATED" }
-  | { type: "SET_SURPRISE"; value: "player" | null };
+  | { type: "SET_SURPRISE"; value: "player" | null }
+  | { type: "SET_GOLD"; gold: number }
+  | { type: "ADD_GOLD"; amount: number };
 
 // Re-export ArcPhase for convenience of consumers importing from state.
 export type { ArcPhase };
