@@ -632,6 +632,7 @@ export default function SoloDnD() {
         spellSlots: char.spellSlots ?? null,
         language,
         arc,
+        gold: char.startGold,
         silentFallback: t("dm.silent"),
       });
       await processAndSetMessages(char, char.hp, startInv, [], [], reply, []);
