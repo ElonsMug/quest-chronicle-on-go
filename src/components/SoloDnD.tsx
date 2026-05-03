@@ -185,6 +185,8 @@ export default function SoloDnD() {
   const pendingPotionInfoRef = useRef<string | null>(null);
   const devTaps = useRef(0);
   const bottomRef = useRef<HTMLDivElement>(null);
+    const actionPanelRef = useRef<HTMLDivElement>(null);
+    const [actionPanelHeight, setActionPanelHeight] = useState(320);
 
   // Mirror of `game` for closures captured by async DM callbacks.
   // The reducer is the source of truth; this ref just makes the latest
@@ -194,6 +196,14 @@ export default function SoloDnD() {
 
   useEffect(() => { initAnalytics(); }, []);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, loading, pendingRoll, pendingInitiative]);
+useEffect(() => {
+      if (!actionPanelRef.current) return;
+      const observer = new ResizeObserver(() => {
+        setActionPanelHeight(actionPanelRef.current?.offsetHeight ?? 320);
+      });
+      observer.observe(actionPanelRef.current);
+      return () => observer.disconnect();
+    }, []);
 
   // Pick a fresh free-input placeholder when the placeholder list updates
   // (i.e. on first render and on every language change).
@@ -1424,7 +1434,7 @@ export default function SoloDnD() {
 
       {activeTab === "story" && (<>
 
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3" style={{ paddingBottom: "320px" }}>
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3" style={{ paddingBottom: `${actionPanelHeight + 16}px` }}>
         {messages.map((msg, i) => {
           if (msg.role === "user") {
             const isSystem = msg.content.startsWith("[");
@@ -1478,7 +1488,7 @@ export default function SoloDnD() {
         <div ref={bottomRef} />
       </div>
 
-      <div className="fixed left-0 right-0 z-10" style={{ bottom: "56px", background: "linear-gradient(0deg,#0c0a09 60%,transparent 100%)" }}>
+      <div ref={actionPanelRef} className="fixed left-0 right-0 z-10" style={{ bottom: "56px", background: "linear-gradient(0deg,#0c0a09 60%,transparent 100%)" }}>
         <div className="px-4 pb-4 pt-3 max-w-md mx-auto space-y-2">
           {showDefeatActions && (
             <>
