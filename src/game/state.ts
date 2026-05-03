@@ -58,6 +58,8 @@ export const initialGameState: GameState = {
   arc: null,
   surpriseAdvantage: null,
   gold: 0,
+  heroicSurgeUsed: false,
+  artifactBonus: 0,
 };
 
 // ─────────────────────────────────────────────────────────────────
