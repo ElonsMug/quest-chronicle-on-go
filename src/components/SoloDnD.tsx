@@ -573,6 +573,7 @@ export default function SoloDnD() {
     return results.join("\n");
   }
 
+  async function processAndSetMessages(char: Character, currentHp: number, currentInv: string[], currentEff: string[], currentEnemies: Enemy[], reply: string, prevMessages: ChatMessage[]) {
     const parsed = parseDMResponse(reply);
     // Dev-only: warn in console if the DM leaked Latin words into a Russian
     // narrative. Helps catch prompt regressions before they ship.
