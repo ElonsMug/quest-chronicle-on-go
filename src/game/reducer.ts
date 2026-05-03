@@ -20,6 +20,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           ? { ...action.character.spellSlots }
           : null,
         arc: action.arc,
+        gold: action.character.startGold,
       };
 
     case "RESET_TO_MENU":
