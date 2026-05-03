@@ -245,6 +245,15 @@ TAG MECHANICS (always on a separate line):
    Several items = several tags, each on its own line.
 [GOLD: +N] — player gains N gold coins. [GOLD: -N] — player spends N gold coins.
    Always use [GOLD:] when money changes hands for any reason (rewards, purchases, theft, bribes).
+   TRANSACTION RULES — follow these exactly when player spends gold:
+   1. Before any purchase/bribe/payment, state the price explicitly in dialogue.
+   2. Compare price to player's current gold (shown in PLAYER STATUS above).
+   3. If player has enough gold → offer a choice: pay full price OR haggle.
+   4. If player does NOT have enough gold → haggling is the only path to success.
+   5. After player confirms payment → write [GOLD: -N] on its own line.
+   6. NEVER resolve a transaction narratively without [GOLD: -N].
+   Wrong: "You hand over the coins and receive the map."
+   Right: "You hand over the coins and receive the map.\n[GOLD: -10]"
 [UPGRADE: old_name -> new_name] — when the player upgrades, repairs,
    enchants or modifies an existing item. The system finds the item with the
    old name in the inventory and replaces it with the new one.
