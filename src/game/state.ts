@@ -55,6 +55,7 @@ export const initialGameState: GameState = {
   messages: [],
   arc: null,
   surpriseAdvantage: null,
+  gold: 0,
 };
 
 // ─────────────────────────────────────────────────────────────────
