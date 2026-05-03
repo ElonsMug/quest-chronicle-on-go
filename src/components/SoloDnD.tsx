@@ -1322,7 +1322,7 @@ export default function SoloDnD() {
 
       {activeTab === "story" && (<>
 
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3" style={{ paddingBottom: "280px" }}>
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3" style={{ paddingBottom: "320px" }}>
         {messages.map((msg, i) => {
           if (msg.role === "user") {
             const isSystem = msg.content.startsWith("[");
