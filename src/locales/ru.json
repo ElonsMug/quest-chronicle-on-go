@@ -136,7 +136,19 @@
     "longRest": "Длинный отдых",
     "longRestSubtitle": "Полное HP · Все слоты заклинаний",
     "noRestInCombat": "Нельзя отдыхать в бою",
-    "potionInCombatHint": "Зелье можно выпить только в свой ход — перед основным действием"
+    "potionInCombatHint": "Зелье можно выпить только в свой ход — перед основным действием",
+    "wallet": "Кошелёк",
+    "gold": "зм",
+    "filterAll": "Все",
+    "filterWeapons": "Оружие",
+    "filterArmor": "Броня",
+    "filterConsumables": "Зелья",
+    "filterQuest": "Квест",
+    "usePotion": "Выпить",
+    "categoryWeapon": "Оружие",
+    "categoryArmor": "Броня",
+    "categoryPotion": "Зелье",
+    "categoryQuest": "Квест"
   },
   "spells": {
     "title": "Заклинания",
