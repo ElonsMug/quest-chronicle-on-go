@@ -242,6 +242,8 @@ export default function SoloDnD() {
       language,
       arc: stateRef.current.arc,
       gold: stateRef.current.gold,
+      ac: char.ac,
+      artifactBonus: stateRef.current.artifactBonus,
       silentFallback: t("dm.silent"),
     });
   }
