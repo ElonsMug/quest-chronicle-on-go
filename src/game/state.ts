@@ -120,7 +120,10 @@ export type GameAction =
   | { type: "MARK_BOSS_DEFEATED" }
   | { type: "SET_SURPRISE"; value: "player" | null }
   | { type: "SET_GOLD"; gold: number }
-  | { type: "ADD_GOLD"; amount: number };
+  | { type: "ADD_GOLD"; amount: number }
+  | { type: "USE_HEROIC_SURGE" }
+  | { type: "SET_ARTIFACT_BONUS"; bonus: number }
+  | { type: "RESET_BOSS_FLAGS" };
 
 // Re-export ArcPhase for convenience of consumers importing from state.
 export type { ArcPhase };
