@@ -1599,6 +1599,27 @@ export default function SoloDnD() {
                   </button>
                 </div>
               )}
+              {character && !heroicSurgeUsed && enemies.some(e => e.isBoss) && (
+                <button
+                  onClick={async () => {
+                    useHeroicSurge();
+                    await handleChoice(i18n.t("combat_log.heroicSurge"));
+                  }}
+                  className="w-full py-3 rounded-xl font-bold active:scale-95 transition-transform"
+                  style={{
+                    background: "linear-gradient(135deg,#7c3aed,#4c1d95)",
+                    fontFamily: "serif",
+                    color: "#faf5ff",
+                  }}
+                >
+                  ⚡ {t("combat_log.heroicSurge")}
+                </button>
+              )}
+              {character && heroicSurgeUsed && enemies.some(e => e.isBoss) && (
+                <div className="text-center text-xs text-stone-600 py-1">
+                  ⚡ {t("combat_log.heroicSurgeUsed")}
+                </div>
+              )}
             </>
           )}
 
