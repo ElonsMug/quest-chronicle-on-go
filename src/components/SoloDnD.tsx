@@ -1376,8 +1376,8 @@ export default function SoloDnD() {
         <div ref={bottomRef} />
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 z-10" style={{ background: "linear-gradient(0deg,#0c0a09 60%,transparent 100%)" }}>
-        <div className="px-4 pb-6 pt-3 max-w-md mx-auto space-y-2">
+      <div className="fixed left-0 right-0 z-10" style={{ bottom: "56px", background: "linear-gradient(0deg,#0c0a09 60%,transparent 100%)" }}>
+        <div className="px-4 pb-4 pt-3 max-w-md mx-auto space-y-2">
           {showDefeatActions && (
             <>
               <div className="text-center text-xs text-stone-500 pb-1" style={{ fontFamily: "serif" }}>
