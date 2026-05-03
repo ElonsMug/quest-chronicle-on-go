@@ -710,6 +710,7 @@ export default function SoloDnD() {
     // Single atomic init — sets character, hp, inventory, spellSlots, arc
     // and resets effects/enemies/allies/inCombat/berserk/dodge/defensive/messages.
     dispatch({ type: "START_GAME", character: char, startInventory: startInv, arc });
+    dispatch({ type: "RESET_BOSS_FLAGS" });
     setPendingRoll(null);
     setPendingInitiative(false);
     setShowSpellMini(false);
