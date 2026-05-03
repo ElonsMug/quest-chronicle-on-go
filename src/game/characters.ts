@@ -73,6 +73,7 @@ export function buildCharacters(t: (k: string) => string): Character[] {
       ],
       spellSlots: { current: 3, max: 3 },
       spellSaveDC: 14,
+      startGold: 8,
       spells: [
         {
           id: "fireBolt",
