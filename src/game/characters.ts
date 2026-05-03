@@ -51,6 +51,7 @@ export function buildCharacters(t: (k: string) => string): Character[] {
         t("characters.rogue.items.healingPotion"),
       ],
       classAbility: { name: t("characters.rogue.ability"), type: "sneak" },
+      startGold: 15,
     },
     {
       id: "mage",
