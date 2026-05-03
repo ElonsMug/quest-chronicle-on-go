@@ -114,7 +114,9 @@ export type GameAction =
   | { type: "SET_ARC"; arc: Arc }
   | { type: "MARK_MIDBOSS_DEFEATED" }
   | { type: "MARK_BOSS_DEFEATED" }
-  | { type: "SET_SURPRISE"; value: "player" | null };
+  | { type: "SET_SURPRISE"; value: "player" | null }
+  | { type: "SET_GOLD"; gold: number }
+  | { type: "ADD_GOLD"; amount: number };
 
 // Re-export ArcPhase for convenience of consumers importing from state.
 export type { ArcPhase };
