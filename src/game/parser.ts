@@ -6,6 +6,18 @@
 // when the narrative is written in another language.
 // ─────────────────────────────────────────────────────────────────
 
+import type { Stat } from "./types";
+
+function mapStatToKey(s: string): Stat {
+  const l = s.toLowerCase();
+  if (l.includes("str") || l.includes("сил") || l.includes("strength")) return "str";
+  if (l.includes("dex") || l.includes("лов") || l.includes("dexterity")) return "dex";
+  if (l.includes("con") || l.includes("вын") || l.includes("constitution")) return "con";
+  if (l.includes("wis") || l.includes("мдр") || l.includes("wisdom")) return "wis";
+  if (l.includes("cha") || l.includes("хар") || l.includes("charisma")) return "cha";
+  return "int";
+}
+
 export function parseDMResponse(text: string) {
   const choices: { num: string; text: string }[] = [];
   const narrativeLines: string[] = [];
