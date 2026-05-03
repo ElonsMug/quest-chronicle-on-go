@@ -37,6 +37,8 @@ export type GameState = {
   // Cleared automatically after that one action is sent.
   surpriseAdvantage: "player" | null;
   gold: number;
+  heroicSurgeUsed: boolean;
+  artifactBonus: number;
 };
 
 export const initialGameState: GameState = {
