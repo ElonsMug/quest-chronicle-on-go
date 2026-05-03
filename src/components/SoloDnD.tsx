@@ -135,7 +135,11 @@ export default function SoloDnD() {
     arc,
     surpriseAdvantage,
     gold,
+    heroicSurgeUsed,
+    artifactBonus,
   } = game;
+  const useHeroicSurge = () => dispatch({ type: "USE_HEROIC_SURGE" });
+  const setArtifactBonus = (bonus: number) => dispatch({ type: "SET_ARTIFACT_BONUS", bonus });
 
   // ── Setter shims ────────────────────────────────────────────────
   // Thin wrappers so existing call-sites keep their familiar
@@ -331,6 +335,13 @@ export default function SoloDnD() {
         }
       }
       if (changed) setInventory(newInv);
+      for (const up of parsed.upgrades) {
+        const acMatch = up.to.match(/\(\s*(?:AC|КД)\s*(\d+)\s*\)/i);
+        if (acMatch) {
+          const newAc = parseInt(acMatch[1]);
+          dispatch({ type: "SET_CHARACTER_AC", ac: newAc, armorName: up.to });
+        }
+      }
     }
 
     if (parsed.newEnemies?.length) {
@@ -504,6 +515,71 @@ export default function SoloDnD() {
     await handleChoice(msg);
   }
 
+  // Resolve enemy attacks on the client. Each [ENEMY_ATTACK: Name] from the
+  // DM rolls d20 + ATK vs player AC and applies damage directly. Returns a
+  // human-readable log to be appended as an assistant system message.
+  async function executeEnemyAttacks(
+    attackerNames: string[],
+    currentEnemies: Enemy[],
+    playerAc: number,
+  ): Promise<string> {
+    const results: string[] = [];
+    for (const name of attackerNames) {
+      const enemy = currentEnemies.find(
+        e => e.hp > 0 && e.name.toLowerCase() === name.toLowerCase()
+      );
+      if (!enemy) continue;
+      const roll = rollDice(20);
+      const total = roll + enemy.attackBonus;
+      const crit = roll === 20;
+      const autoMiss = roll === 1;
+      const hit = !autoMiss && (crit || total >= playerAc);
+      let dmgDealt = 0;
+      if (hit) {
+        const dmgDice = parseDiceSides(enemy.damage);
+        const dmgMod = parseInt(enemy.damage.split("+")[1] || "0");
+        dmgDealt = crit
+          ? rollDice(dmgDice) + rollDice(dmgDice) + dmgMod
+          : rollDice(dmgDice) + dmgMod;
+        if (dmgDealt < 1) dmgDealt = 1;
+        const ch = stateRef.current.character;
+        const livingEnemies = currentEnemies.filter(e => e.hp > 0);
+        const bossPresent = livingEnemies.some(e => e.isBoss);
+        if (ch && !bossPresent) {
+          const cap = Math.max(1, Math.floor(ch.maxHp * 0.6));
+          if (dmgDealt > cap && stateRef.current.hp > ch.maxHp * 0.5) {
+            dmgDealt = cap;
+          }
+        }
+        const newHp = Math.max(0, stateRef.current.hp - dmgDealt);
+        setHp(newHp);
+        if (newHp <= 0) {
+          setDefeatPending(true);
+          setDefeatDismissed(false);
+        }
+      }
+      if (crit) {
+        results.push(i18n.t("combat_log.enemyAttackCrit", { name: enemy.name, dmg: dmgDealt }));
+      } else if (autoMiss) {
+        results.push(i18n.t("combat_log.enemyAttackMiss", {
+          name: enemy.name, roll: 1, atk: enemy.attackBonus,
+          total: 1 + enemy.attackBonus, ac: playerAc,
+        }));
+      } else if (hit) {
+        results.push(i18n.t("combat_log.enemyAttackHit", {
+          name: enemy.name, roll, atk: enemy.attackBonus,
+          total, ac: playerAc, dmg: dmgDealt,
+        }));
+      } else {
+        results.push(i18n.t("combat_log.enemyAttackMiss", {
+          name: enemy.name, roll, atk: enemy.attackBonus,
+          total, ac: playerAc,
+        }));
+      }
+    }
+    return results.join("\n");
+  }
+
   async function processAndSetMessages(char: Character, currentHp: number, currentInv: string[], currentEff: string[], currentEnemies: Enemy[], reply: string, prevMessages: ChatMessage[]) {
     const parsed = parseDMResponse(reply);
     // Dev-only: warn in console if the DM leaked Latin words into a Russian
@@ -512,6 +588,27 @@ export default function SoloDnD() {
     const newMsgs: ChatMessage[] = [...prevMessages, { role: "assistant", content: reply, parsed }];
     const { newHp, newInv, newEff, newEnemies } = applyParsed(parsed, currentHp, currentInv, currentEff, currentEnemies);
     setMessages(newMsgs);
+
+    if (parsed.artifactBonus !== null && parsed.artifactBonus !== undefined) {
+      setArtifactBonus(parsed.artifactBonus);
+    }
+    if (parsed.enemyAttacks && parsed.enemyAttacks.length > 0) {
+      const ch = stateRef.current.character;
+      if (ch) {
+        const attackLog = await executeEnemyAttacks(
+          parsed.enemyAttacks,
+          newEnemies.length > 0 ? newEnemies : currentEnemies,
+          ch.ac,
+        );
+        if (attackLog) {
+          setMessages(prev => [...prev, {
+            role: "assistant" as const,
+            content: attackLog,
+            parsed: parseDMResponse(attackLog),
+          }]);
+        }
+      }
+    }
 
     // ── Arc progression ────────────────────────────────────────
     // Detect bosses that died THIS scene by diffing live-before vs. after.
@@ -613,6 +710,7 @@ export default function SoloDnD() {
     // Single atomic init — sets character, hp, inventory, spellSlots, arc
     // and resets effects/enemies/allies/inCombat/berserk/dodge/defensive/messages.
     dispatch({ type: "START_GAME", character: char, startInventory: startInv, arc });
+    dispatch({ type: "RESET_BOSS_FLAGS" });
     setPendingRoll(null);
     setPendingInitiative(false);
     setShowSpellMini(false);
@@ -1499,6 +1597,27 @@ export default function SoloDnD() {
                     className="w-full text-center px-3 py-1.5 text-xs text-stone-500 hover:text-stone-300 transition-colors">
                     {t("common.cancel")}
                   </button>
+                </div>
+              )}
+              {character && !heroicSurgeUsed && enemies.some(e => e.isBoss) && (
+                <button
+                  onClick={async () => {
+                    useHeroicSurge();
+                    await handleChoice(i18n.t("combat_log.heroicSurge"));
+                  }}
+                  className="w-full py-3 rounded-xl font-bold active:scale-95 transition-transform"
+                  style={{
+                    background: "linear-gradient(135deg,#7c3aed,#4c1d95)",
+                    fontFamily: "serif",
+                    color: "#faf5ff",
+                  }}
+                >
+                  ⚡ {t("combat_log.heroicSurge")}
+                </button>
+              )}
+              {character && heroicSurgeUsed && enemies.some(e => e.isBoss) && (
+                <div className="text-center text-xs text-stone-600 py-1">
+                  ⚡ {t("combat_log.heroicSurgeUsed")}
                 </div>
               )}
             </>
