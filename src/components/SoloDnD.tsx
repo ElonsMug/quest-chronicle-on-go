@@ -133,6 +133,7 @@ export default function SoloDnD() {
     messages,
     arc,
     surpriseAdvantage,
+    gold,
   } = game;
 
   // ── Setter shims ────────────────────────────────────────────────
