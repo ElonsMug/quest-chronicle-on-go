@@ -36,6 +36,7 @@ export type GameState = {
   // action does NOT trigger an enemy retaliation turn (no combatTurnReminder).
   // Cleared automatically after that one action is sent.
   surpriseAdvantage: "player" | null;
+  gold: number;
 };
 
 export const initialGameState: GameState = {
