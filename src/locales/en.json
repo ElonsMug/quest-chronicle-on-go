@@ -32,6 +32,35 @@
     "startAs": "Begin as {{name}}",
     "selectCharacter": "Select a character"
   },
+  "nav": {
+    "story": "Story",
+    "character": "Character",
+    "inventory": "Inventory",
+    "journal": "Journal"
+  },
+  "journal": {
+    "title": "Journal",
+    "currentArc": "Current arc",
+    "arcProgress": "Arc progress",
+    "heroPath": "Hero's path",
+    "villain": "Main villain",
+    "noArc": "Adventure not started yet",
+    "phase1": "Hook",
+    "phase2": "Investigation",
+    "phase3": "Mid-boss",
+    "phase4": "Preparation",
+    "phase5": "Final",
+    "phaseDone": "Done",
+    "phaseNow": "Now"
+  },
+  "character": {
+    "title": "Character",
+    "stats": "Stats",
+    "ability": "Class ability",
+    "weapon": "Weapon",
+    "effects": "Active effects",
+    "noEffects": "No active effects"
+  },
   "stats": {
     "str": "STR",
     "dex": "DEX",
