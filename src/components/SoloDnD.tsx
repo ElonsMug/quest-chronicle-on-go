@@ -1249,34 +1249,21 @@ export default function SoloDnD() {
 
           <div className="text-center cursor-pointer select-none" onClick={handleDevTap}>
             <div className="text-amber-200 text-sm font-bold">{character?.emoji} {character?.name}</div>
-            <button
-              onClick={e => { e.stopPropagation(); setActiveTab("inventory"); }}
-              className="text-stone-500 text-xs hover:text-amber-400 transition-colors"
-            >
-              🎒 {t("header.items", { count: inventory.length })}
-            </button>
           </div>
 
           <div className="flex items-center gap-2 min-w-[60px] justify-end">
-            {character?.id === "mage" && spellSlots && (
-              <button
-                onClick={() => setShowSpells(true)}
-                className="text-sm tracking-widest hover:opacity-80 transition-opacity"
-                style={{ color: "#60a5fa", fontFamily: "serif" }}
-                title={t("header.spellSlotsTitle", { current: spellSlots.current, max: spellSlots.max })}
-              >
-                {Array.from({ length: spellSlots.max }, (_, i) => i < spellSlots.current ? "✦" : "◇").join("")}
-              </button>
-            )}
             <div className="flex items-center gap-1.5">
               <div className="text-xs text-stone-500">{t("stats.hp")}</div>
-              <div className="font-bold text-sm" style={{ color: character && hp / character.maxHp > 0.5 ? "#f87171" : character && hp / character.maxHp > 0.25 ? "#fbbf24" : "#ef4444" }}>{hp}</div>
+              <div className="font-bold text-sm" style={{ color: character && hp / character.maxHp > 0.5 ? "#4ade80" : character && hp / character.maxHp > 0.25 ? "#fbbf24" : "#ef4444" }}>{hp}</div>
               <div className="text-stone-600 text-xs">/{character?.maxHp}</div>
+            </div>
+            <div className="flex items-center gap-1 text-amber-400 text-sm font-bold" title={t("inventory.wallet")}>
+              🪙<span>{gold}</span>
             </div>
           </div>
         </div>
 
-        {inCombat && enemies.filter(e => e.hp > 0).length > 0 && (
+        {activeTab === "story" && inCombat && enemies.filter(e => e.hp > 0).length > 0 && (
           <div className="px-4 pb-2 space-y-1 border-t border-stone-800/40 pt-2">
             {surpriseAdvantage === "player" && (
               <div className="text-amber-400 text-[10px] uppercase tracking-widest font-bold mb-1">
@@ -1294,7 +1281,7 @@ export default function SoloDnD() {
             ))}
           </div>
         )}
-        {inCombat && allies.filter(a => a.hp > 0).length > 0 && (
+        {activeTab === "story" && inCombat && allies.filter(a => a.hp > 0).length > 0 && (
           <div className="px-4 pb-2 space-y-1">
             {allies.filter(a => a.hp > 0).map((ally, i) => (
               <div key={i} className="flex items-center gap-2">
@@ -1307,8 +1294,33 @@ export default function SoloDnD() {
             ))}
           </div>
         )}
-        {arc && !arc.completed && <ArcProgressBar arc={arc} />}
       </div>
+
+      {activeTab === "character" && character && (
+        <CharacterTab
+          character={character}
+          hp={hp}
+          spellSlots={spellSlots}
+          effects={effects}
+        />
+      )}
+      {activeTab === "inventory" && (
+        <InventoryTab
+          inventory={inventory}
+          effects={effects}
+          gold={gold}
+          inCombat={inCombat}
+          canUsePotion={showCombatButtons && !pendingPotionInfoRef.current}
+          filter={invFilter}
+          onFilterChange={setInvFilter}
+          onUseItem={handleUseItem}
+          onShortRest={handleShortRest}
+          onLongRest={handleLongRest}
+        />
+      )}
+      {activeTab === "journal" && <JournalTab arc={arc} />}
+
+      {activeTab === "story" && (<>
 
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3" style={{ paddingBottom: "280px" }}>
         {messages.map((msg, i) => {
