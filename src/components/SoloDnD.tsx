@@ -327,7 +327,7 @@ useEffect(() => {
     setLoading(true);
     try {
       const reply = await callAPI(c, h, inv, eff, [], prompt);
-      await processAndSetMessages(c, h, inv, eff, [], reply, []);
+      await narrative.processAndSetMessages(c, h, inv, eff, [], reply, []);
     } catch {
       const text = t("dm.genericError");
       setMessages([{ role: "assistant", content: text, parsed: parseDMResponse(text) }]);
