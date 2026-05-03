@@ -1,11 +1,6 @@
 // ─────────────────────────────────────────────────────────────────
 // CHARACTER FACTORY
 // ─────────────────────────────────────────────────────────────────
-// Stable IDs are decoupled from display names. All player-visible strings
-// (name/subtitle/ability/weapon/items/spells) are pulled from i18n at the
-// moment a character is built, so language switches before "Begin as ..."
-// pick the right localized labels.
-// ─────────────────────────────────────────────────────────────────
 
 import type { Character } from "./types";
 
@@ -18,7 +13,7 @@ export function buildCharacters(t: (k: string) => string): Character[] {
       subtitle: t("characters.warrior.subtitle"),
       hp: 14,
       maxHp: 14,
-      stats: { str: 3, dex: 1, int: -1 },
+      stats: { str: 3, dex: 1, con: 2, int: -1, wis: 0, cha: 0 },
       ability: t("characters.warrior.ability"),
       abilityDesc: t("characters.warrior.abilityDesc"),
       weapon: { name: t("characters.warrior.weapon"), dice: "d8", stat: "str" },
@@ -28,8 +23,11 @@ export function buildCharacters(t: (k: string) => string): Character[] {
         t("characters.warrior.items.shortSword"),
         t("characters.warrior.items.leatherArmor"),
         t("characters.warrior.items.healingPotion"),
+        t("characters.warrior.items.rope"),
       ],
       classAbility: { name: t("characters.warrior.ability"), type: "berserk" },
+      ac: 13,
+      armorName: t("characters.warrior.armor"),
       startGold: 10,
     },
     {
@@ -39,7 +37,7 @@ export function buildCharacters(t: (k: string) => string): Character[] {
       subtitle: t("characters.rogue.subtitle"),
       hp: 10,
       maxHp: 10,
-      stats: { str: 0, dex: 3, int: 1 },
+      stats: { str: 0, dex: 3, con: 1, int: 1, wis: 2, cha: 2 },
       ability: t("characters.rogue.ability"),
       abilityDesc: t("characters.rogue.abilityDesc"),
       weapon: { name: t("characters.rogue.weapon"), dice: "d6", stat: "dex" },
@@ -47,10 +45,13 @@ export function buildCharacters(t: (k: string) => string): Character[] {
       backstory: t("characters.rogue.backstory"),
       startItems: [
         t("characters.rogue.items.dagger"),
+        t("characters.rogue.items.darkCloak"),
         t("characters.rogue.items.lockpicks"),
         t("characters.rogue.items.healingPotion"),
       ],
       classAbility: { name: t("characters.rogue.ability"), type: "sneak" },
+      ac: 12,
+      armorName: t("characters.rogue.armor"),
       startGold: 15,
     },
     {
@@ -60,7 +61,7 @@ export function buildCharacters(t: (k: string) => string): Character[] {
       subtitle: t("characters.mage.subtitle"),
       hp: 8,
       maxHp: 8,
-      stats: { str: -1, dex: 0, int: 4 },
+      stats: { str: -1, dex: 0, con: 0, int: 4, wis: 1, cha: 2 },
       ability: t("characters.mage.ability"),
       abilityDesc: t("characters.mage.abilityDesc"),
       weapon: { name: t("characters.mage.weapon"), dice: "d6", stat: "int" },
@@ -68,11 +69,14 @@ export function buildCharacters(t: (k: string) => string): Character[] {
       backstory: t("characters.mage.backstory"),
       startItems: [
         t("characters.mage.items.staff"),
+        t("characters.mage.items.robes"),
         t("characters.mage.items.healingPotion"),
         t("characters.mage.items.fireBoltScroll"),
       ],
       spellSlots: { current: 3, max: 3 },
       spellSaveDC: 14,
+      ac: 11,
+      armorName: t("characters.mage.armor"),
       startGold: 8,
       spells: [
         {
