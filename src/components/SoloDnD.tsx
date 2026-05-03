@@ -508,7 +508,71 @@ export default function SoloDnD() {
     await handleChoice(msg);
   }
 
-  async function processAndSetMessages(char: Character, currentHp: number, currentInv: string[], currentEff: string[], currentEnemies: Enemy[], reply: string, prevMessages: ChatMessage[]) {
+  // Resolve enemy attacks on the client. Each [ENEMY_ATTACK: Name] from the
+  // DM rolls d20 + ATK vs player AC and applies damage directly. Returns a
+  // human-readable log to be appended as an assistant system message.
+  async function executeEnemyAttacks(
+    attackerNames: string[],
+    currentEnemies: Enemy[],
+    playerAc: number,
+  ): Promise<string> {
+    const results: string[] = [];
+    for (const name of attackerNames) {
+      const enemy = currentEnemies.find(
+        e => e.hp > 0 && e.name.toLowerCase() === name.toLowerCase()
+      );
+      if (!enemy) continue;
+      const roll = rollDice(20);
+      const total = roll + enemy.attackBonus;
+      const crit = roll === 20;
+      const autoMiss = roll === 1;
+      const hit = !autoMiss && (crit || total >= playerAc);
+      let dmgDealt = 0;
+      if (hit) {
+        const dmgDice = parseDiceSides(enemy.damage);
+        const dmgMod = parseInt(enemy.damage.split("+")[1] || "0");
+        dmgDealt = crit
+          ? rollDice(dmgDice) + rollDice(dmgDice) + dmgMod
+          : rollDice(dmgDice) + dmgMod;
+        if (dmgDealt < 1) dmgDealt = 1;
+        const ch = stateRef.current.character;
+        const livingEnemies = currentEnemies.filter(e => e.hp > 0);
+        const bossPresent = livingEnemies.some(e => e.isBoss);
+        if (ch && !bossPresent) {
+          const cap = Math.max(1, Math.floor(ch.maxHp * 0.6));
+          if (dmgDealt > cap && stateRef.current.hp > ch.maxHp * 0.5) {
+            dmgDealt = cap;
+          }
+        }
+        const newHp = Math.max(0, stateRef.current.hp - dmgDealt);
+        setHp(newHp);
+        if (newHp <= 0) {
+          setDefeatPending(true);
+          setDefeatDismissed(false);
+        }
+      }
+      if (crit) {
+        results.push(i18n.t("combat_log.enemyAttackCrit", { name: enemy.name, dmg: dmgDealt }));
+      } else if (autoMiss) {
+        results.push(i18n.t("combat_log.enemyAttackMiss", {
+          name: enemy.name, roll: 1, atk: enemy.attackBonus,
+          total: 1 + enemy.attackBonus, ac: playerAc,
+        }));
+      } else if (hit) {
+        results.push(i18n.t("combat_log.enemyAttackHit", {
+          name: enemy.name, roll, atk: enemy.attackBonus,
+          total, ac: playerAc, dmg: dmgDealt,
+        }));
+      } else {
+        results.push(i18n.t("combat_log.enemyAttackMiss", {
+          name: enemy.name, roll, atk: enemy.attackBonus,
+          total, ac: playerAc,
+        }));
+      }
+    }
+    return results.join("\n");
+  }
+
     const parsed = parseDMResponse(reply);
     // Dev-only: warn in console if the DM leaked Latin words into a Russian
     // narrative. Helps catch prompt regressions before they ship.
