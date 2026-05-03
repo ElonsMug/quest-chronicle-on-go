@@ -135,7 +135,11 @@ export default function SoloDnD() {
     arc,
     surpriseAdvantage,
     gold,
+    heroicSurgeUsed,
+    artifactBonus,
   } = game;
+  const useHeroicSurge = () => dispatch({ type: "USE_HEROIC_SURGE" });
+  const setArtifactBonus = (bonus: number) => dispatch({ type: "SET_ARTIFACT_BONUS", bonus });
 
   // ── Setter shims ────────────────────────────────────────────────
   // Thin wrappers so existing call-sites keep their familiar
