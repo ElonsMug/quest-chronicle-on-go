@@ -106,8 +106,10 @@
       "items": {
         "dagger": "Dagger",
         "lockpicks": "Lockpicks",
-        "healingPotion": "Healing Potion (d6+2 HP)"
-      }
+        "healingPotion": "Healing Potion (d6+2 HP)",
+        "darkCloak": "Dark Cloak (AC 12)"
+      },
+      "armor": "Dark Cloak"
     },
     "mage": {
       "name": "Mage",
@@ -119,8 +121,10 @@
       "items": {
         "staff": "Staff",
         "healingPotion": "Healing Potion (d6+2 HP)",
-        "fireBoltScroll": "Scroll of Fire Bolt"
+        "fireBoltScroll": "Scroll of Fire Bolt",
+        "robes": "Mage Robes (AC 11)"
       },
+      "armor": "Mage Robes",
       "spells": {
         "fireBolt": {
           "name": "Fire Bolt",
