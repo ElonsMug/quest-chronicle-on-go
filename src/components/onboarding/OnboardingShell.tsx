@@ -147,8 +147,10 @@ export function OnboardingShell() {
     );
   }
 
-  // Watcher lecture before the class select. Skip when continuing a save.
-  if (!continued && !(save && returningChoice === "continue")) {
+  // Watcher lecture: only for users who just finished onboarding in this
+  // session. Returning users (profile already in DB on load) skip straight
+  // to class select / saved game.
+  if (justCreatedProfile && !continued && !(save && returningChoice === "continue")) {
     return <Screen4Watcher t={t} onContinue={() => setContinued(true)} />;
   }
 
