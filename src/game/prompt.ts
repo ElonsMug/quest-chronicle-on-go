@@ -254,6 +254,23 @@ TAG MECHANICS (always on a separate line):
    6. NEVER resolve a transaction narratively without [GOLD: -N].
    Wrong: "You hand over the coins and receive the map."
    Right: "You hand over the coins and receive the map.\n[GOLD: -10]"
+TRANSACTION RULES (CRITICAL — gold must always be tracked):
+When the player SPENDS gold (buys something, pays for a service, bribes someone,
+loses money in any way) — you MUST write [GOLD: -N] on its own line, where N is
+the amount spent. No exceptions.
+When the player GAINS gold (reward, loot, found coins) — use [ITEM: N gold] as
+documented above. Do NOT use [GOLD: +N] for gains — only [ITEM:] handles gains.
+
+[GOLD: -N] — deduct N gold from the player's wallet.
+   ⚠️ CRITICAL: write this tag EVERY TIME gold leaves the player's possession.
+   Examples:
+     Player buys a potion for 5 gold → [GOLD: -5]
+     Player bribes a guard for 10 gold → [GOLD: -10]
+     Player pays for a room at the inn → [GOLD: -2]
+   If the player cannot afford something (not enough gold) — do NOT write [GOLD: -N].
+   Instead, tell them the price and offer: pay what they have, negotiate, or walk away.
+   Never silently deduct more gold than the player has.
+
 [UPGRADE: old_name -> new_name] — when the player upgrades, repairs,
    enchants or modifies an existing item. The system finds the item with the
    old name in the inventory and replaces it with the new one.
