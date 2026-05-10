@@ -25,6 +25,9 @@ export function OnboardingShell() {
   const [continued, setContinued] = useState(false);
   const [returningChoice, setReturningChoice] = useState<"continue" | "new" | null>(null);
   const [screen1Continued, setScreen1Continued] = useState(false);
+  // True only when the profile was just created in this session.
+  // Returning users (profile already in DB on load) skip the watcher lecture.
+  const [justCreatedProfile, setJustCreatedProfile] = useState(false);
   const [spiritDraft, setSpiritDraft] = useState(
     () => SPIRIT_NAMES[Math.floor(Math.random() * SPIRIT_NAMES.length)],
   );
@@ -122,7 +125,10 @@ export function OnboardingShell() {
           const { error } = await supabase
             .from("profiles")
             .insert({ id: user.id, spirit_name: spiritDraft.trim() });
-          if (!error) await refreshProfile();
+          if (!error) {
+            setJustCreatedProfile(true);
+            await refreshProfile();
+          }
           setCreatingProfile(false);
         }}
       />
@@ -141,8 +147,10 @@ export function OnboardingShell() {
     );
   }
 
-  // Watcher lecture before the class select. Skip when continuing a save.
-  if (!continued && !(save && returningChoice === "continue")) {
+  // Watcher lecture: only for users who just finished onboarding in this
+  // session. Returning users (profile already in DB on load) skip straight
+  // to class select / saved game.
+  if (justCreatedProfile && !continued && !(save && returningChoice === "continue")) {
     return <Screen4Watcher t={t} onContinue={() => setContinued(true)} />;
   }
 
