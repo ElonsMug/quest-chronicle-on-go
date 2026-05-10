@@ -125,7 +125,10 @@ export function OnboardingShell() {
           const { error } = await supabase
             .from("profiles")
             .insert({ id: user.id, spirit_name: spiritDraft.trim() });
-          if (!error) await refreshProfile();
+          if (!error) {
+            setJustCreatedProfile(true);
+            await refreshProfile();
+          }
           setCreatingProfile(false);
         }}
       />
