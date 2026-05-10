@@ -2,23 +2,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   checkTotalSize,
   corsHeaders,
+  dmRequestSchema,
   jsonResponse,
   verifyRequestOrigin,
 } from "@/server/security";
-import { z } from "zod";
-
-const dmRequestSchema = z.object({
-  system: z.string().max(80_000).default(""),
-  messages: z
-    .array(
-      z.object({
-        role: z.enum(["user", "assistant"]),
-        content: z.string().min(1).max(30_000),
-      }),
-    )
-    .min(1)
-    .max(80),
-});
 
 // Proxy to the Anthropic Messages API.
 // Validates input, enforces an Origin allowlist, returns sanitized errors.
