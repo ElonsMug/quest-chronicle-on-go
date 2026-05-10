@@ -105,9 +105,6 @@ export function parseDMResponse(text: string) {
       isMidBoss,
     });
   }
-  // Heuristic boss promotion: if exactly one enemy was declared in this
-  // response and its HP exceeds the leader cap (20), mark it as a boss so the
-  // anti-oneshot guard correctly steps aside.
 
   const allyRe = /\[ALLY:\s*([^,\]]+),\s*HP:(\d+)\]/gi;
   let am: RegExpExecArray | null;
