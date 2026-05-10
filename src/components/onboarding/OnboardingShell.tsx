@@ -145,7 +145,7 @@ export function OnboardingShell() {
     return <Screen4Watcher t={t} onContinue={() => setContinued(true)} />;
   }
 
-  return <SoloDnD />;
+  return <SoloDnD restoreSave={returningChoice === "continue" ? save : null} />;
 }
 
 // ─── Screen components ──────────────────────────────────────────

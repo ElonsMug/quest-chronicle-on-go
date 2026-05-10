@@ -575,7 +575,7 @@ useEffect(() => {
           onClose={() => setShowSpells(false)}
         />
       )}
-      {showDev && <DevPanel scenes={devScenes} onJump={jumpToScene} onClose={() => setShowDev(false)} />}
+      {showDev && <DevPanel scenes={devScenes} onJump={jumpToScene} onClose={() => setShowDev(false)} onResetOnboarding={user ? () => void resetOnboarding() : undefined} />}
       {showDefeated && (
         <DefeatedScreen
           hasPotion={inventory.some(isPotion)}
