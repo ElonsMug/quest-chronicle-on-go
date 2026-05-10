@@ -9,6 +9,7 @@ import {
 
 // Proxy to the Anthropic Messages API.
 // Validates input, enforces an Origin allowlist, returns sanitized errors.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const Route = createFileRoute("/api/dm")({
   server: {
     handlers: {
