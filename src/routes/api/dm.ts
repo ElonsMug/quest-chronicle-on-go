@@ -5,7 +5,7 @@ import {
   dmRequestSchema,
   jsonResponse,
   verifyRequestOrigin,
-} from "@/server/security";
+} from "@/server/security.server";
 
 // Proxy to the Anthropic Messages API.
 // Validates input, enforces an Origin allowlist, returns sanitized errors.
