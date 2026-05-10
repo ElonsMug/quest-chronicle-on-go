@@ -95,22 +95,12 @@ YOU MUST:
     ? (() => {
         const phaseLabel = PHASE_LABELS[arc.phase];
         const phaseDirective = (() => {
-          if (language === "ru") {
-            switch (arc.phase) {
-              case 1: return `ФАЗА 1 — Завязка. Введи героя в арку: намекни на главную цель и злодея, но без боя. Закончи 3 вариантами действий.`;
-              case 2: return `ФАЗА 2 — Расследование. Игрок собирает зацепки и встречает второстепенных NPC, ведущих к мини-боссу «${arc.midBossName}». Бой возможен, но не обязателен.`;
-              case 3: return `ФАЗА 3 — Мини-босс. ⚠️ В ЭТОЙ ИЛИ СЛЕДУЮЩЕЙ СЦЕНЕ организуй встречу с «${arc.midBossName}» и начни бой через [ENEMY:] + [INITIATIVE]. Это ключевой бой арки. Не используй флаг BOSS — это ещё не финал.`;
-              case 4: return `ФАЗА 4 — Подготовка к финалу. Мини-босс мёртв. Игрок собирается с силами, ищет последние зацепки о «${arc.antagonist}». Бой не обязателен.`;
-              case 5: return `ФАЗА 5 — ФИНАЛ. ⚠️ В ЭТОЙ СЦЕНЕ организуй финальный бой с «${arc.antagonist}». Объяви его через [ENEMY: <Имя>, HP:28, AC:15, DMG:d8+2, MOTIVE:boss, BOSS] (флаг BOSS обязателен), затем [INITIATIVE]. Это кульминация арки.`;
-            }
-          } else {
-            switch (arc.phase) {
-              case 1: return `PHASE 1 — Hook. Introduce the hero to the arc: hint at the main goal and villain, no combat. End with 3 choices.`;
-              case 2: return `PHASE 2 — Investigation. Player gathers leads and meets supporting NPCs that point toward the mid-boss "${arc.midBossName}". Combat possible but not required.`;
-              case 3: return `PHASE 3 — Mid-boss. ⚠️ IN THIS OR THE NEXT SCENE stage the encounter with "${arc.midBossName}" and start combat with [ENEMY:] + [INITIATIVE]. This is the arc's key fight. Do NOT use the BOSS flag — this is not the finale.`;
-              case 4: return `PHASE 4 — Preparation. The mid-boss is dead. The player gathers strength and final clues about "${arc.antagonist}". Combat optional.`;
-              case 5: return `PHASE 5 — FINAL. ⚠️ IN THIS SCENE stage the final fight with "${arc.antagonist}". Declare them via [ENEMY: <Name>, HP:28, AC:15, DMG:d8+2, MOTIVE:boss, BOSS] (BOSS flag REQUIRED), then [INITIATIVE]. This is the climax.`;
-            }
+          switch (arc.phase) {
+            case 1: return `PHASE 1 — Hook. Introduce the hero to the arc: hint at the main goal and villain, no combat. End with 3 choices.`;
+            case 2: return `PHASE 2 — Investigation. Player gathers leads and meets supporting NPCs that point toward the mid-boss "${arc.midBossName}". Combat possible but not required.`;
+            case 3: return `PHASE 3 — Mid-boss. ⚠️ IN THIS OR THE NEXT SCENE stage the encounter with "${arc.midBossName}" and start combat with [ENEMY:] + [INITIATIVE]. This is the arc's key fight. Do NOT use the BOSS flag — this is not the finale.`;
+            case 4: return `PHASE 4 — Preparation. The mid-boss is dead. The player gathers strength and final clues about "${arc.antagonist}". Combat optional.`;
+            case 5: return `PHASE 5 — FINAL. ⚠️ IN THIS SCENE stage the final fight with "${arc.antagonist}". Declare them via [ENEMY: <Name>, HP:28, AC:15, DMG:d8+2, MOTIVE:boss, BOSS] (BOSS flag REQUIRED), then [INITIATIVE]. This is the climax.`;
           }
         })();
         return language === "ru"
