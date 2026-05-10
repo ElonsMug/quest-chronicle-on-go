@@ -9,6 +9,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "@/auth/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import SoloDnD from "@/components/SoloDnD";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 const SPIRIT_NAMES = [
   "Kaelar","Thorn","Elidis","Varen","Sable","Mira",
