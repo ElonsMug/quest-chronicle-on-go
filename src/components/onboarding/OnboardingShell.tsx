@@ -22,9 +22,7 @@ export function OnboardingShell() {
   const { t } = useTranslation();
   const { loading, user, profile, save, isPreview, signInGoogle, refreshProfile } = useAuth();
   const [previewStage, setPreviewStage] = useState<Stage>("screen1");
-  // If the user already has a profile when the app loads, they've finished
-  // onboarding before — skip the watcher lecture entirely.
-  const [continued, setContinued] = useState(() => !!profile);
+  const [continued, setContinued] = useState(false);
   const [returningChoice, setReturningChoice] = useState<"continue" | "new" | null>(null);
   const [screen1Continued, setScreen1Continued] = useState(false);
   const [spiritDraft, setSpiritDraft] = useState(
