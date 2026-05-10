@@ -164,8 +164,9 @@ function Screen1({ lines, onContinue, continueLabel }: {
   lines: string[]; onContinue: () => void; continueLabel: string;
 }) {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-8 py-12"
+    <div className="min-h-screen flex flex-col items-center justify-center px-8 py-12 relative"
       style={{ background: "linear-gradient(180deg,#0c0a09 0%,#1c1917 100%)", fontFamily: "serif" }}>
+      <LanguageSwitcher className="absolute top-4 right-4" />
       <div className="max-w-md w-full space-y-5 text-amber-100/90 text-center text-lg leading-relaxed">
         {lines.map((line, i) => (
           <p
