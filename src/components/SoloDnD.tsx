@@ -423,6 +423,16 @@ useEffect(() => {
           <h1 className="text-4xl font-bold text-amber-100 leading-tight mb-2 whitespace-pre-line">{t("menu.title")}</h1>
           <p className="text-stone-500 text-sm">{t("menu.subtitle")}</p>
           <div className="mt-4 w-16 h-px bg-amber-700/50 mx-auto" />
+          {profile && (
+            <>
+              <div className="text-amber-600 text-[10px] tracking-[0.4em] uppercase mt-5 mb-1">
+                {t("onboarding.select_subheading")}
+              </div>
+              <div className="text-2xl text-amber-100" style={{ fontFamily: "serif" }}>
+                {profile.spirit_name}
+              </div>
+            </>
+          )}
         </div>
         <div className="px-4 pb-8 flex flex-col gap-3 max-w-md mx-auto w-full">
           <p className="text-stone-500 text-xs text-center mb-1 tracking-wide uppercase">{t("menu.chooseHero")}</p>
@@ -430,7 +440,7 @@ useEffect(() => {
             <CharacterCard key={char.id} char={char} selected={selectedChar?.id === char.id} onSelect={setSelectedChar} />
           ))}
           <button
-            onClick={() => selectedChar && startGame(selectedChar)}
+            onClick={() => selectedChar && (user ? setPendingGenderChar(selectedChar) : startGame(selectedChar))}
             disabled={!selectedChar}
             className="mt-2 w-full py-4 rounded-2xl font-bold text-lg transition-all duration-300 active:scale-95"
             style={{
@@ -442,6 +452,39 @@ useEffect(() => {
             {selectedChar ? t("menu.startAs", { name: selectedChar.name }) : t("menu.selectCharacter")}
           </button>
         </div>
+        {pendingGenderChar && (
+          <div className="fixed inset-0 z-[80] flex items-center justify-center px-4" style={{ background: "rgba(0,0,0,0.85)" }}>
+            <div className="max-w-sm w-full bg-stone-900 border border-amber-900/50 rounded-2xl p-6 space-y-3" style={{ fontFamily: "serif" }}>
+              <p className="text-amber-100/90 text-base leading-relaxed">{t("onboarding.gender_prompt")}</p>
+              {([
+                ["male", t("onboarding.gender_male")],
+                ["female", t("onboarding.gender_female")],
+                ["other", t("onboarding.gender_other")],
+              ] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setChosenGender(key)}
+                  className={`w-full py-3 rounded-xl border text-amber-100 font-bold transition-colors ${
+                    chosenGender === key ? "border-amber-500 bg-stone-800" : "border-stone-700 bg-stone-950 hover:border-amber-700"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+              <button
+                disabled={!chosenGender}
+                onClick={() => {
+                  const ch = pendingGenderChar;
+                  setPendingGenderChar(null);
+                  if (ch) void startGame(ch);
+                }}
+                className="w-full py-3 rounded-xl bg-amber-700 text-stone-950 font-bold disabled:opacity-50"
+              >
+                {t("onboarding.gender_confirm")}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
