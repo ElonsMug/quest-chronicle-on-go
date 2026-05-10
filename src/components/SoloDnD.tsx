@@ -201,6 +201,57 @@ export default function SoloDnD({ restoreSave }: { restoreSave?: GameSave | null
 
   useEffect(() => { initAnalytics(); }, []);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, loading, pendingRoll, pendingInitiative]);
+
+  // ── Restore from save ─────────────────────────────────────────
+  useEffect(() => {
+    if (!restoreSave || restoreDoneRef.current) return;
+    const gs = restoreSave.game_state as Record<string, unknown>;
+    const charSnap = gs.character as Character | null;
+    if (!charSnap) return;
+    const fresh = characters.find(c => c.id === charSnap.id);
+    const ch = fresh ?? charSnap;
+    restoreDoneRef.current = true;
+    dispatch({ type: "START_GAME", character: ch, startInventory: (gs.inventory as string[]) ?? [], arc: (gs.arc as never) ?? null as never });
+    if (typeof gs.hp === "number") dispatch({ type: "SET_HP", hp: gs.hp });
+    if (Array.isArray(gs.inventory)) dispatch({ type: "SET_INVENTORY", inventory: gs.inventory as string[] });
+    if (Array.isArray(gs.effects)) dispatch({ type: "SET_EFFECTS", effects: gs.effects as string[] });
+    if (Array.isArray(gs.enemies)) dispatch({ type: "SET_ENEMIES", enemies: gs.enemies as Enemy[] });
+    if (Array.isArray(gs.allies)) dispatch({ type: "SET_ALLIES", allies: gs.allies as Ally[] });
+    if (Array.isArray(gs.messages)) dispatch({ type: "SET_MESSAGES", messages: gs.messages as ChatMessage[] });
+    if (gs.spellSlots) dispatch({ type: "SET_SPELL_SLOTS", slots: gs.spellSlots as { current: number; max: number } });
+    if (typeof gs.inCombat === "boolean") dispatch({ type: "SET_IN_COMBAT", value: gs.inCombat });
+    if (typeof gs.gold === "number") dispatch({ type: "SET_GOLD", gold: gs.gold });
+    if (gs.arc) dispatch({ type: "SET_ARC", arc: gs.arc as never });
+    setScreen("game");
+  }, [restoreSave, characters]);
+
+  // ── Auto-save (debounced) on any state change while a session is active.
+  useEffect(() => {
+    if (!user || !character || screen !== "game") return;
+    const timer = setTimeout(() => {
+      const gameState = {
+        character, hp, inventory, effects, enemies, allies, inCombat,
+        spellSlots, messages, arc, gold, surpriseAdvantage,
+        heroicSurgeUsed, artifactBonus, berserkChargesLeft,
+        berserkUsedThisCombat, didDodgeLastTurn, defensiveStance,
+      };
+      void supabase.from("game_saves").upsert(
+        {
+          user_id: user.id,
+          class_id: character.id,
+          gender: chosenGender,
+          game_state: gameState as never,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id" },
+      );
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [user, character, hp, inventory, effects, enemies, allies, inCombat,
+      spellSlots, messages, arc, gold, surpriseAdvantage, heroicSurgeUsed,
+      artifactBonus, berserkChargesLeft, berserkUsedThisCombat,
+      didDodgeLastTurn, defensiveStance, chosenGender, screen]);
+
 useEffect(() => {
       if (!actionPanelRef.current) return;
       const observer = new ResizeObserver(() => {
