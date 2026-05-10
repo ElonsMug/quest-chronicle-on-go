@@ -10,9 +10,10 @@ type Props = {
   scenes: DevScene[];
   onJump: (prompt: string) => void;
   onClose: () => void;
+  onResetOnboarding?: () => void;
 };
 
-export function DevPanel({ scenes, onJump, onClose }: Props) {
+export function DevPanel({ scenes, onJump, onClose, onResetOnboarding }: Props) {
   const { t } = useTranslation();
   return (
     <div
@@ -42,6 +43,15 @@ export function DevPanel({ scenes, onJump, onClose }: Props) {
             </button>
           ))}
         </div>
+        {onResetOnboarding && (
+          <button
+            onClick={onResetOnboarding}
+            className="mt-4 w-full py-3 rounded-xl border border-red-900/60 bg-stone-950 text-red-300 text-sm font-bold hover:border-red-700 transition-colors"
+            style={{ fontFamily: "serif" }}
+          >
+            ⟲ {t("onboarding.dev_reset")}
+          </button>
+        )}
       </div>
     </div>
   );

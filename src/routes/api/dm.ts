@@ -9,7 +9,11 @@ import {
 
 // Proxy to the Anthropic Messages API.
 // Validates input, enforces an Origin allowlist, returns sanitized errors.
-export const Route = createFileRoute("/api/dm")({
+// TanStack Start exposes server route handlers via the `server` block, but
+// the typings for createFileRoute don't surface it yet. Cast keeps the
+// route file-based, dev-tooling-aware, and the runtime ignores the cast.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const Route = (createFileRoute("/api/dm") as any)({
   server: {
     handlers: {
       OPTIONS: async ({ request }: { request: Request }) => {

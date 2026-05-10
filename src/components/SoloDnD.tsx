@@ -11,6 +11,8 @@ import { useTranslation } from "react-i18next";
 import { initAnalytics, trackEvent } from "@/lib/analytics";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import i18n from "@/i18n";
+import { useAuth, type GameSave } from "@/auth/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 // ─── Pure game logic ─────────────────────────────────────────────
 import type {
@@ -51,9 +53,13 @@ import { CombatPanel } from "@/components/game/CombatPanel";
 // ─────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────
-export default function SoloDnD() {
+export default function SoloDnD({ restoreSave }: { restoreSave?: GameSave | null } = {}) {
   const { t, i18n: i18nInstance } = useTranslation();
   const language: "en" | "ru" = i18nInstance.language === "ru" ? "ru" : "en";
+  const { user, profile, resetOnboarding } = useAuth();
+  const [pendingGenderChar, setPendingGenderChar] = useState<Character | null>(null);
+  const [chosenGender, setChosenGender] = useState<string | null>(null);
+  const restoreDoneRef = useRef(false);
 
   // CHARACTERS rebuilt whenever the active language changes so the menu
   // shows localized names/items immediately.
@@ -195,6 +201,57 @@ export default function SoloDnD() {
 
   useEffect(() => { initAnalytics(); }, []);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, loading, pendingRoll, pendingInitiative]);
+
+  // ── Restore from save ─────────────────────────────────────────
+  useEffect(() => {
+    if (!restoreSave || restoreDoneRef.current) return;
+    const gs = restoreSave.game_state as Record<string, unknown>;
+    const charSnap = gs.character as Character | null;
+    if (!charSnap) return;
+    const fresh = characters.find(c => c.id === charSnap.id);
+    const ch = fresh ?? charSnap;
+    restoreDoneRef.current = true;
+    dispatch({ type: "START_GAME", character: ch, startInventory: (gs.inventory as string[]) ?? [], arc: (gs.arc as never) ?? null as never });
+    if (typeof gs.hp === "number") dispatch({ type: "SET_HP", hp: gs.hp });
+    if (Array.isArray(gs.inventory)) dispatch({ type: "SET_INVENTORY", inventory: gs.inventory as string[] });
+    if (Array.isArray(gs.effects)) dispatch({ type: "SET_EFFECTS", effects: gs.effects as string[] });
+    if (Array.isArray(gs.enemies)) dispatch({ type: "SET_ENEMIES", enemies: gs.enemies as Enemy[] });
+    if (Array.isArray(gs.allies)) dispatch({ type: "SET_ALLIES", allies: gs.allies as Ally[] });
+    if (Array.isArray(gs.messages)) dispatch({ type: "SET_MESSAGES", messages: gs.messages as ChatMessage[] });
+    if (gs.spellSlots) dispatch({ type: "SET_SPELL_SLOTS", slots: gs.spellSlots as { current: number; max: number } });
+    if (typeof gs.inCombat === "boolean") dispatch({ type: "SET_IN_COMBAT", value: gs.inCombat });
+    if (typeof gs.gold === "number") dispatch({ type: "SET_GOLD", gold: gs.gold });
+    if (gs.arc) dispatch({ type: "SET_ARC", arc: gs.arc as never });
+    setScreen("game");
+  }, [restoreSave, characters]);
+
+  // ── Auto-save (debounced) on any state change while a session is active.
+  useEffect(() => {
+    if (!user || !character || screen !== "game") return;
+    const timer = setTimeout(() => {
+      const gameState = {
+        character, hp, inventory, effects, enemies, allies, inCombat,
+        spellSlots, messages, arc, gold, surpriseAdvantage,
+        heroicSurgeUsed, artifactBonus, berserkChargesLeft,
+        berserkUsedThisCombat, didDodgeLastTurn, defensiveStance,
+      };
+      void supabase.from("game_saves").upsert(
+        {
+          user_id: user.id,
+          class_id: character.id,
+          gender: chosenGender,
+          game_state: gameState as never,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id" },
+      );
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [user, character, hp, inventory, effects, enemies, allies, inCombat,
+      spellSlots, messages, arc, gold, surpriseAdvantage, heroicSurgeUsed,
+      artifactBonus, berserkChargesLeft, berserkUsedThisCombat,
+      didDodgeLastTurn, defensiveStance, chosenGender, screen]);
+
 useEffect(() => {
       if (!actionPanelRef.current) return;
       const observer = new ResizeObserver(() => {
@@ -366,6 +423,16 @@ useEffect(() => {
           <h1 className="text-4xl font-bold text-amber-100 leading-tight mb-2 whitespace-pre-line">{t("menu.title")}</h1>
           <p className="text-stone-500 text-sm">{t("menu.subtitle")}</p>
           <div className="mt-4 w-16 h-px bg-amber-700/50 mx-auto" />
+          {profile && (
+            <>
+              <div className="text-amber-600 text-[10px] tracking-[0.4em] uppercase mt-5 mb-1">
+                {t("onboarding.select_subheading")}
+              </div>
+              <div className="text-2xl text-amber-100" style={{ fontFamily: "serif" }}>
+                {profile.spirit_name}
+              </div>
+            </>
+          )}
         </div>
         <div className="px-4 pb-8 flex flex-col gap-3 max-w-md mx-auto w-full">
           <p className="text-stone-500 text-xs text-center mb-1 tracking-wide uppercase">{t("menu.chooseHero")}</p>
@@ -373,7 +440,7 @@ useEffect(() => {
             <CharacterCard key={char.id} char={char} selected={selectedChar?.id === char.id} onSelect={setSelectedChar} />
           ))}
           <button
-            onClick={() => selectedChar && startGame(selectedChar)}
+            onClick={() => selectedChar && (user ? setPendingGenderChar(selectedChar) : startGame(selectedChar))}
             disabled={!selectedChar}
             className="mt-2 w-full py-4 rounded-2xl font-bold text-lg transition-all duration-300 active:scale-95"
             style={{
@@ -385,6 +452,39 @@ useEffect(() => {
             {selectedChar ? t("menu.startAs", { name: selectedChar.name }) : t("menu.selectCharacter")}
           </button>
         </div>
+        {pendingGenderChar && (
+          <div className="fixed inset-0 z-[80] flex items-center justify-center px-4" style={{ background: "rgba(0,0,0,0.85)" }}>
+            <div className="max-w-sm w-full bg-stone-900 border border-amber-900/50 rounded-2xl p-6 space-y-3" style={{ fontFamily: "serif" }}>
+              <p className="text-amber-100/90 text-base leading-relaxed">{t("onboarding.gender_prompt")}</p>
+              {([
+                ["male", t("onboarding.gender_male")],
+                ["female", t("onboarding.gender_female")],
+                ["other", t("onboarding.gender_other")],
+              ] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setChosenGender(key)}
+                  className={`w-full py-3 rounded-xl border text-amber-100 font-bold transition-colors ${
+                    chosenGender === key ? "border-amber-500 bg-stone-800" : "border-stone-700 bg-stone-950 hover:border-amber-700"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+              <button
+                disabled={!chosenGender}
+                onClick={() => {
+                  const ch = pendingGenderChar;
+                  setPendingGenderChar(null);
+                  if (ch) void startGame(ch);
+                }}
+                className="w-full py-3 rounded-xl bg-amber-700 text-stone-950 font-bold disabled:opacity-50"
+              >
+                {t("onboarding.gender_confirm")}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -475,7 +575,7 @@ useEffect(() => {
           onClose={() => setShowSpells(false)}
         />
       )}
-      {showDev && <DevPanel scenes={devScenes} onJump={jumpToScene} onClose={() => setShowDev(false)} />}
+      {showDev && <DevPanel scenes={devScenes} onJump={jumpToScene} onClose={() => setShowDev(false)} onResetOnboarding={user ? () => void resetOnboarding() : undefined} />}
       {showDefeated && (
         <DefeatedScreen
           hasPotion={inventory.some(isPotion)}
