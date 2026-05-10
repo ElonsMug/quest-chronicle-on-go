@@ -11,6 +11,8 @@ import { useTranslation } from "react-i18next";
 import { initAnalytics, trackEvent } from "@/lib/analytics";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import i18n from "@/i18n";
+import { useAuth, type GameSave } from "@/auth/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 // ─── Pure game logic ─────────────────────────────────────────────
 import type {
@@ -51,9 +53,13 @@ import { CombatPanel } from "@/components/game/CombatPanel";
 // ─────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────
-export default function SoloDnD() {
+export default function SoloDnD({ restoreSave }: { restoreSave?: GameSave | null } = {}) {
   const { t, i18n: i18nInstance } = useTranslation();
   const language: "en" | "ru" = i18nInstance.language === "ru" ? "ru" : "en";
+  const { user, profile, resetOnboarding } = useAuth();
+  const [pendingGenderChar, setPendingGenderChar] = useState<Character | null>(null);
+  const [chosenGender, setChosenGender] = useState<string | null>(null);
+  const restoreDoneRef = useRef(false);
 
   // CHARACTERS rebuilt whenever the active language changes so the menu
   // shows localized names/items immediately.
