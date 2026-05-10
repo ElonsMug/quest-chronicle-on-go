@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import SoloDnD from "@/components/SoloDnD";
+import { AuthProvider } from "@/auth/AuthContext";
+import { OnboardingShell } from "@/components/onboarding/OnboardingShell";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -12,5 +13,9 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  return <SoloDnD />;
+  return (
+    <AuthProvider>
+      <OnboardingShell />
+    </AuthProvider>
+  );
 }
