@@ -25,6 +25,9 @@ export function OnboardingShell() {
   const [continued, setContinued] = useState(false);
   const [returningChoice, setReturningChoice] = useState<"continue" | "new" | null>(null);
   const [screen1Continued, setScreen1Continued] = useState(false);
+  // True only when the profile was just created in this session.
+  // Returning users (profile already in DB on load) skip the watcher lecture.
+  const [justCreatedProfile, setJustCreatedProfile] = useState(false);
   const [spiritDraft, setSpiritDraft] = useState(
     () => SPIRIT_NAMES[Math.floor(Math.random() * SPIRIT_NAMES.length)],
   );
