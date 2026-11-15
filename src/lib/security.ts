@@ -8,7 +8,7 @@
 import { z } from "zod";
 
 // ── Input limits ─────────────────────────────────────────────────
-// Conservative caps to keep Anthropic billing predictable.
+// Conservative caps to keep model billing predictable.
 export const LIMITS = {
   systemMaxChars: 40_000,
   messagesMax: 80,
@@ -18,6 +18,7 @@ export const LIMITS = {
 
 // ── Zod schema for /api/dm payload ───────────────────────────────
 export const dmRequestSchema = z.object({
+  purpose: z.enum(["turn", "arc-setup"]).default("turn"),
   system: z.string().max(LIMITS.systemMaxChars).default(""),
   messages: z
     .array(

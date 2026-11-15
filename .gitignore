@@ -16,6 +16,9 @@ dist-ssr
 .nitro
 *.local
 
+# Local D&D sources and extracted text
+/docs/dnd/library.local/
+
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars

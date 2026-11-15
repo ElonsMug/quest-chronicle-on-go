@@ -83,6 +83,7 @@ Return JSON: {"goal":"...","antagonist":"...","setting":"...","midBossName":"...
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        purpose: "arc-setup",
         system,
         messages: [{ role: "user", content: userMsg }],
       }),

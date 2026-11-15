@@ -7,13 +7,9 @@ import {
   verifyRequestOrigin,
 } from "@/lib/security";
 
-// Proxy to the Anthropic Messages API.
+// Proxy to the configured Dungeon Master model.
 // Validates input, enforces an Origin allowlist, returns sanitized errors.
-// TanStack Start exposes server route handlers via the `server` block, but
-// the typings for createFileRoute don't surface it yet. Cast keeps the
-// route file-based, dev-tooling-aware, and the runtime ignores the cast.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const Route = (createFileRoute("/api/dm") as any)({
+export const Route = createFileRoute("/api/dm")({
   server: {
     handlers: {
       OPTIONS: async ({ request }: { request: Request }) => {
@@ -30,17 +26,6 @@ export const Route = (createFileRoute("/api/dm") as any)({
         if (!ok) {
           console.warn("[dm] rejected origin:", origin);
           return jsonResponse({ error: "Forbidden" }, 403, origin);
-        }
-
-        // 2) API key configured?
-        const apiKey = process.env.ANTHROPIC_API_KEY;
-        if (!apiKey) {
-          console.error("[dm] ANTHROPIC_API_KEY missing");
-          return jsonResponse(
-            { error: "Service unavailable" },
-            503,
-            origin,
-          );
         }
 
         // 3) Parse & validate body
@@ -64,46 +49,22 @@ export const Route = (createFileRoute("/api/dm") as any)({
           return jsonResponse({ error: "Request too large" }, 413, origin);
         }
 
-        // 4) Call Anthropic
+        const { DmProviderError, generateDmReply, getDmConfig } =
+          await import("@/lib/dm-provider.server");
+        const config = getDmConfig(process.env);
+        if (!config) {
+          console.error("[dm] Missing or invalid provider configuration");
+          return jsonResponse({ error: "Service unavailable" }, 503, origin);
+        }
+
         try {
-          const res = await fetch("https://api.anthropic.com/v1/messages", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-api-key": apiKey,
-              "anthropic-version": "2023-06-01",
-            },
-            body: JSON.stringify({
-              model: "claude-haiku-4-5-20251001",
-              max_tokens: 1200,
-              system: parsed.data.system,
-              messages: parsed.data.messages,
-            }),
-          });
-
-          if (!res.ok) {
-            const errText = await res.text();
-            console.error("[dm] anthropic error:", res.status, errText);
-            return jsonResponse(
-              { error: "The Master is silent for a moment..." },
-              502,
-              origin,
-            );
-          }
-
-          const data = (await res.json()) as {
-            content?: Array<{ text?: string }>;
-          };
-          const text = data.content?.[0]?.text ?? "The Master is silent...";
-
+          const text = await generateDmReply(config, parsed.data);
           return jsonResponse({ text }, 200, origin);
         } catch (err) {
-          console.error("[dm] proxy failed:", err);
-          return jsonResponse(
-            { error: "Connection to Master failed" },
-            502,
-            origin,
-          );
+          const status = err instanceof DmProviderError ? err.status : undefined;
+          const timedOut = err instanceof Error && err.name === "TimeoutError";
+          console.error("[dm] proxy failed", { provider: config.provider, status, timedOut });
+          return jsonResponse({ error: "Connection to Master failed" }, 502, origin);
         }
       },
     },
