@@ -1,10 +1,12 @@
 // ─────────────────────────────────────────────────────────────────
 // DM API CLIENT
 // ─────────────────────────────────────────────────────────────────
-// Thin wrapper around POST /api/dm. Builds the system prompt, sends the
+// Builds the system prompt, sends the
 // chat history + user message, returns the DM's plain text reply.
 // ─────────────────────────────────────────────────────────────────
 
+import { supabase } from "@/integrations/supabase/client";
+import type { DMRequest } from "../../supabase/functions/_shared/dm-security";
 import type { Character, ChatMessage } from "./types";
 import type { Arc } from "./arcs";
 import { buildSystemPrompt } from "./prompt";
@@ -41,17 +43,32 @@ export async function callDM(args: DMRequestArgs): Promise<string> {
     ? (spellSlots ?? { current: 0, max: 0 })
     : null;
 
-  const res = await fetch("/api/dm", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      system: buildSystemPrompt(character, hp, inventory, effects, slotsForPrompt, language, arc, gold, ac, artifactBonus),
-      messages: [...history, { role: "user", content: userMessage }]
-        .map((m) => ({ role: m.role, content: m.content })),
-    }),
+  const text = await requestDm({
+    purpose: "turn",
+    system: buildSystemPrompt(character, hp, inventory, effects, slotsForPrompt, language, arc, gold, ac, artifactBonus),
+    messages: [
+      ...history.map(({ role, content }) => ({ role, content })),
+      { role: "user", content: userMessage },
+    ],
   });
+  return text || silentFallback;
+}
 
-  if (!res.ok) throw new Error(`API error ${res.status}`);
-  const data = (await res.json()) as { text?: string };
-  return data.text || silentFallback;
+export async function requestDm(request: DMRequest): Promise<string> {
+  if (import.meta.env.DEV) {
+    const response = await fetch("/api/dm", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+    });
+    if (!response.ok) throw new Error(`API error ${response.status}`);
+    const data = (await response.json()) as { text?: string };
+    return data.text ?? "";
+  }
+
+  const { data, error } = await supabase.functions.invoke<{ text?: string }>("dungeon-master", {
+    body: request,
+  });
+  if (error) throw error;
+  return data?.text ?? "";
 }

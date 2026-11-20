@@ -343,7 +343,7 @@ useEffect(() => {
     handleContinueStory, handleDefeatedRetry, handleDefeatedUsePotion,
   } = session;
 
-  // ── API: request to the /api/dm server function (used by jumpToScene) ─
+  // ── API: request to the Dungeon Master (used by jumpToScene) ─
   async function callAPI(char: Character, currentHp: number, currentInv: string[], currentEff: string[], history: ChatMessage[], userMessage: string) {
     return callDM({
       character: char,

@@ -16,7 +16,7 @@ import type { Character } from "./types";
 import type { Arc, ArcTemplate } from "./arcs";
 import { createArcFromTemplate } from "./arcs";
 
-type DMResponse = { text?: string };
+import { requestDm } from "./api";
 
 function tryParseArcJson(raw: string): Partial<{
   goal: string;
@@ -79,17 +79,11 @@ Skeleton (rewrite with new names/place, KEEP the essence):
 Return JSON: {"goal":"...","antagonist":"...","setting":"...","midBossName":"..."}`;
 
   try {
-    const res = await fetch("/api/dm", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        system,
-        messages: [{ role: "user", content: userMsg }],
-      }),
+    const raw = await requestDm({
+      purpose: "arc-setup",
+      system,
+      messages: [{ role: "user", content: userMsg }],
     });
-    if (!res.ok) return fallback;
-    const data = (await res.json()) as DMResponse;
-    const raw = data.text ?? "";
     const parsed = tryParseArcJson(raw);
     if (!parsed) return fallback;
     return {

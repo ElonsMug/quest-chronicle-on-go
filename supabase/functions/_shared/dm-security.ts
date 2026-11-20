@@ -2,13 +2,12 @@
 // SECURITY HELPERS for /api/dm and other server routes
 // ─────────────────────────────────────────────────────────────────
 // Centralized config for input limits, allowed origins and CORS.
-// Keep this file dependency-free so it loads quickly in the Worker.
 // ─────────────────────────────────────────────────────────────────
 
 import { z } from "zod";
 
 // ── Input limits ─────────────────────────────────────────────────
-// Conservative caps to keep Anthropic billing predictable.
+// Conservative caps to keep model billing predictable.
 export const LIMITS = {
   systemMaxChars: 40_000,
   messagesMax: 80,
@@ -18,6 +17,7 @@ export const LIMITS = {
 
 // ── Zod schema for /api/dm payload ───────────────────────────────
 export const dmRequestSchema = z.object({
+  purpose: z.enum(["turn", "arc-setup"]).default("turn"),
   system: z.string().max(LIMITS.systemMaxChars).default(""),
   messages: z
     .array(
@@ -52,6 +52,7 @@ const ALLOWED_HOSTS = new Set([
   // Production
   "quest-chronicle-on-go.lovable.app",
   // Preview / stable project domains for THIS project
+  "preview--quest-chronicle-on-go.lovable.app",
   "id-preview--4ffc9a2d-14fa-4181-a41a-6ff83f90fe63.lovable.app",
   "preview--4ffc9a2d-14fa-4181-a41a-6ff83f90fe63.lovable.app",
   "project--4ffc9a2d-14fa-4181-a41a-6ff83f90fe63.lovable.app",
@@ -115,7 +116,7 @@ export function corsHeaders(origin: string | null): Record<string, string> {
   return {
     "Access-Control-Allow-Origin": allowed,
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
     "Access-Control-Max-Age": "86400",
     Vary: "Origin",
   };
