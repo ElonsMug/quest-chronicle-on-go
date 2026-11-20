@@ -8,6 +8,7 @@ import type { TFunction } from "i18next";
 import type { Character } from "@/game/types";
 import type { Arc } from "@/game/arcs";
 import { isPotion } from "@/game/inventory";
+import { isScoutKit } from "@/game/vendor";
 
 export type TabKey = "story" | "character" | "inventory" | "journal";
 export type InvFilter = "all" | "weapons" | "armor" | "consumables" | "quest";
@@ -65,7 +66,7 @@ export function BottomNav({
 
 // ── Item categorization ────────────────────────────────────────────
 function categorize(item: string): InvFilter {
-  if (isPotion(item)) return "consumables";
+  if (isPotion(item) || isScoutKit(item)) return "consumables";
   if (/sword|dagger|staff|bow|axe|blade|меч|кинжал|посох|лук|топор/i.test(item)) return "weapons";
   if (/armor|shield|helm|cloak|mail|robes|кольчуга|броня|щит|шлем|плащ|мантия|доспех/i.test(item)) return "armor";
   return "quest";
@@ -315,7 +316,7 @@ export function InventoryTab({
         <div className="space-y-2">
           {items.map(({ it, idx, cat }) => {
             const cs = categoryStyle(cat, t);
-            const usable = cat === "consumables";
+            const usable = isPotion(it);
             const disabled = inCombat && !canUsePotion;
             return (
               <div
@@ -334,7 +335,7 @@ export function InventoryTab({
                     {it}
                   </div>
                   <div className="text-stone-500" style={{ fontSize: 11, fontFamily: "sans-serif" }}>
-                    {cs.label}
+                    {isScoutKit(it) ? t("vendor.kitEffect") : cs.label}
                   </div>
                 </div>
                 {usable && (

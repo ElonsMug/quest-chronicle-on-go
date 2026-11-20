@@ -9,7 +9,13 @@
 import { useState, useRef, useEffect, useMemo, useReducer } from "react";
 import { useTranslation } from "react-i18next";
 import { initAnalytics, trackEvent } from "@/lib/analytics";
+import { LighthouseAdventure } from "@/components/game/LighthouseAdventure";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { captureCombatCheckpoint, readCombatCheckpoint, type CombatCheckpoint } from "@/game/combatCheckpoint";
+import { combatReference } from "@/game/combatReferences";
+import { midBossArtifactBonus, readCombatLoot } from "@/game/combatLoot";
+import type { Arc } from "@/game/arcs";
+import { readPendingCombatTurn, stripEnemyAttackRolls, type PendingCombatTurn } from "@/game/combatTurn";
 import i18n from "@/i18n";
 import { useAuth, type GameSave } from "@/auth/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,7 +33,10 @@ import { buildCharacters } from "@/game/characters";
 import { buildDevScenes } from "@/game/devScenes";
 import { parseDMResponse } from "@/game/parser";
 import { callDM } from "@/game/api";
+import { canSettleGold, currentSceneMessageIndex, storyChoices } from "@/game/sceneMessages";
+import { isScoutKit, vendorPrice } from "@/game/vendor";
 import { isPotion } from "@/game/inventory";
+import { downloadSessionReport } from "@/game/sessionReport";
 import { gameReducer } from "@/game/reducer";
 import { initialGameState } from "@/game/state";
 import { ArcCompletedScreen } from "@/components/game/ArcCompletedScreen";
@@ -53,7 +62,10 @@ import { CombatPanel } from "@/components/game/CombatPanel";
 // ─────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────
-export default function SoloDnD({ restoreSave }: { restoreSave?: GameSave | null } = {}) {
+export default function SoloDnD({ restoreSave, lighthouseOnly = false }: {
+  restoreSave?: GameSave | null;
+  lighthouseOnly?: boolean;
+} = {}) {
   const { t, i18n: i18nInstance } = useTranslation();
   const language: "en" | "ru" = i18nInstance.language === "ru" ? "ru" : "en";
   const { user, profile, resetOnboarding } = useAuth();
@@ -73,7 +85,9 @@ export default function SoloDnD({ restoreSave }: { restoreSave?: GameSave | null
   // ── UI / transient state (independent flags, kept as useState) ──
   const [screen, setScreen] = useState<"select" | "game">("select");
   const [selectedChar, setSelectedChar] = useState<Character | null>(null);
+  const [lighthouseHero, setLighthouseHero] = useState<Character | null>(null);
   const [loading, setLoading] = useState(false);
+  const [pendingCombatTurn, setPendingCombatTurn] = useState<PendingCombatTurn | null>(null);
   const [pendingRoll, setPendingRoll] = useState<PendingRoll | null>(null);
   const [pendingInitiative, setPendingInitiative] = useState(false);
   const [freeInput, setFreeInput] = useState(false);
@@ -142,9 +156,9 @@ export default function SoloDnD({ restoreSave }: { restoreSave?: GameSave | null
     gold,
     heroicSurgeUsed,
     artifactBonus,
+    combatLoot,
   } = game;
   const useHeroicSurge = () => dispatch({ type: "USE_HEROIC_SURGE" });
-  const setArtifactBonus = (bonus: number) => dispatch({ type: "SET_ARTIFACT_BONUS", bonus });
 
   // ── Setter shims ────────────────────────────────────────────────
   // Thin wrappers so existing call-sites keep their familiar
@@ -184,14 +198,17 @@ export default function SoloDnD({ restoreSave }: { restoreSave?: GameSave | null
   const setSurpriseAdvantage = (v: "player" | null) =>
     dispatch({ type: "SET_SURPRISE", value: v });
 
-  const combatStartSnapshotRef = useRef<{ hp: number; enemies: Enemy[]; allies: Ally[] } | null>(null);
+  const combatCheckpointRef = useRef<CombatCheckpoint | null>(null);
+  const needsCombatCheckpointRef = useRef(false);
+  const turnRequestInFlight = useRef(false);
   // Bonus action "potion drunk" — accumulated here and attached to the next
   // main player action.
   const pendingPotionInfoRef = useRef<string | null>(null);
   const devTaps = useRef(0);
   const bottomRef = useRef<HTMLDivElement>(null);
-    const actionPanelRef = useRef<HTMLDivElement>(null);
-    const [actionPanelHeight, setActionPanelHeight] = useState(320);
+  const actionPanelRef = useRef<HTMLDivElement>(null);
+  const [actionPanelHeight, setActionPanelHeight] = useState(320);
+  const inlineStoryActions = !inCombat && !defeatPending;
 
   // Mirror of `game` for closures captured by async DM callbacks.
   // The reducer is the source of truth; this ref just makes the latest
@@ -200,7 +217,16 @@ export default function SoloDnD({ restoreSave }: { restoreSave?: GameSave | null
   stateRef.current = game;
 
   useEffect(() => { initAnalytics(); }, []);
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, loading, pendingRoll, pendingInitiative]);
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages, loading, pendingRoll, pendingInitiative, inlineStoryActions]);
+
+  useEffect(() => {
+    if (!needsCombatCheckpointRef.current || loading || !game.inCombat || game.hp <= 0
+      || !game.enemies.some(enemy => enemy.hp > 0)) return;
+    combatCheckpointRef.current = captureCombatCheckpoint(game, pendingInitiative, pendingRoll);
+    needsCombatCheckpointRef.current = false;
+  }, [game, loading, pendingInitiative, pendingRoll]);
 
   // ── Restore from save ─────────────────────────────────────────
   useEffect(() => {
@@ -211,17 +237,36 @@ export default function SoloDnD({ restoreSave }: { restoreSave?: GameSave | null
     const fresh = characters.find(c => c.id === charSnap.id);
     const ch = fresh ?? charSnap;
     restoreDoneRef.current = true;
-    dispatch({ type: "START_GAME", character: ch, startInventory: (gs.inventory as string[]) ?? [], arc: (gs.arc as never) ?? null as never });
-    if (typeof gs.hp === "number") dispatch({ type: "SET_HP", hp: gs.hp });
+    const savedArc = (gs.arc as Arc | undefined) ?? null;
+    const savedLoot = readCombatLoot(gs.combatLoot, savedArc);
+    dispatch({ type: "START_GAME", character: ch, startInventory: (gs.inventory as string[]) ?? [], arc: savedArc });
+    if (typeof gs.hp === "number") {
+      dispatch({ type: "SET_HP", hp: gs.hp });
+      if (gs.hp <= 0) setDefeatPending(true);
+    }
     if (Array.isArray(gs.inventory)) dispatch({ type: "SET_INVENTORY", inventory: gs.inventory as string[] });
     if (Array.isArray(gs.effects)) dispatch({ type: "SET_EFFECTS", effects: gs.effects as string[] });
     if (Array.isArray(gs.enemies)) dispatch({ type: "SET_ENEMIES", enemies: gs.enemies as Enemy[] });
     if (Array.isArray(gs.allies)) dispatch({ type: "SET_ALLIES", allies: gs.allies as Ally[] });
-    if (Array.isArray(gs.messages)) dispatch({ type: "SET_MESSAGES", messages: gs.messages as ChatMessage[] });
+    if (Array.isArray(gs.messages)) {
+      dispatch({ type: "SET_MESSAGES", messages: gs.messages as ChatMessage[] });
+      if (gs.inCombat) {
+        combatCheckpointRef.current = readCombatCheckpoint(gs.combatCheckpoint, ch.id, gs.messages.length);
+        if (Array.isArray(gs.enemies)) {
+          setPendingCombatTurn(readPendingCombatTurn(gs.pendingCombatTurn, gs.messages as ChatMessage[], gs.enemies as Enemy[]));
+        }
+        if (gs.pendingInitiative === true) setPendingInitiative(true);
+        if (gs.pendingRoll && typeof gs.pendingRoll === "object") setPendingRoll(gs.pendingRoll as PendingRoll);
+      }
+    }
     if (gs.spellSlots) dispatch({ type: "SET_SPELL_SLOTS", slots: gs.spellSlots as { current: number; max: number } });
     if (typeof gs.inCombat === "boolean") dispatch({ type: "SET_IN_COMBAT", value: gs.inCombat });
     if (typeof gs.gold === "number") dispatch({ type: "SET_GOLD", gold: gs.gold });
-    if (gs.arc) dispatch({ type: "SET_ARC", arc: gs.arc as never });
+    dispatch({
+      type: "RESTORE_COMBAT_LOOT",
+      loot: savedLoot,
+      artifactBonus: savedLoot.midBossClaimed && typeof gs.artifactBonus === "number" && gs.artifactBonus > 0 ? midBossArtifactBonus : 0,
+    });
     setScreen("game");
   }, [restoreSave, characters]);
 
@@ -232,8 +277,10 @@ export default function SoloDnD({ restoreSave }: { restoreSave?: GameSave | null
       const gameState = {
         character, hp, inventory, effects, enemies, allies, inCombat,
         spellSlots, messages, arc, gold, surpriseAdvantage,
-        heroicSurgeUsed, artifactBonus, berserkChargesLeft,
+        heroicSurgeUsed, artifactBonus, combatLoot, berserkChargesLeft,
         berserkUsedThisCombat, didDodgeLastTurn, defensiveStance,
+        combatCheckpoint: inCombat ? combatCheckpointRef.current : null,
+        pendingInitiative, pendingRoll, pendingCombatTurn,
       };
       void supabase.from("game_saves").upsert(
         {
@@ -249,17 +296,16 @@ export default function SoloDnD({ restoreSave }: { restoreSave?: GameSave | null
     return () => clearTimeout(timer);
   }, [user, character, hp, inventory, effects, enemies, allies, inCombat,
       spellSlots, messages, arc, gold, surpriseAdvantage, heroicSurgeUsed,
-      artifactBonus, berserkChargesLeft, berserkUsedThisCombat,
-      didDodgeLastTurn, defensiveStance, chosenGender, screen]);
+      artifactBonus, combatLoot, berserkChargesLeft, berserkUsedThisCombat,
+      didDodgeLastTurn, defensiveStance, chosenGender, screen, pendingInitiative, pendingRoll, pendingCombatTurn]);
 
-useEffect(() => {
-      if (!actionPanelRef.current) return;
-      const observer = new ResizeObserver(() => {
-        setActionPanelHeight(actionPanelRef.current?.offsetHeight ?? 320);
-      });
-      observer.observe(actionPanelRef.current);
-      return () => observer.disconnect();
-    }, []);
+  useEffect(() => {
+    const panel = actionPanelRef.current;
+    if (!panel || inlineStoryActions) return;
+    const observer = new ResizeObserver(() => setActionPanelHeight(panel.offsetHeight));
+    observer.observe(panel);
+    return () => observer.disconnect();
+  }, [screen, activeTab, inlineStoryActions]);
 
   // Pick a fresh free-input placeholder when the placeholder list updates
   // (i.e. on first render and on every language change).
@@ -285,7 +331,7 @@ useEffect(() => {
   // These break the circular dependencies between useNarrative,
   // useCombat and useGameSession (handleChoice ↔ processAndSetMessages
   // ↔ executeAttackRoll ↔ doSave ↔ executeEnemyAttacks).
-  const handleChoiceRef = useRef<(text: string) => Promise<void>>(async () => {});
+  const handleChoiceRef = useRef<GameDeps["handleChoiceRef"]["current"]>(async () => {});
   const processAndSetMessagesRef = useRef<GameDeps["processAndSetMessagesRef"]["current"]>(
     async () => [],
   );
@@ -293,7 +339,7 @@ useEffect(() => {
     async () => {},
   );
   const executeEnemyAttacksRef = useRef<GameDeps["executeEnemyAttacksRef"]["current"]>(
-    async () => "",
+    (_attackers, _enemies, _ac, hp) => ({ log: "", hp }),
   );
   const applyParsedRef = useRef<GameDeps["applyParsedRef"]["current"]>(
     () => ({ newHp: 0, newInv: [], newEff: [], newEnemies: [] }),
@@ -305,15 +351,15 @@ useEffect(() => {
     stateRef, dispatch,
     setHp, setInventory, setEffects, setEnemies, setAllies, setMessages,
     setSpellSlots, setInCombat, setBerserkChargesLeft, setBerserkUsedThisCombat,
-    setDidDodgeLastTurn, setDefensiveStance, setSurpriseAdvantage, setArtifactBonus,
-    setLoading, setPendingRoll, setPendingInitiative,
+    setDidDodgeLastTurn, setDefensiveStance, setSurpriseAdvantage,
+    setLoading, setPendingRoll, setPendingInitiative, setPendingCombatTurn,
     setFreeInput, setFreeText,
     setSelectingTarget, setPendingAction: setPendingAction as React.Dispatch<React.SetStateAction<PendingAction>>,
     setShowSpellMini, setShowSpells,
     setDefeatPending, setDefeatDismissed, setShowDefeated,
     setNegotiationDeclined, setScreen, setPreparingArc, setArcCompletedDismissed,
-    combatStartSnapshotRef, pendingPotionInfoRef,
-    inCombat, loading, pendingRoll, pendingInitiative,
+    combatCheckpointRef, needsCombatCheckpointRef, pendingPotionInfoRef, turnRequestInFlight,
+    inCombat, loading, pendingRoll, pendingInitiative, pendingCombatTurn,
     handleChoiceRef, processAndSetMessagesRef, executeAttackRollRef,
     executeEnemyAttacksRef, applyParsedRef, doSaveRef,
   };
@@ -331,7 +377,7 @@ useEffect(() => {
   doSaveRef.current = session.doSave;
 
   const {
-    handleChoice, handleRollResult, handleInitiativeResult,
+    handleChoice, handleRollResult, handleInitiativeResult, retryCombatTurn,
   } = narrative;
   const {
     handleAttack, handleBerserk, handleDefend, handleDodge, handleSneak,
@@ -343,7 +389,7 @@ useEffect(() => {
     handleContinueStory, handleDefeatedRetry, handleDefeatedUsePotion,
   } = session;
 
-  // ── API: request to the /api/dm server function (used by jumpToScene) ─
+  // ── API: request to the Dungeon Master (used by jumpToScene) ─
   async function callAPI(char: Character, currentHp: number, currentInv: string[], currentEff: string[], history: ChatMessage[], userMessage: string) {
     return callDM({
       character: char,
@@ -373,8 +419,12 @@ useEffect(() => {
   }
 
   async function jumpToScene(prompt: string) {
+    if (turnRequestInFlight.current) return;
     const { character: c, hp: h, inventory: inv, effects: eff } = stateRef.current;
     if (!c) return;
+    combatCheckpointRef.current = null;
+    needsCombatCheckpointRef.current = false;
+    setPendingCombatTurn(null);
     setMessages([]);
     setEnemies([]);
     setAllies([]);
@@ -409,6 +459,10 @@ useEffect(() => {
     setPendingLanguageSwitch(null);
   }
 
+  if (lighthouseHero) {
+    return <LighthouseAdventure hero={lighthouseHero} playerId={user?.id} onExit={() => setLighthouseHero(null)} />;
+  }
+
   // ─────────────────────────────────────────────────────────────
   // SELECT SCREEN
   // ─────────────────────────────────────────────────────────────
@@ -439,7 +493,7 @@ useEffect(() => {
           {characters.map(char => (
             <CharacterCard key={char.id} char={char} selected={selectedChar?.id === char.id} onSelect={setSelectedChar} />
           ))}
-          <button
+          {!lighthouseOnly && <button
             onClick={() => selectedChar && (user ? setPendingGenderChar(selectedChar) : startGame(selectedChar))}
             disabled={!selectedChar}
             className="mt-2 w-full py-4 rounded-2xl font-bold text-lg transition-all duration-300 active:scale-95"
@@ -450,6 +504,13 @@ useEffect(() => {
               letterSpacing: "0.05em",
             }}>
             {selectedChar ? t("menu.startAs", { name: selectedChar.name }) : t("menu.selectCharacter")}
+          </button>}
+          <button
+            onClick={() => selectedChar && setLighthouseHero(selectedChar)}
+            disabled={!selectedChar}
+            className="w-full rounded-2xl border border-amber-800/70 px-4 py-3 font-semibold text-amber-200 hover:bg-stone-900 disabled:opacity-50"
+          >
+            {t("lighthouse.entry")}
           </button>
         </div>
         {pendingGenderChar && (
@@ -492,29 +553,19 @@ useEffect(() => {
   // ─────────────────────────────────────────────────────────────
   // GAME SCREEN
   // ─────────────────────────────────────────────────────────────
-  const lastMsg = messages[messages.length - 1];
-  // `parsed` is what the bottom action area binds to. Out-of-combat client-only
-  // events (drank a potion, took a short rest) append a synthetic assistant
-  // message with no choices — if we used that as `parsed`, the player would
-  // be stranded without buttons (softlock). Walk back to the most recent
-  // assistant message that actually carries choices, so the previous DM
-  // choices stay live until the DM speaks again.
-  let parsed = lastMsg?.parsed;
-  if (lastMsg?.role === "assistant" && (!parsed?.choices || parsed.choices.length === 0)) {
-    for (let i = messages.length - 2; i >= 0; i--) {
-      const m = messages[i];
-      if (m.role !== "assistant") continue;
-      if (m.parsed?.choices && m.parsed.choices.length > 0) {
-        parsed = m.parsed;
-        break;
-      }
-    }
-  }
+  const choiceSourceMessageIndex = currentSceneMessageIndex(messages);
+  const parsed = messages[choiceSourceMessageIndex]?.parsed;
   // Defeat is registered (HP=0). When the defeat screen is closed, we show
   // "Retry / Menu" instead of combat buttons so the player can re-read the
   // journal or continue.
   const hasPotion = inventory.some(isPotion);
   const showDefeatActions = defeatPending && !showDefeated && !loading;
+  const canRetryCombat = inCombat && !!combatCheckpointRef.current;
+
+  function retryCombat() {
+    setActiveTab("story");
+    handleDefeatedRetry();
+  }
 
   // ── Behavior shift / negotiation moment ──────────────────────
   // Pick the leader: the enemy with the highest maxHp (matches how the prompt
@@ -543,7 +594,7 @@ useEffect(() => {
         ? false
         : leaderInShift;
   const showNegotiation =
-    !loading && !freeInput && !pendingRoll && !pendingInitiative &&
+    !loading && !pendingCombatTurn && !freeInput && !pendingRoll && !pendingInitiative &&
     !showDefeated && !defeatPending && inCombat && negotiationActive &&
     !negotiationDeclined && !!character;
 
@@ -560,9 +611,30 @@ useEffect(() => {
     }
   }
 
-  const showCombatButtons = !loading && !freeInput && !pendingRoll && !pendingInitiative && !showDefeated && !defeatPending && inCombat && !!character;
-  const showChoices = !loading && !freeInput && !pendingRoll && !pendingInitiative && !showDefeated && !defeatPending && !inCombat && (parsed?.choices?.length ?? 0) > 0;
+  const showCombatButtons = !loading && !pendingCombatTurn && !freeInput && !pendingRoll && !pendingInitiative && !showDefeated && !defeatPending && inCombat && !!character;
+  const showStoryActions = !!character && !loading && !freeInput && !pendingRoll
+    && !pendingInitiative && !showDefeated && !defeatPending && !inCombat;
+  const goldOffer = showStoryActions ? parsed?.goldOffer : null;
+  const vendor = showStoryActions ? parsed?.vendor : null;
+  const vendorTipAvailable = vendor && !messages.some(message => message.vendorTip === vendor.tip);
+  const vendorKitAvailable = vendor && !inventory.some(isScoutKit);
+  const choiceMessage = messages[choiceSourceMessageIndex];
+  const sceneChoices = parsed?.choices.some(choice => /\[(?:CHECK:|CLUE_FALLBACK:)/i.test(choice.text))
+    ? parseDMResponse(choiceMessage.content).choices : parsed?.choices ?? [];
   const showFreeArea = freeInput && !loading && !defeatPending;
+  const displayedChoices = showStoryActions
+    ? storyChoices(sceneChoices.filter(choice => !/free\s*(choice|action)|свой\s*вариант/i.test(choice.text)), choiceMessage?.socialFailure)
+    : [];
+
+  function exportSession() {
+    downloadSessionReport(game, {
+      language, activeTab, loading, pendingRoll, pendingInitiative, showCombatButtons,
+      showNegotiation, selectingTarget, freeInputOpen: freeInput, freeChoiceAvailable: showStoryActions,
+      defeatPending, choiceSourceMessageIndex: displayedChoices.length > 0 ? choiceSourceMessageIndex : null,
+      displayedChoices, pendingCombatTurn,
+    });
+  }
+
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(180deg,#0c0a09 0%,#1c1917 100%)", fontFamily: "serif" }}>
@@ -581,7 +653,7 @@ useEffect(() => {
           hasPotion={inventory.some(isPotion)}
           onContinueStory={() => void handleContinueStory()}
           onUsePotion={handleDefeatedUsePotion}
-          onRetry={handleDefeatedRetry}
+          onRetry={canRetryCombat ? retryCombat : undefined}
           onMenu={() => { setShowDefeated(false); setDefeatPending(false); setDefeatDismissed(false); exitToMenu(); }}
           onClose={() => { setShowDefeated(false); setDefeatDismissed(true); }}
         />
@@ -642,12 +714,22 @@ useEffect(() => {
       <div className="sticky top-0 z-20 border-b border-stone-800/60 backdrop-blur" style={{ background: "rgba(12,10,9,0.93)" }}>
         <div className="flex items-center justify-between px-4 py-2.5 gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            <button onClick={exitToMenu} className="text-stone-500 text-sm hover:text-stone-300 transition-colors whitespace-nowrap">← {t("common.menu")}</button>
-            <LanguageSwitcher onBeforeChange={handleLanguageBeforeChange} />
+            <button onClick={exitToMenu} disabled={loading} className="text-stone-500 text-sm hover:text-stone-300 transition-colors whitespace-nowrap disabled:opacity-50">← {t("common.menu")}</button>
+            <LanguageSwitcher disabled={loading || preparingArc} onBeforeChange={handleLanguageBeforeChange} />
           </div>
 
-          <div className="text-center cursor-pointer select-none" onClick={handleDevTap}>
-            <div className="text-amber-200 text-sm font-bold">{character?.emoji} {character?.name}</div>
+          <div className="flex flex-col items-center text-center">
+            <div className="cursor-pointer select-none text-sm font-bold text-amber-200" onClick={handleDevTap}>
+              {character?.emoji} {character?.name}
+            </div>
+            <button
+              type="button"
+              onClick={exportSession}
+              title={t("sessionReport.description")}
+              className="text-xs text-stone-400 underline decoration-stone-700 underline-offset-2 hover:text-amber-200 focus-visible:outline-amber-500"
+            >
+              {t("sessionReport.save")}
+            </button>
           </div>
 
           <div className="flex items-center gap-2 min-w-[60px] justify-end">
@@ -669,7 +751,7 @@ useEffect(() => {
                 ⚡ {t("combat.surpriseRound", { defaultValue: "Surprise round" })}
               </div>
             )}
-            {enemies.filter(e => e.hp > 0).map((en, i) => (
+            {enemies.map((en, i) => en.hp > 0 && (
               <EnemyHP
                 key={i}
                 name={en.name}
@@ -721,9 +803,25 @@ useEffect(() => {
 
       {activeTab === "story" && (<>
 
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3" style={{ paddingBottom: `${actionPanelHeight + 16}px` }}>
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3" style={inlineStoryActions ? undefined : { paddingBottom: actionPanelHeight + 72 }}>
         {messages.map((msg, i) => {
           if (msg.role === "user") {
+            if (msg.abilityRoll) {
+              const { action, skill, stat, result } = msg.abilityRoll;
+              const label = skill ? t(`checks.skills.${skill}`) : t(`stats.${stat}`);
+              return (
+                <div key={i} className="flex justify-end">
+                  <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-stone-800 px-4 py-2.5 text-sm text-stone-300">
+                    {action && <p>{action}</p>}
+                    <p className="mt-1 text-xs text-amber-200">
+                      {label} · d20 ({result.hitRoll}) {result.mod < 0 ? "−" : "+"} {Math.abs(result.mod)} = {result.total}
+                      {" · "}{t("checks.difficulty", { dc: result.dc })}
+                      {" · "}{t(result.success ? "combat.success" : "combat.fail")}
+                    </p>
+                  </div>
+                </div>
+              );
+            }
             const isSystem = msg.content.startsWith("[");
             return (
               <div key={i} className="flex justify-end">
@@ -743,7 +841,7 @@ useEffect(() => {
             <div key={i} className="space-y-2">
               <div className="bg-stone-900/60 rounded-2xl rounded-tl-sm px-4 py-4 border border-stone-800/40 max-w-full overflow-hidden">
                 <p className="text-amber-100/90 text-sm leading-relaxed whitespace-pre-line" style={{ fontFamily: "serif", overflowWrap: "break-word", wordBreak: "break-word" }}>
-                  {p.narrative}
+                  {msg.source === "client" ? p.narrative : stripEnemyAttackRolls(p.narrative)}
                 </p>
                 {p.newItem && <div className="mt-2 text-xs text-amber-500">✦ {t("dm.receivedItem", { item: p.newItem })}</div>}
               </div>
@@ -772,11 +870,17 @@ useEffect(() => {
             </div>
           </div>
         )}
-        <div ref={bottomRef} />
+        {!inlineStoryActions && <div ref={bottomRef} />}
       </div>
 
-      <div ref={actionPanelRef} className="fixed left-0 right-0 z-10" style={{ bottom: "56px", background: "linear-gradient(0deg,#0c0a09 60%,transparent 100%)" }}>
+      <div ref={actionPanelRef} className={inlineStoryActions ? "mb-14" : "fixed bottom-14 left-0 right-0 z-10 bg-stone-950"}>
         <div className="px-4 pb-4 pt-3 max-w-md mx-auto space-y-2">
+          {pendingCombatTurn && !loading && (
+            <button onClick={() => void retryCombatTurn()}
+              className="w-full rounded-xl border border-amber-800 bg-stone-900 px-4 py-3 font-bold text-amber-200">
+              {t("dm.retryCombatTurn")}
+            </button>
+          )}
           {showDefeatActions && (
             <>
               <div className="text-center text-xs text-stone-500 pb-1" style={{ fontFamily: "serif" }}>
@@ -793,11 +897,13 @@ useEffect(() => {
                   🧪 {t("defeated.drinkPotion")}
                 </button>
               )}
-              <button onClick={handleDefeatedRetry}
-                className="w-full py-3 rounded-xl border border-stone-700 bg-stone-900 text-stone-300 text-sm font-bold"
-                style={{ fontFamily: "serif" }}>
-                ⚔️ {t("defeated.retry")}
-              </button>
+              {canRetryCombat && (
+                <button onClick={retryCombat}
+                  className="w-full py-3 rounded-xl border border-stone-700 bg-stone-900 text-stone-300 text-sm font-bold"
+                  style={{ fontFamily: "serif" }}>
+                  ⚔️ {t("defeated.retry")}
+                </button>
+              )}
               <button onClick={() => { setDefeatPending(false); setDefeatDismissed(false); exitToMenu(); }}
                 className="w-full py-3 rounded-xl border border-stone-800 bg-stone-950 text-stone-500 text-sm"
                 style={{ fontFamily: "serif" }}>
@@ -874,15 +980,16 @@ useEffect(() => {
               {selectingTarget && pendingAction && (
                 <div className="space-y-1 pl-2 border-l-2 border-amber-900/60">
                   <div className="text-xs text-stone-500 px-2">{t("combat.selectTarget")}</div>
-                  {enemies.filter(e => e.hp > 0).map((en, i) => (
+                  {enemies.map((en, i) => en.hp > 0 && (
                     <button key={i}
                       onClick={() => {
                         const action = pendingAction;
                         setSelectingTarget(false);
                         setPendingAction(null);
-                        if (action.type === "attack") void handleAttack(en.name);
-                        else if (action.type === "sneak") void handleSneak(en.name);
-                        else if (action.type === "spell") void handleSpell(action.spell, en.name);
+                        const reference = combatReference("enemy", i);
+                        if (action.type === "attack") void handleAttack(reference);
+                        else if (action.type === "sneak") void handleSneak(reference);
+                        else if (action.type === "spell") void handleSpell(action.spell, reference);
                       }}
                       className="w-full text-left px-3 py-2 rounded-lg bg-stone-900 border border-stone-700 hover:border-amber-700 text-amber-100 text-sm transition-colors"
                       style={{ fontFamily: "serif" }}>
@@ -920,15 +1027,69 @@ useEffect(() => {
             </>
           )}
 
-          {showChoices && parsed && (
+          {goldOffer && (<>
+            <button
+              type="button"
+              disabled={!canSettleGold(gold, goldOffer.amount)}
+              onClick={() => void narrative.confirmGoldOffer(choiceSourceMessageIndex)}
+              className="w-full rounded-xl border border-amber-800 bg-stone-900 px-4 py-3 text-left text-amber-100 disabled:opacity-50"
+            >
+              <span className="block font-bold">
+                {t(goldOffer.amount > 0 ? "goldOffer.receive" : "goldOffer.pay", { amount: Math.abs(goldOffer.amount) })}
+              </span>
+              <span className="block text-sm text-stone-300">{goldOffer.reason}</span>
+            </button>
+            {goldOffer.amount < 0 && (
+              <button onClick={() => void narrative.declinePaidOffer(choiceSourceMessageIndex)}
+                className="w-full rounded-xl border border-stone-700 bg-stone-900 px-4 py-3 text-left text-sm text-amber-100">
+                {t("goldOffer.decline")}
+              </button>
+            )}
+          </>)}
+
+          {vendor && (vendorTipAvailable || vendorKitAvailable) && (
+            <div className="space-y-2 rounded-xl border border-amber-900/70 bg-stone-900 p-3">
+              <h3 className="text-sm font-semibold text-amber-200">{t(`vendor.roles.${vendor.role}`)}</h3>
+              {vendorTipAvailable && (
+                <button type="button" disabled={gold < vendorPrice}
+                  onClick={() => void narrative.buyFromVendor(choiceSourceMessageIndex, "tip")}
+                  className="block w-full rounded-lg border border-amber-800 px-3 py-2 text-left text-sm text-amber-100 disabled:opacity-50">
+                  {t("vendor.buyTip", { price: vendorPrice })}
+                </button>
+              )}
+              {vendorKitAvailable && (
+                <button type="button" disabled={gold < vendorPrice}
+                  onClick={() => void narrative.buyFromVendor(choiceSourceMessageIndex, "kit")}
+                  className="block w-full rounded-lg border border-amber-800 px-3 py-2 text-left text-sm text-amber-100 disabled:opacity-50">
+                  <span className="block">{t("vendor.buyKit", { price: vendorPrice })}</span>
+                  <span className="text-xs text-stone-300">{t("vendor.kitEffect")}</span>
+                </button>
+              )}
+            </div>
+          )}
+          {vendor && displayedChoices.length === 0 && (
+            <button type="button"
+              onClick={() => narrative.chooseStoryAction({ num: "", text: t("vendor.leave"), check: null })}
+              className="w-full rounded-xl border border-stone-700 bg-stone-900 px-4 py-3 text-left text-sm text-amber-100">
+              {t("vendor.leave")}
+            </button>
+          )}
+
+          {showStoryActions && (
             <>
-              {parsed.choices
-                .filter(choice => !/free\s*(choice|action)|свой\s*вариант/i.test(choice.text))
-                .map((choice, i) => (
-                <button key={i} onClick={() => handleChoice(choice.text)} disabled={loading}
+              {displayedChoices.map((choice, i) => (
+                <button key={i} onClick={() => narrative.chooseStoryAction(choice)} disabled={loading}
                   className="w-full text-left px-4 py-3 rounded-xl border border-stone-700 bg-stone-900/95 text-amber-100 text-sm leading-snug transition-all active:scale-[0.98] hover:border-amber-700/50 hover:bg-stone-800"
                   style={{ fontFamily: "serif", overflowWrap: "break-word", wordBreak: "break-word" }}>
                   <span className="text-amber-600 font-bold mr-2">{choice.num}.</span>{choice.text}
+                  {choice.check && (
+                    <span className="mt-1 block text-xs text-amber-500">
+                      {t("checks.choiceLabel", {
+                        skill: choice.check.skill ? t(`checks.skills.${choice.check.skill}`) : t(`stats.${choice.check.stat}`),
+                        dc: choice.check.dc,
+                      })}
+                    </span>
+                  )}
                 </button>
               ))}
               <button disabled={loading} onClick={() => {
@@ -970,6 +1131,7 @@ useEffect(() => {
             </>
           )}
         </div>
+        {inlineStoryActions && <div ref={bottomRef} className="scroll-mb-14" />}
       </div>
       </>)}
 

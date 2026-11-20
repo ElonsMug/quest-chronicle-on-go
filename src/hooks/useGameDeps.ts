@@ -9,6 +9,8 @@ import type { TFunction } from "i18next";
 import type {
   Character, ChatMessage, Enemy, Ally, PendingRoll, RollResult, Spell,
 } from "@/game/types";
+import type { CombatCheckpoint } from "@/game/combatCheckpoint";
+import type { PendingCombatTurn, PlayerCombatAttack } from "@/game/combatTurn";
 import type { GameState, GameAction } from "@/game/state";
 
 export type PendingAction =
@@ -40,10 +42,10 @@ export type GameDeps = {
   setDidDodgeLastTurn: (v: boolean) => void;
   setDefensiveStance: (v: boolean) => void;
   setSurpriseAdvantage: (v: "player" | null) => void;
-  setArtifactBonus: (bonus: number) => void;
 
   // UI setters
   setLoading: Dispatch<SetStateAction<boolean>>;
+  setPendingCombatTurn: Dispatch<SetStateAction<PendingCombatTurn | null>>;
   setPendingRoll: Dispatch<SetStateAction<PendingRoll | null>>;
   setPendingInitiative: Dispatch<SetStateAction<boolean>>;
   setFreeInput: Dispatch<SetStateAction<boolean>>;
@@ -61,27 +63,30 @@ export type GameDeps = {
   setArcCompletedDismissed: Dispatch<SetStateAction<boolean>>;
 
   // refs
-  combatStartSnapshotRef: MutableRefObject<{ hp: number; enemies: Enemy[]; allies: Ally[] } | null>;
+  combatCheckpointRef: MutableRefObject<CombatCheckpoint | null>;
+  needsCombatCheckpointRef: MutableRefObject<boolean>;
   pendingPotionInfoRef: MutableRefObject<string | null>;
+  turnRequestInFlight: MutableRefObject<boolean>;
 
   // live React closure values (current render)
   inCombat: boolean;
   loading: boolean;
   pendingRoll: PendingRoll | null;
   pendingInitiative: boolean;
+  pendingCombatTurn: PendingCombatTurn | null;
 
   // cross-hook function refs (wired after all hooks initialize)
-  handleChoiceRef: MutableRefObject<(text: string) => Promise<void>>;
+  handleChoiceRef: MutableRefObject<(text: string, context?: { attack?: PlayerCombatAttack; dodge?: true }) => Promise<void>>;
   processAndSetMessagesRef: MutableRefObject<(
     char: Character, hp: number, inv: string[], eff: string[],
     enemies: Enemy[], reply: string, prevMessages: ChatMessage[],
   ) => Promise<ChatMessage[]>>;
   executeAttackRollRef: MutableRefObject<(req: {
-    weapon: string; dice: string; mod: number; ac: number; targetName?: string;
+    weapon: string; dice: string; mod: number; ac: number; targetRef?: string;
   }) => Promise<void>>;
   executeEnemyAttacksRef: MutableRefObject<(
-    attackerNames: string[], currentEnemies: Enemy[], playerAc: number,
-  ) => Promise<string>>;
+    attackerNames: string[], currentEnemies: Enemy[], playerAc: number, playerHp: number, disadvantage?: boolean,
+  ) => { log: string; hp: number }>;
   applyParsedRef: MutableRefObject<(
     parsed: import("@/game/types").Parsed,
     hp: number, inv: string[], eff: string[], enemies: Enemy[],

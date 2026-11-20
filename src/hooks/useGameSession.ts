@@ -18,11 +18,12 @@ export function useGameSession(deps: GameDeps) {
     t, language, stateRef, dispatch,
     setHp, setInventory, setMessages, setEnemies, setAllies, setInCombat,
     setSelectingTarget, setPendingAction, setShowSpellMini,
-    setLoading, setPendingRoll, setPendingInitiative,
+    setLoading, setPendingRoll, setPendingInitiative, setPendingCombatTurn,
     setScreen, setPreparingArc, setArcCompletedDismissed,
-    setShowDefeated, setDefeatPending, setDefeatDismissed,
+    setShowDefeated, setDefeatPending, setDefeatDismissed, setShowSpells,
+    setFreeInput, setFreeText, setNegotiationDeclined,
     inCombat, loading, pendingRoll, pendingInitiative,
-    pendingPotionInfoRef,
+    pendingPotionInfoRef, combatCheckpointRef, needsCombatCheckpointRef,
   } = deps;
 
   function doSave(
@@ -46,6 +47,9 @@ export function useGameSession(deps: GameDeps) {
   }
 
   async function startGame(char: Character, customPrompt?: string) {
+    setPendingCombatTurn(null);
+    combatCheckpointRef.current = null;
+    needsCombatCheckpointRef.current = false;
     const startInv = [...char.startItems];
     const template = pickRandomTemplate(char.id);
     setScreen("game");
@@ -99,6 +103,10 @@ export function useGameSession(deps: GameDeps) {
   }
 
   function exitToMenu() {
+    if (deps.turnRequestInFlight.current) return;
+    setPendingCombatTurn(null);
+    combatCheckpointRef.current = null;
+    needsCombatCheckpointRef.current = false;
     const { character: c, hp: h, inventory: inv, effects: eff, messages: msgs } = stateRef.current;
     if (c) doSave(c, h, inv, eff, msgs);
     dispatch({ type: "RESET_TO_MENU" });
@@ -115,7 +123,7 @@ export function useGameSession(deps: GameDeps) {
     setHp(newHp);
     const text = t("combat.shortRestNarrative", { heal, hp: newHp, max: c.maxHp });
     setMessages(prev => [...prev, {
-      role: "assistant", content: text, parsed: parseDMResponse(text),
+      role: "assistant", source: "client", content: text, parsed: parseDMResponse(text),
     }]);
   }
 
@@ -129,7 +137,7 @@ export function useGameSession(deps: GameDeps) {
     });
     const text = t("combat.longRestNarrative");
     setMessages(prev => [...prev, {
-      role: "assistant", content: text, parsed: parseDMResponse(text),
+      role: "assistant", source: "client", content: text, parsed: parseDMResponse(text),
     }]);
   }
 
@@ -148,18 +156,20 @@ export function useGameSession(deps: GameDeps) {
       const narrativeText = t("combat.potionUsed", { heal, hp: newHp, max: c.maxHp });
       const parsedText = t("combat.potionUsedNarrative", { heal, hp: newHp, max: c.maxHp });
       setMessages(prev => [...prev, {
-        role: "assistant", content: narrativeText, parsed: parseDMResponse(parsedText),
+        role: "assistant", source: "client", content: narrativeText, parsed: parseDMResponse(parsedText),
       }]);
       return;
     }
     const narrativeText = t("combat.potionOutOfCombat", { heal, hp: newHp, max: c.maxHp });
     const parsedText = t("combat.potionOutOfCombatNarrative", { heal, hp: newHp, max: c.maxHp });
     setMessages(prev => [...prev, {
-      role: "assistant", content: narrativeText, parsed: parseDMResponse(parsedText),
+      role: "assistant", source: "client", content: narrativeText, parsed: parseDMResponse(parsedText),
     }]);
   }
 
   async function handleContinueStory() {
+    combatCheckpointRef.current = null;
+    needsCombatCheckpointRef.current = false;
     setShowDefeated(false);
     setDefeatPending(false);
     setDefeatDismissed(true);
@@ -175,28 +185,29 @@ export function useGameSession(deps: GameDeps) {
   }
 
   function handleDefeatedRetry() {
-    const snap = deps.combatStartSnapshotRef.current;
-    const { character: c } = stateRef.current;
-    if (!snap || !c) {
-      setShowDefeated(false);
-      setDefeatPending(false);
-      setDefeatDismissed(false);
-      return;
-    }
+    const checkpoint = combatCheckpointRef.current;
+    if (!checkpoint || !stateRef.current.inCombat || loading) return;
+    setPendingCombatTurn(null);
+
+    const content = t("defeated.restarted");
+    dispatch({
+      type: "RESTORE_COMBAT_CHECKPOINT",
+      checkpoint,
+      restartNote: { role: "assistant", source: "client", content, parsed: parseDMResponse(content) },
+    });
     setShowDefeated(false);
     setDefeatPending(false);
     setDefeatDismissed(false);
     setSelectingTarget(false);
+    setPendingAction(null);
     setShowSpellMini(false);
-    setPendingRoll(null);
-    setPendingInitiative(false);
-    dispatch({
-      type: "RESTORE_SNAPSHOT",
-      hp: snap.hp,
-      enemies: snap.enemies.map(e => ({ ...e, hp: e.maxHp })),
-      allies: snap.allies ? snap.allies.map(a => ({ ...a })) : [],
-    });
-    void deps.handleChoiceRef.current(i18n.t("system.retryCombat"));
+    setShowSpells(false);
+    setFreeInput(false);
+    setFreeText("");
+    setNegotiationDeclined(false);
+    pendingPotionInfoRef.current = null;
+    setPendingRoll(checkpoint.pendingRoll);
+    setPendingInitiative(checkpoint.pendingInitiative);
   }
 
   function handleDefeatedUsePotion() {
@@ -212,7 +223,7 @@ export function useGameSession(deps: GameDeps) {
     setDefeatDismissed(false);
     const text = t("combat.defeatedRescue", { heal });
     setMessages(prev => [...prev, {
-      role: "assistant", content: text, parsed: parseDMResponse(text),
+      role: "assistant", source: "client", content: text, parsed: parseDMResponse(text),
     }]);
   }
 

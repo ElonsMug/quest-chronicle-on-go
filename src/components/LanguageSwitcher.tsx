@@ -11,9 +11,11 @@ import { setLocale, type Locale, SUPPORTED_LOCALES } from "@/i18n";
  */
 export function LanguageSwitcher({
   className = "",
+  disabled = false,
   onBeforeChange,
 }: {
   className?: string;
+  disabled?: boolean;
   onBeforeChange?: (next: Locale) => boolean | Promise<boolean>;
 }) {
   const { i18n, t } = useTranslation();
@@ -47,8 +49,9 @@ export function LanguageSwitcher({
             type="button"
             onClick={() => void handle(loc)}
             aria-pressed={active}
+            disabled={disabled}
             title={loc === "en" ? t("language.english") : t("language.russian")}
-            className={`px-2.5 py-1 rounded-full font-bold transition-colors ${
+            className={`px-2.5 py-1 rounded-full font-bold transition-colors disabled:opacity-60 ${
               active
                 ? "bg-amber-700/80 text-stone-950"
                 : "text-stone-400 hover:text-amber-200"

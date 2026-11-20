@@ -11,7 +11,9 @@
 // ─────────────────────────────────────────────────────────────────
 
 import type { Character, Enemy, Ally, ChatMessage } from "./types";
+import type { CombatCheckpoint } from "./combatCheckpoint";
 import type { Arc, ArcPhase } from "./arcs";
+import { createCombatLoot, type CombatLoot, type CombatReward } from "./combatLoot.ts";
 
 export type SpellSlots = { current: number; max: number };
 
@@ -39,6 +41,7 @@ export type GameState = {
   gold: number;
   heroicSurgeUsed: boolean;
   artifactBonus: number;
+  combatLoot: CombatLoot;
 };
 
 export const initialGameState: GameState = {
@@ -60,6 +63,7 @@ export const initialGameState: GameState = {
   gold: 0,
   heroicSurgeUsed: false,
   artifactBonus: 0,
+  combatLoot: createCombatLoot(null),
 };
 
 // ─────────────────────────────────────────────────────────────────
@@ -76,7 +80,7 @@ export type GameAction =
       type: "START_GAME";
       character: Character;
       startInventory: string[];
-      arc: Arc;
+      arc: Arc | null;
     }
   | { type: "RESET_TO_MENU" }
 
@@ -106,23 +110,20 @@ export type GameAction =
 
   // Composite resets
   | { type: "RESET_COMBAT_FLAGS" } // berserk*, didDodge, defensive — used at combat end
-  | { type: "RESTORE_SNAPSHOT"; hp: number; enemies: Enemy[]; allies: Ally[] }
+  | { type: "RESTORE_COMBAT_CHECKPOINT"; checkpoint: CombatCheckpoint; restartNote: ChatMessage }
   | { type: "LONG_REST"; hp: number; spellSlots: SpellSlots | null }
 
   // ── Arc progression ───────────────────────────────────────────
   // Replaces the entire arc snapshot. The reducer is dumb on purpose:
   // the next-arc value is computed by computeNextArc() in arcs.ts and
-  // passed in. Phase-flag mutations (midBossDefeated, bossDefeated) go
-  // through MARK_MIDBOSS_DEFEATED / MARK_BOSS_DEFEATED so callers don't
-  // have to clone the arc by hand.
+  // passed in along with the victory flags.
   | { type: "SET_ARC"; arc: Arc }
-  | { type: "MARK_MIDBOSS_DEFEATED" }
-  | { type: "MARK_BOSS_DEFEATED" }
   | { type: "SET_SURPRISE"; value: "player" | null }
   | { type: "SET_GOLD"; gold: number }
   | { type: "ADD_GOLD"; amount: number }
   | { type: "USE_HEROIC_SURGE" }
-  | { type: "SET_ARTIFACT_BONUS"; bonus: number }
+  | { type: "RESTORE_COMBAT_LOOT"; loot: CombatLoot; artifactBonus: number }
+  | { type: "CLAIM_COMBAT_REWARD"; reward: CombatReward; language: "en" | "ru" }
   | { type: "RESET_BOSS_FLAGS" }
   | { type: "SET_CHARACTER_AC"; ac: number; armorName: string };
 

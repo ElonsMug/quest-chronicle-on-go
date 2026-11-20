@@ -6,7 +6,8 @@
 // ─────────────────────────────────────────────────────────────────
 
 import type { GameState, GameAction } from "./state";
-import { initialGameState } from "./state";
+import { initialGameState } from "./state.ts";
+import { claimCombatReward, combatLootItemName, createCombatLoot, midBossArtifactBonus } from "./combatLoot.ts";
 
 export function gameReducer(state: GameState, action: GameAction): GameState {
   switch (action.type) {
@@ -20,6 +21,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           ? { ...action.character.spellSlots }
           : null,
         arc: action.arc,
+        combatLoot: createCombatLoot(action.arc),
         gold: action.character.startGold,
       };
 
@@ -99,18 +101,13 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         defensiveStance: false,
       };
 
-    case "RESTORE_SNAPSHOT":
+    case "RESTORE_COMBAT_CHECKPOINT":
       return {
-        ...state,
-        hp: action.hp,
-        enemies: action.enemies,
-        allies: action.allies,
+        ...action.checkpoint.resources,
+        combatLoot: action.checkpoint.resources.combatLoot ?? state.combatLoot,
+        artifactBonus: action.checkpoint.resources.combatLoot ? action.checkpoint.resources.artifactBonus : state.artifactBonus,
         inCombat: true,
-        berserkChargesLeft: 0,
-        berserkUsedThisCombat: false,
-        didDodgeLastTurn: false,
-        defensiveStance: false,
-        heroicSurgeUsed: false,
+        messages: [...state.messages.slice(0, action.checkpoint.messageCount), action.restartNote],
       };
 
     case "LONG_REST":
@@ -126,16 +123,6 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case "SET_ARC":
       return { ...state, arc: action.arc };
 
-    case "MARK_MIDBOSS_DEFEATED":
-      return state.arc
-        ? { ...state, arc: { ...state.arc, midBossDefeated: true } }
-        : state;
-
-    case "MARK_BOSS_DEFEATED":
-      return state.arc
-        ? { ...state, arc: { ...state.arc, bossDefeated: true } }
-        : state;
-
     case "SET_SURPRISE":
       return { ...state, surpriseAdvantage: action.value };
 
@@ -148,8 +135,21 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case "USE_HEROIC_SURGE":
       return { ...state, heroicSurgeUsed: true };
 
-    case "SET_ARTIFACT_BONUS":
-      return { ...state, artifactBonus: action.bonus };
+    case "RESTORE_COMBAT_LOOT":
+      return { ...state, combatLoot: action.loot, artifactBonus: action.artifactBonus };
+
+    case "CLAIM_COMBAT_REWARD": {
+      const combatLoot = claimCombatReward(state.combatLoot, action.reward);
+      if (combatLoot === state.combatLoot) return state;
+      const { item, gold, kind } = action.reward;
+      return {
+        ...state,
+        combatLoot,
+        gold: state.gold + gold,
+        inventory: item ? [...state.inventory, combatLootItemName(item, action.language)] : state.inventory,
+        artifactBonus: kind === "midBoss" ? midBossArtifactBonus : state.artifactBonus,
+      };
+    }
 
     case "RESET_BOSS_FLAGS":
       return { ...state, heroicSurgeUsed: false };

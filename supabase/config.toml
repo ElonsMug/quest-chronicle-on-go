@@ -1,1 +1,5 @@
 project_id = "hjqekazfxfsesaasukwv"
+
+[functions.dungeon-master]
+verify_jwt = true
+import_map = "./functions/dungeon-master/deno.json"
