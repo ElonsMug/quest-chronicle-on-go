@@ -55,7 +55,7 @@ export async function callDM(args: DMRequestArgs): Promise<string> {
 }
 
 export async function requestDm(request: DMRequest): Promise<string> {
-  if (import.meta.env.DEV) {
+  if (import.meta.env.DEV && ["localhost", "127.0.0.1"].includes(window.location.hostname)) {
     const response = await fetch("/api/dm", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

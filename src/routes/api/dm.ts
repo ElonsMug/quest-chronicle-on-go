@@ -9,7 +9,9 @@ export const Route = createFileRoute("/api/dm")({
         const { jsonResponse, verifyRequestOrigin } =
           await import("../../../supabase/functions/_shared/dm-security");
         const { ok, origin } = verifyRequestOrigin(request);
-        if (!ok) return jsonResponse({ error: "Forbidden" }, 403, origin);
+        if (!ok || !origin || !["localhost", "127.0.0.1"].includes(new URL(origin).hostname)) {
+          return jsonResponse({ error: "Forbidden" }, 403, origin);
+        }
 
         const { handleDmRequest } = await import("../../../supabase/functions/_shared/dm-handler");
         return handleDmRequest(request, origin, process.env);
