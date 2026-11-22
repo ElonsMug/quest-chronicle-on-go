@@ -53,7 +53,7 @@ export async function callDM(args: DMRequestArgs): Promise<string> {
       ...history.map(({ role, content, source }) => ({
         role,
         content: role === "assistant" && source !== "client"
-          ? stripEnemyAttackRolls(content).replace(/\[(?:VENDOR|CLUE_FALLBACK):[^\]]*\]/gi, "").trim()
+          ? stripEnemyAttackRolls(content).replace(/\[(?:VENDOR|CLUE_FALLBACK|EPILOGUE):[^\]]*\]/gi, "").trim()
           : content,
       })),
       { role: "user", content: userMessage },
@@ -66,6 +66,12 @@ type DmResponse = { text?: string; model?: string; usage?: DmUsage };
 
 export async function requestDm(request: DMRequest): Promise<string> {
   return (await requestDmResult(request)).text ?? "";
+}
+
+export function isDmUnavailable(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return error.message === "API error 503"
+    || ("context" in error && error.context instanceof Response && error.context.status === 503);
 }
 
 export async function requestDmResult(request: DMRequest): Promise<DmResponse> {

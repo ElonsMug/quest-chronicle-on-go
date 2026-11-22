@@ -10,7 +10,7 @@ import type {
   Character, ChatMessage, Enemy, Ally, PendingRoll, RollResult, Spell,
 } from "@/game/types";
 import type { CombatCheckpoint } from "@/game/combatCheckpoint";
-import type { PendingCombatTurn, PlayerCombatAttack } from "@/game/combatTurn";
+import type { PendingTurn, TurnResolution } from "@/game/pendingTurn";
 import type { GameState, GameAction } from "@/game/state";
 
 export type PendingAction =
@@ -45,7 +45,7 @@ export type GameDeps = {
 
   // UI setters
   setLoading: Dispatch<SetStateAction<boolean>>;
-  setPendingCombatTurn: Dispatch<SetStateAction<PendingCombatTurn | null>>;
+  setPendingTurn: Dispatch<SetStateAction<PendingTurn | null>>;
   setPendingRoll: Dispatch<SetStateAction<PendingRoll | null>>;
   setPendingInitiative: Dispatch<SetStateAction<boolean>>;
   setFreeInput: Dispatch<SetStateAction<boolean>>;
@@ -73,10 +73,10 @@ export type GameDeps = {
   loading: boolean;
   pendingRoll: PendingRoll | null;
   pendingInitiative: boolean;
-  pendingCombatTurn: PendingCombatTurn | null;
+  pendingTurn: PendingTurn | null;
 
   // cross-hook function refs (wired after all hooks initialize)
-  handleChoiceRef: MutableRefObject<(text: string, context?: { attack?: PlayerCombatAttack; dodge?: true }) => Promise<void>>;
+  handleChoiceRef: MutableRefObject<(text: string, context?: TurnResolution) => Promise<void>>;
   processAndSetMessagesRef: MutableRefObject<(
     char: Character, hp: number, inv: string[], eff: string[],
     enemies: Enemy[], reply: string, prevMessages: ChatMessage[],

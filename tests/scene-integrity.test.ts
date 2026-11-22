@@ -169,3 +169,11 @@ test("the alternate clue uses a normal existing option without replacing the oth
   assert.deepEqual(choices.map(choice => choice.clueRoute), [true, undefined, undefined]);
   assert.equal(choices[0].check, null);
 });
+
+test("drink-potion choices use inventory without treating requests for a potion as consumption", async () => {
+  const { isDrinkPotionAction } = await import("../src/game/inventory.ts");
+  assert.equal(isDrinkPotionAction("Быстро выпить целебное зелье лечения из инвентаря"), true);
+  assert.equal(isDrinkPotionAction("Я выпиваю зелье"), true);
+  assert.equal(isDrinkPotionAction("Drink a healing potion"), true);
+  assert.equal(isDrinkPotionAction("Я прошу еще 3 зелья у друга стражника"), false);
+});

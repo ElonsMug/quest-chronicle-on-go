@@ -9,9 +9,17 @@
 // arrives.
 // ─────────────────────────────────────────────────────────────────
 
-import type { CharacterId, Parsed } from "./types";
+import { finalePlanSchema, type FinalePlan, type FinaleProgress } from "./arcFinale.ts";
+import type { CharacterId, Enemy, Parsed } from "./types";
 
 export type ArcPhase = 1 | 2 | 3 | 4 | 5;
+
+export type ArcEnding = {
+  kind: "victory" | "surrender";
+  epilogue: string;
+  rewardGold?: number;
+  artifact?: FinalePlan["artifact"];
+};
 
 export type Arc = {
   id: string;
@@ -22,14 +30,19 @@ export type Arc = {
   antagonist: string;
   setting: string;
   midBossName: string;
+  successEpilogue?: string;
+  finalePlan?: FinalePlan;
+  finale?: FinaleProgress;
 
   // Progression (mutated by computeNextPhase)
   phase: ArcPhase;
   sceneCount: number;       // total scenes since arc start
   phaseSceneCount: number;  // scenes spent in current phase
   midBossDefeated: boolean;
+  midBossBypassed?: boolean;
   bossDefeated: boolean;
   completed: boolean;
+  ending?: ArcEnding;
 };
 
 export type ArcTemplate = {
@@ -292,6 +305,8 @@ export function parseArcVariation(raw: string, language: "en" | "ru"): Partial<{
   antagonist: string;
   setting: string;
   midBossName: string;
+  successEpilogue: string;
+  finalePlan: FinalePlan;
 }> | null {
   // The model often wraps JSON in ```json fences or surrounding prose.
   // Pull out the first {...} block instead of trusting the whole string.
@@ -307,11 +322,19 @@ export function parseArcVariation(raw: string, language: "en" | "ru"): Partial<{
       const matches = language === "ru" ? hasCyrillic && !hasLatin : hasLatin && !hasCyrillic;
       return matches ? value.trim() : undefined;
     };
+    const successEpilogue = pick("successEpilogue")?.slice(0, 800);
+    const candidate = finalePlanSchema.safeParse(obj.finalePlan);
+    const plan = candidate.success ? candidate.data : undefined;
+    const localized = plan && [plan.objective?.action, plan.objective?.result, plan.recognition?.recipient,
+      plan.recognition?.response, plan.artifact.name].every(value => !value
+        || (language === "ru" ? /\p{Script=Cyrillic}/u.test(value) : !/\p{Script=Cyrillic}/u.test(value)));
     return {
       goal: pick("goal"),
       antagonist: pick("antagonist"),
       setting: pick("setting"),
       midBossName: pick("midBossName"),
+      ...(successEpilogue ? { successEpilogue } : {}),
+      ...(localized ? { finalePlan: plan } : {}),
     };
   } catch {
     return null;
@@ -334,11 +357,23 @@ export function parseArcVariation(raw: string, language: "en" | "ru"): Partial<{
 //   • Phase 1 → 2 after first scene resolved.
 //   • Phase 2 → 3 once phaseSceneCount >= target AND not in combat
 //     (so we transition between scenes, not mid-fight).
-//   • Phase 3 → 4 only when arc.midBossDefeated flips true
-//     (set after winning the phase-3 encounter marked MIDBOSS).
+//   • Phase 3 → 4 when the mid-boss is defeated or bypassed.
 //   • Phase 4 → 5 once phaseSceneCount >= target AND not in combat.
-//   • Phase 5 → completed when arc.bossDefeated flips true.
+//   • Phase 5 → completed after a resolved final encounter.
 // ─────────────────────────────────────────────────────────────────
+export function finalEncounterOutcome(
+  arc: Arc | null, before: readonly Enemy[], after: readonly Enemy[], playerHp: number,
+  encounterActive: boolean, combatEnd: Parsed["combatEndType"], acceptedSurrender: boolean,
+): ArcEnding["kind"] | null {
+  if (!arc || arc.completed || arc.phase !== 5 || playerHp <= 0 || encounterActive) return null;
+  if (!before.some(enemy => enemy.isBoss) || !before.some(enemy => enemy.hp > 0)) return null;
+  if (acceptedSurrender && combatEnd === "surrender" && before.some(enemy => enemy.isBoss && enemy.hp > 0)) {
+    return "surrender";
+  }
+  return combatEnd === "victory" && after.length >= before.length && !after.some(enemy => enemy.hp > 0)
+    ? "victory" : null;
+}
+
 export function computeNextArc(
   arc: Arc,
   _parsed: Parsed | null,
@@ -365,13 +400,13 @@ export function computeNextArc(
       if (next.phaseSceneCount >= PHASE_TARGET_SCENES[2] && !inCombat) advance(3);
       break;
     case 3:
-      if (next.midBossDefeated) advance(4);
+      if (next.midBossDefeated || next.midBossBypassed) advance(4);
       break;
     case 4:
       if (next.phaseSceneCount >= PHASE_TARGET_SCENES[4] && !inCombat) advance(5);
       break;
     case 5:
-      if (next.bossDefeated) {
+      if (next.ending || (next.bossDefeated && !next.finale)) {
         next.completed = true;
       }
       break;

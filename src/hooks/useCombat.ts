@@ -9,24 +9,25 @@ import { resolveEnemyAttack } from "@/game/enemyBalance";
 import { rollDice, parseDiceSides, PROFICIENCY_BONUS } from "@/game/dice";
 import type { Enemy, Spell, Stat } from "@/game/types";
 import type { GameDeps } from "./useGameDeps";
+import { parseDMResponse } from "@/game/parser";
 
 export function useCombat(deps: GameDeps) {
   const {
     t, stateRef, dispatch,
-    setHp, setEffects, setEnemies, setAllies, setInCombat,
+    setHp, setEffects, setMessages,
     setDidDodgeLastTurn, setDefensiveStance, setSelectingTarget,
     setPendingAction, setShowSpellMini, setShowSpells,
-    setSpellSlots, setNegotiationDeclined,
+    setSpellSlots,
     setDefeatPending, setDefeatDismissed,
-    pendingPotionInfoRef,
   } = deps;
 
   function turnLocked() {
-    return deps.loading || deps.pendingCombatTurn !== null || deps.turnRequestInFlight.current;
+    return deps.loading || deps.pendingTurn !== null || deps.turnRequestInFlight.current;
   }
 
   async function executeAttackRoll(req: {
     weapon: string; dice: string; mod: number; ac: number; targetRef?: string;
+    damageBonus?: number; sneak?: boolean; extraAttack?: true; berserkAttack?: true;
   }) {
     if (turnLocked()) return;
     const hitRoll = rollDice(20);
@@ -41,6 +42,7 @@ export function useCombat(deps: GameDeps) {
       damage = crit
         ? rollDice(dmgDice) + rollDice(dmgDice) + req.mod
         : rollDice(dmgDice) + req.mod;
+      damage += (req.damageBonus ?? 0) + (req.sneak ? rollDice(6) + (crit ? rollDice(6) : 0) : 0);
       if (damage < 1) damage = 1;
     }
     const { enemies, artifactBonus } = stateRef.current;
@@ -61,7 +63,7 @@ export function useCombat(deps: GameDeps) {
     } else {
       msg = i18n.t("system.attackMiss", { weapon: req.weapon, target: tname, ac: req.ac, roll: hitRoll, mod: req.mod, prof, total });
     }
-    await deps.handleChoiceRef.current(msg, { attack });
+    await deps.handleChoiceRef.current(msg, { attack, extraAttack: req.extraAttack, berserkAttack: req.berserkAttack });
   }
 
   function executeEnemyAttacks(
@@ -93,17 +95,17 @@ export function useCombat(deps: GameDeps) {
     return { log: results.join("\n"), hp: playerHp };
   }
 
-  async function handleAttack(targetRef?: string) {
+  async function handleAttack(targetRef?: string, options: { sneak?: boolean; extraAttack?: true } = {}) {
     if (turnLocked()) return;
     const { character: ch, enemies: en, berserkChargesLeft: bcl } = stateRef.current;
     if (!ch) return;
     setSelectingTarget(false);
     setPendingAction(null);
     setDidDodgeLastTurn(false);
-    let mod = ch.stats[ch.weapon.stat] || 0;
+    const mod = ch.stats[ch.weapon.stat] || 0;
     if (bcl > 0) {
-      mod += 2;
       dispatch({ type: "DECREMENT_BERSERK_CHARGE" });
+      if (bcl === 1) setEffects(previous => previous.filter(effect => !/berserk|берсерк/i.test(effect)));
     }
     if (stateRef.current.defensiveStance) {
       setDefensiveStance(false);
@@ -112,16 +114,19 @@ export function useCombat(deps: GameDeps) {
       ? findCombatantIndex(en, "enemy", targetRef)
       : en.findIndex(enemy => enemy.hp > 0);
     await executeAttackRoll({
-      weapon: ch.weapon.name, dice: ch.weapon.dice, mod,
+      weapon: ch.weapon.name, dice: ch.weapon.dice, mod, ...options,
+      damageBonus: bcl > 0 ? 2 : 0, berserkAttack: bcl > 0 ? true : undefined,
       ac: en[targetIndex]?.ac ?? 12,
       targetRef: targetIndex === -1 ? undefined : combatReference("enemy", targetIndex),
     });
   }
 
-  async function handleBerserk() {
+  function handleBerserk() {
+    if (turnLocked() || stateRef.current.berserkUsedThisCombat) return;
     dispatch({ type: "ACTIVATE_BERSERK" });
-    setEffects(prev => [...prev, t("combat.berserkEffect")]);
-    await deps.handleChoiceRef.current(i18n.t("system.berserkActivated"));
+    const content = t("combat.berserkEffect");
+    setEffects(prev => [...prev, content]);
+    setMessages(previous => [...previous, { role: "assistant", source: "client", content, parsed: parseDMResponse(content) }]);
   }
 
   async function handleDefend() {
@@ -136,33 +141,18 @@ export function useCombat(deps: GameDeps) {
   }
 
   async function handleSneak(targetRef?: string) {
-    setSelectingTarget(false);
-    setPendingAction(null);
-    await handleAttack(targetRef);
+    if (!stateRef.current.didDodgeLastTurn) return;
+    await handleAttack(targetRef, { sneak: true });
   }
 
   async function handleAcceptSurrender(name: string) {
-    setEnemies([]);
-    setAllies([]);
-    setInCombat(false);
-    setSelectingTarget(false);
-    setPendingAction(null);
-    setShowSpellMini(false);
-    setNegotiationDeclined(true);
-    pendingPotionInfoRef.current = null;
-    await deps.handleChoiceRef.current(i18n.t("system.acceptSurrender", { name }));
+    if (turnLocked()) return;
+    await deps.handleChoiceRef.current(i18n.t("system.acceptSurrender", { name }), { disengagement: "surrender" });
   }
 
   async function handleLetThemGo(name: string) {
-    setEnemies([]);
-    setAllies([]);
-    setInCombat(false);
-    setSelectingTarget(false);
-    setPendingAction(null);
-    setShowSpellMini(false);
-    setNegotiationDeclined(true);
-    pendingPotionInfoRef.current = null;
-    await deps.handleChoiceRef.current(i18n.t("system.letThemGo", { name }));
+    if (turnLocked()) return;
+    await deps.handleChoiceRef.current(i18n.t("system.letThemGo", { name }), { disengagement: "retreat" });
   }
 
   async function handleSpell(s: Spell, targetRef?: string) {

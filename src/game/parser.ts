@@ -45,7 +45,7 @@ export function parseDMResponse(text: string) {
   // The character class `[^\]]*` is intentionally permissive so a malformed
   // tag (extra space, trailing text inside brackets) still gets stripped from
   // the visible narrative even if its dedicated extractor regex doesn't fire.
-  const TAG = /\[(ATTACK|ROLL|CLUE_FALLBACK|CLUE_FOUND|DAMAGE|ITEM|UPGRADE|ENEMY|ENEMY_DAMAGE|ENEMY_ATTACK|ALLY|ALLY_DAMAGE|EFFECT|INITIATIVE|END_COMBAT|PLAYER_HP|BEHAVIOR_SHIFT|SURPRISE|GOLD_OFFER|GOLD|ARTIFACT|VENDOR)[^\]]*\]/gi;
+  const TAG = /\[(ATTACK|ROLL|CLUE_FALLBACK|CLUE_FOUND|DAMAGE|ITEM|UPGRADE|ENEMY|ENEMY_DAMAGE|ENEMY_ATTACK|ENEMY_WITHDRAWAL|MIDBOSS_BYPASSED|EPILOGUE|ALLY|ALLY_DAMAGE|EFFECT|INITIATIVE|END_COMBAT|PLAYER_HP|BEHAVIOR_SHIFT|SURPRISE|GOLD_OFFER|GOLD|ARTIFACT|VENDOR)[^\]]*\]/gi;
 
   const atk = text.match(/\[ATTACK:\s*([^,\]]+),\s*([^,\]]+),\s*([^,\]]+),\s*AC(\d+)\]/i);
   if (atk) attackRequest = { weapon: atk[1].trim(), dice: atk[2].trim(), mod: parseInt(atk[3]) || 0, ac: parseInt(atk[4]) };
@@ -85,7 +85,8 @@ export function parseDMResponse(text: string) {
   let im: RegExpExecArray | null;
   while ((im = itemRe.exec(text)) !== null) {
     const name = im[1].trim();
-    const looseGold = /^\d+\s*(?:gp|gold(?: (?:coins?|pieces?))?|зм|золот(?:ых(?: монет)?|ые монеты|ая монета|о))$/iu.test(name);
+    const looseGold = /^\d+\s*(?:gp|gold(?: (?:coins?|pieces?))?|зм|золот(?:ых(?: монет)?|ые монеты|ая монета|о))$/iu.test(name)
+      || /^(?:золото(?:\s+[^\d]+)?|(?:кошель|мешок|кошел[её]к|сумка) (?:с )?(?:золота|золотом|монет|монетами)|(?:bag|pouch|purse) of (?:gold|coins)|(?:stolen|merchant[’']s) gold)$/iu.test(name);
     if (name && !looseGold && !isScoutKit(name) && !isCombatLootItem(name)) {
       newItems.push(name);
       if (newItem === null) newItem = name;
@@ -241,6 +242,9 @@ export function parseDMResponse(text: string) {
     newAllies,
     allyDamages,
     enemyDamages,
+    enemyWithdrawals: [...text.matchAll(/\[ENEMY_WITHDRAWAL:\s*([^\]\r\n]+)\]/gi)].map(match => match[1].trim()),
+    epilogue: text.match(/^\s*\[EPILOGUE:[ \t]*([^\]\r\n]{12,1200})\][ \t]*$/im)?.[1]?.trim(),
+    midBossBypassed: /\[MIDBOSS_BYPASSED\]/i.test(text),
     newEffects,
     initiativeTrigger,
     combatEnd,

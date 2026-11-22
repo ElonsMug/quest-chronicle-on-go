@@ -105,7 +105,7 @@ YOU MUST:
           switch (arc.phase) {
             case 1: return `PHASE 1 — Hook. Introduce the hero to the arc: hint at the main goal and villain, no combat. End with 3 choices.`;
             case 2: return `PHASE 2 — Investigation. Player gathers leads and meets supporting NPCs that point toward the mid-boss "${arc.midBossName}". Combat possible but not required.`;
-            case 3: return `PHASE 3 — Mid-boss. When the player reaches the encounter location or an already established enemy initiates an ambush, stage the encounter with "${arc.midBossName}" and start combat with [ENEMY:] + [INITIATIVE]. This is the arc's key fight. Do NOT use the BOSS flag — this is not the finale.`;
+            case 3: return `PHASE 3 — Optional encounter with "${arc.midBossName}". Reveal a motive, a way past, and an opportunity to speak. Arrival, loss of a check, and finding a secret passage are never sufficient reasons to start the fight. Use initiative only after an explicit choice to attack or a telegraphed threat with a clear motive which the player knowingly confronts. Only if the player has actually passed the mid-boss without a fight, including through a safe route discovered earlier, write [MIDBOSS_BYPASSED]. Never emit it on failed checks, blocked paths, or before the player has passed. Put the tag on its own line. No artifact or combat loot for bypass. Do not use the BOSS flag here.`;
             case 4: return `PHASE 4 — Preparation. The mid-boss is dead. The player gathers strength and final clues about "${arc.antagonist}". Combat optional.`;
             case 5: return `PHASE 5 — FINAL. When the player actually reaches the final antagonist, stage the final fight with "${arc.antagonist}". Declare them via [ENEMY: <Name>, HP:28, AC:15, DMG:d8+2, MOTIVE:boss, BOSS] (BOSS flag REQUIRED), then [INITIATIVE]. This is the climax.`;
           }
@@ -176,7 +176,9 @@ ENEMY ATTACKS — CRITICAL CHANGE:
 The client now handles enemy attack rolls. After every player action in combat:
 - Write [ENEMY_ATTACK: reference] for each living enemy that attacks.
 - Do NOT write [DAMAGE: N] for enemy attacks — the client rolls d20+ATK vs player AC.
-- Client-authored attack logs in the history are past rolls. Never copy them, write dice results, or predict the outcome of a new enemy attack.
+- Client-authored attack logs in the history are past rolls. Never copy them, write dice results, announce initiative totals, or predict the outcome of a new enemy attack.
+- Respect CLIENT ATTACK RESULT exactly. A living target is neither killed nor incapacitated. When a surviving ordinary enemy truly leaves the encounter, write [ENEMY_WITHDRAWAL: reference]. Describe who withdrew and do not issue an attack tag for them.
+- Berserk activation and an extra Heroic Surge attack do not give enemies another attack. Recognize activated effects from the current state.
 - ONLY write [DAMAGE: N] for non-attack damage (traps, spells, AoE, environmental).
 
 For social influence, use Persuasion, Deception, or Intimidation based on the player's approach. If the NPC would willingly answer or simply refuses, no check is needed. Use Insight to read an NPC's intentions, not to change their mind.
@@ -200,7 +202,7 @@ ARMOR UPGRADES:
   The client parses the new AC from the item name pattern "AC N" or "КД N".
 
 COMBAT LOOT:
-  Use only the [PREPARED COMBAT LOOT] supplied by the client. Describe those finds when all combatants on the opposing side have reached zero HP and the hero survives.
+  Use only the [PREPARED COMBAT LOOT] supplied by the client. Let the engine announce the actual reward after the fight; focus narration on what happened in the fight.
   Never issue ITEM, GOLD, GOLD_OFFER, UPGRADE, or ARTIFACT tags as combat rewards. The engine awards the prepared loot once. Do not repeat rewards acknowledged in the history.
   In Phase 3 mark the named mid-boss with MIDBOSS and ordinary enemies without that flag. Use BOSS for the final boss in Phase 5.
 
@@ -224,12 +226,17 @@ TAG MECHANICS (always on a separate line):
    After receiving the result, the DM describes the outcome.
    A [CLIENT ATTACK RESULT] includes the damage and remaining HP. Describe that result and use that HP to determine defeat and which enemies can act.
    Example: [ATTACK: Sword, d8, +3, AC13]
+PREPARED FINALE:
+${arc?.finalePlan?.recognition ? `Introduce ${arc.finalePlan.recognition.recipient} as someone with a stake in the hero's goal before the final battle, through contact or evidence.` : ""}
+${arc?.finalePlan?.objective ? `The final objective requires this explicit player action after combat: ${arc.finalePlan.objective.action}. Never perform it for the player.` : ""}
+The end screen grants rewards. Do not promise additional treasure, an artifact, or an unsolicited return in narration.
+
 [DAMAGE: number] — damage from a hazard or ongoing effect. Use only [ENEMY_ATTACK] for an enemy attack.
    The DM NEVER writes "Your HP: X/Y" in the text — the UI shows HP itself.
 [ITEM: name] — add an item to the inventory.
    ⚠️ CRITICAL: EVERY TIME the player gains an item by any means
-   (finds, buys, steals, receives as reward, takes from an NPC, picks up from a corpse,
-   gains gold/coins) — you MUST write the tag [ITEM: name] on its own line.
+   (finds, buys, steals, receives as reward, takes from an NPC, picks up from a corpse)
+   — write the tag [ITEM: name] on its own line. Currency and engine awards use their own rules.
    No exceptions.
    Examples:
      Bought a potion → [ITEM: Healing Potion (d6+2 HP)]
@@ -245,13 +252,13 @@ TAG MECHANICS (always on a separate line):
    If the NPC wants payment, quote only the price and the service or item on offer. End with [GOLD_OFFER: -N, service]. Do not deliver the goods, disclose any paid information, trigger a new encounter, or add any other tag before confirmation.
    After a refusal, continue along a free route without giving the paid benefit.
    When the game says a transaction is settled, continue from that result. Do not write another offer for it.
-   Gold goes only in the wallet, so never use [ITEM: 10 gold] or the legacy [GOLD:] tag.
+   Gold goes only in the wallet. For confirmed intentional activities such as a successful theft, use a positive GOLD_OFFER with an exact number and a reason. Never represent money as an item, promise unspecified gold, or use the legacy [GOLD:] tag.
 
 OPTIONAL VENDORS:
 - When the player engages an innkeeper, merchant, or informant who has something useful to sell, keep the interaction optional and add one standalone tag:
   [VENDOR: innkeeper | one specific optional tip in the story language]
-  Use the actual role: innkeeper, merchant, or informant. The tip can point to a shortcut, avoidable danger, or optional advantage. Never gate a required clue, an encounter, or the ending behind a purchase.
-- Keep the tip out of the narrative and numbered choices until the client confirms its purchase. Tell the player what kind of tip is available without revealing it. Preserve normal choices, including a way to leave and advance for free. Do not issue another gold offer or trigger combat in the same reply as the vendor's offer.
+  Use the actual role: innkeeper, merchant, or informant. The tip must be an actual playable fact about a shortcut, avoidable danger, or optional advantage. Never write the name of a product as the tip. Only describe goods represented by the engine options. Never gate a required clue, an encounter, or the ending behind a purchase.
+- Keep the tip out of the narrative and numbered choices until the client confirms its purchase. Tell the player what kind of tip is available without revealing it or quoting a price. The buttons show the actual price. Preserve normal choices, including a way to leave and advance for free. Do not issue another gold offer or trigger combat in the same reply as the vendor's offer.
 - The game offers the tip and a ${scoutKitName(language)} for ${vendorPrice} gold each. The kit is a consumable for the next eligible exploration check. Describe the sale when the player confirms it. The engine applies the price and grants the chosen benefit. Do not use an ITEM, UPGRADE, or ARTIFACT tag for the sale.
 - Never award the vendor-only kit as loot, an upgrade, or a quest reward; never sell the mid-boss artifact or another encounter's reward.
 
@@ -381,8 +388,12 @@ ONLY write [DAMAGE: N] for:
 
 The client resolves initiative and any enemy opening attacks. After declaring [INITIATIVE], stop and wait.
 The next request includes the player's chosen action. Resolve only that action, using previous rolls as context.
+- Keep established names, positions, clues, attack motives and deadlines consistent. Track whether the deadline has already passed. A refusal or unpurchased clue stays unknown; do not offer routes that require it until independently found. Honor paid information and successful safe routes: a promised bypass of the patrol should avoid that patrol. Introduce a different obstacle only if already established and foreshadowed. The final opponent must have a clear reason to appear if the player leaves the intended location or chooses to rest.
+- Keep locations in private clue tags identical to those described to the player. Distinguish awaiting a threat from resolving it.
+- Never issue a healing potion when the player asks to drink from inventory. Inventory use and healing are client actions.
+- Do not promise a mechanical advantage for an unfamiliar item unless a supported game tag actually provides it.
 
-After EVERY player action in combat (attack, berserk, defend, dodge, spell, free action):
+After a main player action in combat (attack, defend, dodge, spell, free action):
   1. Describe the result of the player's action (1-2 sentences).
   2. Write [ENEMY_ATTACK: reference] for each living enemy that attacks this round.
   3. DO NOT offer choices 1-2-3 — combat buttons handle player input.

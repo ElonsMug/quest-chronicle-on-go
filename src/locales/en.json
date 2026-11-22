@@ -48,6 +48,8 @@
     "received": "Combat loot received: {{reward}}"
   },
   "vendor": {
+    "kitOnlyOffer": "The contact offers a field kit to help with exploration.",
+    "standardOffer": "The contact offers to sell useful information. The price is listed below.",
     "roles": {
       "innkeeper": "Innkeeper",
       "merchant": "Merchant",
@@ -239,6 +241,19 @@
     "noSlots": "No slots"
   },
   "combat": {
+    "noPotion": "You have no healing potion left.",
+    "midBossPassed": "You take the side route and leave the opponent behind.",
+    "surrenderFallback": "Your opponent lowers their weapon. The fight is over.",
+    "retreatFallback": "You let your opponent withdraw. The fight is over.",
+    "disengageProceed": "Continue toward the objective",
+    "disengageLook": "Look around before moving on",
+    "reconciledHit": "Your strike lands, but the threat is still present.",
+    "reconciledMiss": "Your strike misses. The fight continues.",
+    "dodgeAttempt": "You shift aside and brace for the next attack.",
+    "midBossApproach": "The way ahead brings you within sight of {{name}}. You still have room to decide how to proceed.",
+    "midBossBypassChoice": "Look for a way around {{name}} and continue without a fight",
+    "midBossTalkChoice": "Approach {{name}} and ask what they want",
+    "midBossFightChoice": "Attack {{name}}",
     "surpriseRound": "Surprise round",
     "attack": "Attack",
     "berserk": "Berserk",
@@ -325,10 +340,67 @@
     }
   },
   "arcCompleted": {
+    "bossFallen": "The final opponent has fallen.",
+    "bossSurrendered": "The final opponent has surrendered.",
+    "showEnding": "View ending",
+    "reward": "Adventure reward · {{gold}} gp",
+    "surrenderSubtitle": "The final opponent surrendered. You achieved your goal.",
+    "surrenderFallback": "Your opponent yields. With the threat contained, you see your task through.",
+    "victoryFallback": "The final threat falls. The way is clear to finish what you came to do, and your task is complete.",
+    "readStory": "Read the journal",
+    "journal": "Epilogue — {{epilogue}}",
     "title": "Arc complete!",
     "subtitle": "{{antagonist}} has fallen. Grey Shore breathes easier.",
     "newArc": "New adventure",
-    "returnToMenu": "Return to menu"
+    "returnToMenu": "Main menu · new adventures",
+    "reportBack": "Return and report your success · {{recipient}}",
+    "continueToEnding": "Finish the adventure",
+    "objectivePending": "The way is clear. One action remains: {{objective}}.",
+    "artifactAward": "Unique artifact acquired · {{name}}",
+    "rewardHeading": "Adventure reward",
+    "rewardAmount": "+{{gold}} gold",
+    "finds": "Items found in this adventure",
+    "noFinds": "You collected no items.",
+    "futureInventory": "In future adventures, you’ll be able to carry collected items forward and use their abilities to change how your stories unfold.",
+    "supportLater": "Support the project · coming later",
+    "perks": {
+      "resolve": "Planned ability: reroll one failed ability check per adventure.",
+      "insight": "Planned ability: gain +2 on your first Investigation check in an adventure.",
+      "guard": "Planned ability: reduce the first hit you take in an adventure by 3 damage.",
+      "fortune": "Planned ability: gain 5 extra gold from your first completed encounter."
+    },
+    "fallback": {
+      "objective": {
+        "altar": {
+          "action": "Destroy the altar",
+          "result": "You destroy the altar and break the pact. The corruption begins to recede."
+        },
+        "ritual": {
+          "action": "Disrupt the ritual",
+          "result": "You break the ritual circle. The summoning stops and the danger passes."
+        },
+        "evidence": {
+          "action": "Gather and expose the evidence",
+          "result": "You collect the evidence and hand it to those who can put an end to the conspiracy."
+        }
+      },
+      "recognition": {
+        "merchants": {
+          "recipient": "the merchants of Grey Shore",
+          "response": "The merchants thank you for freeing the trade road. The first caravan is already preparing to leave."
+        },
+        "villagers": {
+          "recipient": "the villagers",
+          "response": "The villagers come out to meet you. They thank you for giving them a chance to live free of the corruption."
+        }
+      },
+      "artifacts": {
+        "resolve": "Ring of Steadfast Resolve",
+        "insight": "Lens of Hidden Signs",
+        "guard": "Amulet of the Last Shield",
+        "fortune": "Coin of the Fortunate Road"
+      }
+    }
   },
   "dev": {
     "title": "Dev Mode",
@@ -343,12 +415,14 @@
     }
   },
   "dm": {
+    "masterUnavailableOpening": "The Master is temporarily unavailable. Retry to open this adventure.",
+    "masterUnavailableTurn": "The Master is temporarily unavailable. Your move is saved for retry.",
+    "retryOpening": "Retry opening scene",
     "thinking": "The Master is thinking",
     "silent": "The Master is silent...",
     "connectionError": "Connection to the Master failed.",
-    "connectionLost": "Connection lost.",
-    "combatConnectionLost": "Connection lost. Your roll is saved. Retry the same turn to continue.",
-    "retryCombatTurn": "Retry sending this turn",
+    "turnConnectionLost": "The Dungeon Master did not respond. Your turn is saved and can be sent again.",
+    "retryTurn": "Retry sending this turn",
     "genericError": "Error.",
     "receivedItem": "Received: {{item}}",
     "startPrompt": "Begin the adventure. An opening scene in Grey Shore. 3 action choices.",
@@ -423,6 +497,49 @@
     "returning_new": "Start a new journey",
     "dev_reset": "Reset onboarding",
     "dev_preview_label": "DEV: onboarding preview"
+  },
+  "oneshot": {
+    "title": "A new incarnation",
+    "startAs": "Begin as {{name}}",
+    "exit": "Back to heroes",
+    "report": "Save session report",
+    "resources": "HP {{hp}}/{{max}} · {{gold}} gp · Potions {{potions}}",
+    "preparing": "Gemini is preparing your adventure…",
+    "listening": "The Master is considering your move…",
+    "error": "The Master couldn’t answer. Try again.",
+    "retrySetup": "Retry adventure setup",
+    "retryTurn": "Resend the same move",
+    "edit": "Edit move",
+    "freeAction": "Your own action…",
+    "send": "Send",
+    "noMatch": "That action isn’t available in this scene. Try a different approach.",
+    "price": "{{gold}} gp",
+    "check": "{{skill}} · DC {{dc}}",
+    "checkPass": "{{skill}} · d20 {{die}} ({{modifier}}) = {{total}} vs DC {{dc}} · Success",
+    "checkFail": "{{skill}} · d20 {{die}} ({{modifier}}) = {{total}} vs DC {{dc}} · Failure",
+    "yourAttack": "Your attack · d20 {{die}}, total {{total}} vs AC {{ac}} · {{damage}} damage",
+    "enemyAttack": "Enemy attack · d20 {{die}}, total {{total}} vs AC {{ac}} · {{damage}} damage",
+    "healed": "Potion restores {{amount}} HP.",
+    "loot": "Loot received: {{name}} (+3 damage in the final fight).",
+    "forcedExit": "After three rounds, you break off the fight.",
+    "fight": "{{foe}} · {{hp}} HP · Round {{round}} of 3",
+    "clue": "Clue",
+    "journal": "Journal",
+    "usage": "{{model}} · Requests: {{requests}} · Tokens: {{total}} ({{input}} in, {{output}} out)",
+    "unreported": "Requests without a complete token count: {{count}}",
+    "restart": "Generate another adventure",
+    "action": {
+      "strike": "Attack",
+      "potion": "Drink a healing potion",
+      "withdraw": "Break off the fight",
+      "dodge": "Dodge and look for an opening",
+      "tip": "Buy tactical information from {{vendor}}",
+      "buyPotion": "Buy a healing potion from {{vendor}}"
+    },
+    "challenge": "Attack {{opponent}}",
+    "spellSlots": "Spell slots {{count}}",
+    "asleep": "The opponent falls asleep. You can move on.",
+    "resistedSleep": "The spell fails to put the opponent to sleep."
   },
   "lighthouse": {
     "entry": "Play the short adventure",

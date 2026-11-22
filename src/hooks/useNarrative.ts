@@ -5,35 +5,31 @@
 // ─────────────────────────────────────────────────────────────────
 
 import { combatReference, findCombatantIndex } from "@/game/combatReferences";
-import { applyPlayerAttackResult, stripEnemyAttackRolls, type PlayerCombatAttack } from "@/game/combatTurn";
+import { applyPlayerAttackResult, resolveDisengagement, stripEnemyAttackRolls, withdrawingEnemies } from "@/game/combatTurn";
+import { turnMessages, type TurnResolution } from "@/game/pendingTurn";
 import { canSettleGold, currentSceneMessageIndex, getSocialFailure, stagePaidOffer } from "@/game/sceneMessages";
 import type { StoryChoice } from "@/game/abilityChecks";
+import { isPotion } from "@/game/inventory";
 import { balanceEnemy } from "@/game/enemyBalance";
 import { hasScoutKitBonus, isScoutKit, scoutKitBonus, scoutKitName, spendScoutKit, vendorPrice, type VendorPurchase } from "@/game/vendor";
-import { combatLootItemName, earnedCombatReward, plannedCombatReward, type CombatReward } from "@/game/combatLoot";
+import { combatLootItemName, earnedCombatReward, isCombatLootItem, plannedCombatReward, type CombatReward } from "@/game/combatLoot";
 import i18n from "@/i18n";
 import type {
-  Character, ChatMessage, Enemy, Parsed, RollResult, SocialFailure,
+  Character, ChatMessage, Enemy, Parsed, RollResult,
 } from "@/game/types";
 import { parseDMResponse } from "@/game/parser";
 import { reportLanguageLeaks } from "@/game/langGuard";
-import { callDM } from "@/game/api";
-import { computeNextArc } from "@/game/arcs";
+import { callDM, isDmUnavailable } from "@/game/api";
+import { advanceFinale, beginFinale, fallbackFinalePlan, type FinaleAction } from "@/game/arcFinale";
+import { computeNextArc, finalEncounterOutcome, type Arc } from "@/game/arcs";
 import { trackEvent } from "@/lib/analytics";
 import type { GameDeps } from "./useGameDeps";
 
-type ChoiceContext = {
+type ChoiceContext = TurnResolution & {
   balanceAfterTransaction?: number;
   transactionAmount?: number;
-  noCheck?: boolean;
-  checkResult?: string;
   abilityRoll?: ChatMessage["abilityRoll"];
-  dodge?: true;
   vendorPurchase?: { kind: VendorPurchase; tip: string };
-  consumeScoutKit?: boolean;
-  socialFailure?: SocialFailure;
-  followClue?: SocialFailure;
-  attack?: PlayerCombatAttack;
 };
 
 export function useNarrative(deps: GameDeps) {
@@ -47,7 +43,7 @@ export function useNarrative(deps: GameDeps) {
     setLoading, setPendingRoll, setPendingInitiative,
     setFreeInput, setFreeText, setDefeatPending, setDefeatDismissed,
     setShowDefeated, combatCheckpointRef, needsCombatCheckpointRef, pendingPotionInfoRef,
-    inCombat, pendingCombatTurn, setPendingCombatTurn, turnRequestInFlight,
+    inCombat, pendingTurn, setPendingTurn, turnRequestInFlight,
   } = deps;
 
   function scoutKitModifier(skill: string | undefined, inventory: string[], inCombat: boolean) {
@@ -204,12 +200,21 @@ export function useNarrative(deps: GameDeps) {
       });
     }
 
+    const withdrawing = withdrawingEnemies(parsed, newEnemies);
+    if (withdrawing.size > 0) {
+      newEnemies = newEnemies.map((enemy, index) => withdrawing.has(index) ? { ...enemy, hp: 0 } : enemy);
+      setEnemies(newEnemies);
+    }
     if (parsed.combatEndType === "victory" && newEnemies.some(enemy => enemy.hp > 0)) {
       parsed.combatEnd = false;
       parsed.combatEndType = null;
     }
     const combatEnded = parsed.combatEnd || (newEnemies.length > 0 && newEnemies.every(enemy => enemy.hp <= 0));
     if (combatEnded) {
+      if (!parsed.combatEnd) {
+        parsed.combatEnd = true;
+        parsed.combatEndType = "victory";
+      }
       const wasInCombat = currentEnemies.length > 0 || stateRef.current.enemies.length > 0;
       setInCombat(false);
       setEnemies([]);
@@ -280,18 +285,75 @@ export function useNarrative(deps: GameDeps) {
     prevMessages: ChatMessage[], context: ChoiceContext = {},
   ): Promise<ChatMessage[]> {
     const dmResult = parseDMResponse(stripEnemyAttackRolls(reply));
-    const combatScene = currentEnemies.length > 0 || dmResult.newEnemies.length > 0
+    const combatScene = currentEnemies.some(enemy => enemy.hp > 0) || dmResult.newEnemies.length > 0
       || dmResult.initiativeTrigger || stateRef.current.inCombat;
+    const currentArc = stateRef.current.arc;
+    const lastAction = prevMessages.at(-1);
+    const midBoss = dmResult.newEnemies.find(enemy => enemy.isMidBoss);
+    const declaredAction = lastAction?.role === "user" ? lastAction.content.split("\n")[0] : "";
+    const hostileAction = !/без боя|избега|не (?:атак|напад)|\b(?:avoid|without|do not|don’t)\b/iu.test(declaredAction)
+      && /атакова|атакую|напасть|нападу|нападаю|вызвать.{0,50}(?:бой|поединок)|\b(?:attack|fight|duel|strike)\b/iu.test(declaredAction);
+    const prematureMidBoss = currentArc?.phase === 3 && midBoss && !hostileAction
+      && !currentEnemies.some(enemy => enemy.isMidBoss && enemy.hp > 0);
     const offer = dmResult.goldOffer;
     const quote = !stateRef.current.inCombat && !dmResult.vendor && offer && offer.amount < 0
       ? t("goldOffer.quote", { amount: -offer.amount, reason: offer.reason }) : null;
     const result = quote ? stagePaidOffer(dmResult, parseDMResponse(quote)) : dmResult;
-    const parsed = context.attack ? applyPlayerAttackResult(result, context.attack, currentEnemies) : result;
+    const parsed = context.disengagement ? resolveDisengagement(result, context.disengagement)
+      : context.attack ? applyPlayerAttackResult(result, context.attack, currentEnemies) : result;
+    if (context.disengagement) {
+      const invalid = !parsed.narrative || result.initiativeTrigger || result.newEnemies.length || result.enemyAttacks.length
+        || result.combatEndType !== context.disengagement;
+      const fallback = disengagementFallback(context.disengagement);
+      if (invalid || !parsed.choices.length) parsed.choices = fallback.choices;
+      if (invalid) parsed.narrative = fallback.narrative;
+    }
+    if (context.midBossBypass && currentArc?.phase === 3 && !currentEnemies.some(enemy => enemy.hp > 0)) {
+      const safe = parseDMResponse([
+        t("combat.midBossPassed"),
+        `1. ${t("combat.disengageProceed")} [NO_CHECK]`,
+        `2. ${t("combat.disengageLook")} [NO_CHECK]`,
+      ].join("\n"));
+      Object.assign(parsed, safe, { midBossBypassed: true });
+    } else if (prematureMidBoss && !context.disengagement) {
+      const name = midBoss.name;
+      Object.assign(parsed, parseDMResponse([
+        t("combat.midBossApproach", { name }),
+        `1. ${t("combat.midBossBypassChoice")} [NO_CHECK]`,
+        `2. ${t("combat.midBossTalkChoice")} [NO_CHECK]`,
+        `3. ${t("combat.midBossFightChoice", { name })} [NO_CHECK]`,
+      ].join("\n")));
+    }
+    if (context.attack && !parsed.combatEnd && dmResult.combatEnd) {
+      parsed.narrative = t(context.attack.damage ? "combat.reconciledHit" : "combat.reconciledMiss");
+      parsed.choices = [];
+    }
+    if (context.dodge) parsed.narrative = t("combat.dodgeAttempt");
+    if (parsed.vendor && (isScoutKit(parsed.vendor.tip) || /(?:\b\d+\s*(?:gold|gp|зм)|(?:one|a) gold coin|за (?:одну )?золотую монету)/iu.test(parsed.narrative))) {
+      parsed.narrative = t(isScoutKit(parsed.vendor.tip) ? "vendor.kitOnlyOffer" : "vendor.standardOffer");
+    }
+    if (context.attack || context.dodge || context.extraAttack) parsed.attackRequest = null;
+    if (context.extraAttack || (combatScene && parsed.enemyAttacks.length)) parsed.damage = null;
+    if (context.extraAttack) {
+      if (parsed.enemyAttacks.length && !parsed.combatEnd) {
+        parsed.narrative = t(context.attack?.damage ? "combat.reconciledHit" : "combat.reconciledMiss");
+      }
+      parsed.enemyAttacks = [];
+    }
+    const unverifiedCoins = !parsed.goldOffer && /\[ITEM:[^\]\r\n]*\d+\s*(?:gold|gp|зм)[^\]\r\n]*\]/iu.test(reply);
+    if (unverifiedCoins) {
+      parsed.narrative = parsed.narrative.replace(
+        /\s+(?:and (?:a )?(?:purse|pouch|bag) of (?:gold|coins)|и (?:кошель|кошелёк|мешочек) с монетами)/giu, "",
+      );
+    }
     if (context.noCheck || context.checkResult || context.vendorPurchase) parsed.rollRequest = null;
     if (!quote && (combatScene || parsed.vendor || context.vendorPurchase)) {
-      const item = context.vendorPurchase?.kind === "kit" ? scoutKitName(language) : null;
-      parsed.newItem = item;
-      parsed.newItems = item ? [item] : [];
+      const firstDiscovery = !context.disengagement && parsed.initiativeTrigger && currentEnemies.length === 0
+        && !dmResult.combatEnd && !parsed.vendor && !context.vendorPurchase;
+      const items = context.vendorPurchase?.kind === "kit" ? [scoutKitName(language)]
+        : firstDiscovery ? parsed.newItems.filter(item => isPotion(item) && !isCombatLootItem(item)) : [];
+      parsed.newItem = items[0] ?? null;
+      parsed.newItems = items;
       parsed.upgrades = [];
       parsed.goldOffer = null;
     }
@@ -303,11 +365,16 @@ export function useNarrative(deps: GameDeps) {
     const socialFailure = quote ? undefined : context.socialFailure
       ? { ...context.socialFailure, clueFallback: context.socialFailure.clueFallback ?? parsed.clueFallback }
       : clueStillMissing ? context.followClue : undefined;
-    const newMsgs: ChatMessage[] = [...prevMessages, {
-      role: "assistant", content: quote ?? reply, parsed,
-      ...(quote ? { rawContent: reply } : {}),
+    const engineNarration = context.disengagement || context.midBossBypass || prematureMidBoss || context.dodge || unverifiedCoins
+      || context.attack && !parsed.combatEnd && dmResult.combatEnd;
+    const visibleReply = engineNarration ? [parsed.narrative,
+      ...parsed.choices.map(choice => `${choice.num}. ${choice.text}`)].join("\n") : reply;
+    const sceneMessage: ChatMessage = {
+      role: "assistant", content: quote ?? visibleReply, parsed,
+      ...(quote || engineNarration ? { rawContent: reply } : {}),
       ...(socialFailure ? { socialFailure } : {}),
-    }];
+    };
+    const newMsgs: ChatMessage[] = [...prevMessages, sceneMessage];
     if (context.vendorPurchase?.kind === "tip") {
       const vendorTip = context.vendorPurchase.tip;
       const content = t("vendor.tipReceived", { tip: vendorTip });
@@ -319,29 +386,71 @@ export function useNarrative(deps: GameDeps) {
     const { newHp, newInv, newEff, newEnemies } = applyParsed(parsed, currentHp, availableInventory, currentEff, currentEnemies);
     let finalHp = newHp;
     if (!parsed.initiativeTrigger && !parsed.combatEnd && parsed.enemyAttacks.length > 0) {
-      const { log, hp } = deps.executeEnemyAttacksRef.current(parsed.enemyAttacks, newEnemies, char.ac, newHp, context.dodge);
+      const { log, hp } = deps.executeEnemyAttacksRef.current(parsed.enemyAttacks, newEnemies, char.ac - (context.berserkAttack || stateRef.current.berserkChargesLeft > 0 ? 2 : 0), newHp, context.dodge);
       finalHp = hp;
       if (log) {
         newMsgs.push({ role: "assistant", source: "client", content: log, parsed: parseDMResponse(log) });
       }
     }
 
-    const { arc: currentArc, combatLoot } = stateRef.current;
-    const reward = earnedCombatReward(combatLoot, currentArc, currentEnemies, newEnemies, finalHp);
+    const encounterActive = !parsed.combatEnd && newEnemies.some(enemy => enemy.hp > 0);
+    const outcome = finalEncounterOutcome(currentArc, currentEnemies, newEnemies, finalHp, encounterActive,
+      parsed.combatEndType, context.disengagement === "surrender");
+    const { combatLoot } = stateRef.current;
+    const earnedReward = !context.disengagement && parsed.combatEndType !== "retreat" && parsed.combatEndType !== "surrender"
+      ? earnedCombatReward(combatLoot, currentArc, currentEnemies, newEnemies, finalHp) : null;
+    const reward = earnedReward?.kind === "finalBoss" ? null : earnedReward;
     if (reward) {
       dispatch({ type: "CLAIM_COMBAT_REWARD", reward, language });
       const content = t("combatLoot.received", { reward: describeReward(reward) });
       newMsgs.push({ role: "assistant", source: "client", content, parsed: parseDMResponse(content) });
     }
-    setMessages(newMsgs);
-
-    const encounterActive = !parsed.combatEnd && newEnemies.some(enemy => enemy.hp > 0);
-    if (currentArc && !currentArc.completed && (!clueStillMissing || reward)) {
-      const arcAfterKills = reward?.kind === "midBoss" ? { ...currentArc, midBossDefeated: true }
-        : reward?.kind === "finalBoss" ? { ...currentArc, bossDefeated: true } : currentArc;
-      const nextArc = computeNextArc(arcAfterKills, parsed, encounterActive);
-      if (nextArc !== currentArc) dispatch({ type: "SET_ARC", arc: nextArc });
+    if (context.extraAttack) {
+      const content = t("combat_log.heroicSurge");
+      newMsgs.push({ role: "assistant", source: "client", content, parsed: parseDMResponse(content) });
     }
+
+    if (reward?.kind === "midBoss") {
+      parsed.choices = parsed.choices.filter(choice =>
+        !/(?:забрать|подобрать|взять|collect|take|claim).{0,40}(?:артефакт|печать авангарда|artifact|vanguard seal)/iu.test(choice.text));
+    }
+    if (currentArc && !currentArc.completed && (!clueStillMissing || reward || outcome)) {
+      const failedCheck = lastAction?.abilityRoll?.result.success === false
+        || /\bFAIL\b/i.test(context.checkResult ?? "");
+      const resolvedMidBoss = finalHp > 0 && currentArc.phase === 3 && !encounterActive
+        && (context.disengagement ? currentEnemies.some(enemy => enemy.isMidBoss) : !failedCheck && parsed.midBossBypassed);
+      let arcAfterEncounter = reward?.kind === "midBoss" ? { ...currentArc, midBossDefeated: true }
+        : resolvedMidBoss ? { ...currentArc, midBossBypassed: true } : currentArc;
+      if (outcome) {
+        const plan = currentArc.finalePlan ?? fallbackFinalePlan(currentArc, t);
+        const epilogue = (!plan.objective && !plan.recognition ? parsed.epilogue : undefined) || currentArc.successEpilogue
+          || t(outcome === "surrender" ? "arcCompleted.surrenderFallback" : "arcCompleted.victoryFallback");
+        arcAfterEncounter = beginFinale(arcAfterEncounter, plan, outcome, epilogue);
+        parsed.choices = [];
+        parsed.rollRequest = null;
+        parsed.attackRequest = null;
+        if (plan.objective) {
+          const narration = t(outcome === "surrender" ? "arcCompleted.bossSurrendered" : "arcCompleted.bossFallen");
+          parsed.narrative = `${narration} ${t("arcCompleted.objectivePending", { objective: plan.objective.action })}`;
+          sceneMessage.content = parsed.narrative;
+          sceneMessage.rawContent = reply;
+        }
+      }
+      const nextArc = computeNextArc(arcAfterEncounter, parsed, encounterActive);
+      if (nextArc !== currentArc) dispatch({ type: "SET_ARC", arc: nextArc });
+      if (outcome && nextArc.finale?.stage === "recognition" && !nextArc.finalePlan?.recognition) {
+        const finished = advanceFinale(nextArc, "finish");
+        if (finished) {
+          const history = commitFinale(finished.arc, newMsgs);
+          const item = finished.arc.ending?.artifact?.name;
+          deps.doSaveRef.current(char, finalHp, item ? [...newInv, item] : newInv, newEff, history);
+          setPendingInitiative(false);
+          setPendingRoll(null);
+          return history;
+        }
+      }
+    }
+    setMessages(newMsgs);
 
     const initiativeReady = parsed.initiativeTrigger && encounterActive;
     if (encounterActive && !currentEnemies.some(enemy => enemy.hp > 0)) {
@@ -353,7 +462,10 @@ export function useNarrative(deps: GameDeps) {
 
     const wasInCombat = stateRef.current.enemies.length > 0 || currentEnemies.length > 0;
 
-    if (initiativeReady) {
+    if (outcome) {
+      setPendingInitiative(false);
+      setPendingRoll(null);
+    } else if (initiativeReady) {
       setPendingInitiative(true);
       setPendingRoll(null);
     } else if (!context.followClue && !parsed.initiativeTrigger && parsed.attackRequest && !wasInCombat) {
@@ -388,10 +500,59 @@ export function useNarrative(deps: GameDeps) {
     return newMsgs;
   }
 
+  function commitFinale(arc: Arc, history: ChatMessage[]): ChatMessage[] {
+    const ending = arc.ending;
+    if (!ending?.artifact) return history;
+    const summary = [
+      t("arcCompleted.journal", { epilogue: ending.epilogue }),
+      t("arcCompleted.reward", { gold: ending.rewardGold }),
+      t("arcCompleted.artifactAward", { name: ending.artifact.name }),
+    ].join("\n\n");
+    const messages: ChatMessage[] = [...history, {
+      role: "assistant", source: "client", content: summary, parsed: parseDMResponse(summary),
+    }];
+    dispatch({ type: "COMPLETE_FINALE", arc, messages });
+    return messages;
+  }
+
+  function chooseFinaleAction(action: FinaleAction) {
+    if (deps.loading || deps.pendingTurn || turnRequestInFlight.current) return;
+    const { arc, hp, inCombat, messages, character, inventory, effects } = stateRef.current;
+    if (!character || !arc || hp <= 0 || inCombat) return;
+    const next = advanceFinale(arc, action);
+    if (!next) return;
+    const text = action === "objective" ? arc.finalePlan?.objective?.action
+      : action === "report" ? t("arcCompleted.reportBack", { recipient: arc.finalePlan?.recognition?.recipient })
+      : t("arcCompleted.continueToEnding");
+    const history: ChatMessage[] = [...messages, { role: "user", content: text ?? "" }];
+    if (action === "objective" && next.narration) {
+      history.push({ role: "assistant", source: "client", content: next.narration, parsed: parseDMResponse(next.narration) });
+    }
+    if (action === "objective") dispatch({ type: "SET_ARC", arc: next.arc });
+    const done = next.arc.completed ? next.arc
+      : next.arc.finale?.stage === "recognition" && !next.arc.finalePlan?.recognition
+        ? advanceFinale(next.arc, "finish")?.arc : undefined;
+    if (done?.ending?.artifact) {
+      const saved = commitFinale(done, history);
+      deps.doSaveRef.current(character, hp, [...inventory, done.ending.artifact.name], effects, saved);
+    } else {
+      setMessages(history);
+      deps.doSaveRef.current(character, hp, inventory, effects, history);
+    }
+  }
+
+  function disengagementFallback(ending: "surrender" | "retreat") {
+    return parseDMResponse([
+      t(ending === "surrender" ? "combat.surrenderFallback" : "combat.retreatFallback"),
+      `1. ${t("combat.disengageProceed")} [NO_CHECK]`,
+      `2. ${t("combat.disengageLook")} [NO_CHECK]`,
+    ].join("\n"));
+  }
+
   async function handleChoice(choiceText: string, context: ChoiceContext = {}) {
-    if (deps.loading || pendingCombatTurn || turnRequestInFlight.current) return;
-    const { character, enemies, messages: msgs } = stateRef.current;
-    if (!character) return;
+    if (deps.loading || pendingTurn || turnRequestInFlight.current) return;
+    const { character, enemies, messages: msgs, arc } = stateRef.current;
+    if (!character || arc?.finale || arc?.completed) return;
     setFreeInput(false);
     setFreeText("");
     setPendingRoll(null);
@@ -406,7 +567,7 @@ export function useNarrative(deps: GameDeps) {
     const choiceWithPotion = potionInfo ? `${potionInfo}\n${choiceText}` : choiceText;
     const surpriseActive = stateRef.current.surpriseAdvantage === "player";
     if (surpriseActive) setSurpriseAdvantage(null);
-    const turnMessage = surpriseActive
+    const turnMessage = context.disengagement ? choiceWithPotion : surpriseActive
       ? `${choiceWithPotion}\n\n${i18n.t("system.surpriseRoundReminder")}`
       : (inCombat || enemies.length > 0) && !isNarrativeDefeat
         ? `${choiceWithPotion}\n\n${i18n.t("system.combatTurnReminder")}`
@@ -430,8 +591,12 @@ export function useNarrative(deps: GameDeps) {
       ? `[CLIENT CHECK RESULT: ${context.checkResult} Resolve only the action the player selected, using this result. Do not request another roll.]`
       : context.noCheck ? "[CLIENT ACTION WITHOUT A CHECK: Continue this action directly without requesting a roll or adding a payment.]" : "";
     const apiMessage = [turnMessage, instructions, attackOutcome, abilityOutcome].filter(Boolean).join("\n\n");
-    if (context.attack) {
-      setPendingCombatTurn({ messageIndex: msgs.length, requestText: apiMessage, attack: context.attack });
+    if (!context.transactionAmount) {
+      const { attack, dodge, disengagement, extraAttack, berserkAttack, midBossBypass, noCheck, checkResult, consumeScoutKit, socialFailure, followClue } = context;
+      setPendingTurn({
+        messageIndex: msgs.length, requestText: apiMessage,
+        resolution: { attack, dodge, disengagement, extraAttack, berserkAttack, midBossBypass, noCheck, checkResult, consumeScoutKit, socialFailure, followClue },
+      });
     }
     await submitChoice(apiMessage, msgs, newMsgs, context);
   }
@@ -445,13 +610,21 @@ export function useNarrative(deps: GameDeps) {
       let reply: string;
       const silentFallback = t("dm.silent");
       try {
-        const reward = h > 0 ? plannedCombatReward(combatLoot, arc, en) : null;
-        const rewardNote = reward
-          ? `\n\n[PREPARED COMBAT LOOT: ${describeReward(reward)}. Describe these exact finds only if this turn defeats every enemy and the hero survives. The engine grants them. Omit loot tags and do not promise any other prize.]`
+        const reward = h > 0 && !context.disengagement ? plannedCombatReward(combatLoot, arc, en) : null;
+        const rewardNote = reward && reward.kind !== "finalBoss"
+          ? `\n\n[PREPARED COMBAT LOOT: ${describeReward(reward)}. The engine announces and grants this reward in a separate message. Focus on the encounter; do not mention a monetary amount, drop loot tags, or offer a second way to collect it.]`
+          : "";
+        const finalBoss = arc?.phase === 5 && en.some(enemy => enemy.isBoss);
+        const plan = arc ? arc.finalePlan ?? fallbackFinalePlan(arc, t) : undefined;
+        const endingNote = finalBoss && arc ? (plan?.objective
+          ? `\n\n[FINALE: Ending the combat opens the way to this action: ${plan.objective.action}. Keep the objective incomplete until the player explicitly acts. Do not describe the hero performing it or write an epilogue yet.]`
+          : `\n\n[FINALE: If the outcome definitively fulfills this goal: ${arc.goal}, add [EPILOGUE: two or three sentences about what changes in the world]. Omit money, items, returning to NPCs, and unsolicited actions.]`) : "";
+        const extraActionNote = context.extraAttack
+          ? "\n\n[HEROIC SURGE: This is an extra player attack. Describe the resolved strike only. There is no enemy reaction or extra turn.]"
           : "";
         reply = await callDM({
           character: c, hp: h, inventory: context.consumeScoutKit ? spendScoutKit(inv) : inv, effects: eff,
-          history, userMessage: apiMessage + rewardNote,
+          history, userMessage: apiMessage + rewardNote + endingNote + extraActionNote,
           spellSlots: stateRef.current.spellSlots,
           language, arc: stateRef.current.arc,
           combatants: { enemies: en, allies: stateRef.current.allies },
@@ -459,25 +632,32 @@ export function useNarrative(deps: GameDeps) {
           artifactBonus: stateRef.current.artifactBonus,
           silentFallback,
         });
-        if ((context.attack || context.transactionAmount) && (!reply.trim() || reply === silentFallback)) {
+        if (!reply.trim() || reply === silentFallback) {
           throw new Error("Empty turn reply");
         }
         if (context.transactionAmount && parseDMResponse(reply).goldOffer) throw new Error("Repeated gold offer");
-      } catch {
+      } catch (error) {
+        if (context.disengagement) {
+          const fallback = disengagementFallback(context.disengagement);
+          const text = [fallback.narrative, `[END_COMBAT: ${context.disengagement}]`,
+            ...fallback.choices.map(choice => `${choice.num}. ${choice.text} [NO_CHECK]`)].join("\n");
+          setPendingTurn(null);
+          await processAndSetMessages(c, h, inv, eff, en, text, newMsgs, context);
+          return;
+        }
         if (context.transactionAmount) {
           const content = t("goldOffer.connectionLost");
           setMessages([...history, { role: "assistant", source: "client", content, parsed: parseDMResponse(content) }]);
           return;
         }
-        const lostText = t(context.attack ? "dm.combatConnectionLost" : "dm.connectionLost");
+        const lostText = t(isDmUnavailable(error) ? "dm.masterUnavailableTurn" : "dm.turnConnectionLost");
         setMessages([...newMsgs, {
           role: "assistant", content: lostText, parsed: parseDMResponse(lostText),
-          ...(context.attack ? { source: "client" as const } : {}),
-          socialFailure: context.socialFailure ?? (context.followClue?.clueFallback ? undefined : context.followClue),
+          source: "client",
         }]);
         return;
       }
-      if (context.attack) setPendingCombatTurn(null);
+      setPendingTurn(null);
       if (context.transactionAmount) dispatch({ type: "ADD_GOLD", amount: context.transactionAmount });
       await processAndSetMessages(c, h, inv, eff, en, reply, newMsgs, context);
     } finally {
@@ -486,12 +666,12 @@ export function useNarrative(deps: GameDeps) {
     }
   }
 
-  async function retryCombatTurn() {
-    if (deps.loading || !pendingCombatTurn || turnRequestInFlight.current) return;
-    const { messageIndex, attack, requestText } = pendingCombatTurn;
-    const { messages } = stateRef.current;
-    const turnMessages = messages.slice(0, messageIndex + 1);
-    await submitChoice(requestText, messages.slice(0, messageIndex), turnMessages, { attack });
+  async function retryTurn() {
+    if (deps.loading || !pendingTurn || turnRequestInFlight.current) return;
+    const { messageIndex, resolution, requestText } = pendingTurn;
+    const messages = turnMessages(stateRef.current.messages, messageIndex);
+    if (!messages) return;
+    await submitChoice(requestText, messages.history, messages.includingTurn, resolution);
   }
 
   async function handleRollResult(rollRes: RollResult) {
@@ -560,10 +740,11 @@ export function useNarrative(deps: GameDeps) {
 
   function chooseStoryAction(choice: StoryChoice) {
     const { character, inCombat, inventory, messages } = stateRef.current;
-    if (!character || inCombat || deps.loading || deps.pendingRoll || turnRequestInFlight.current) return;
+    if (!character || inCombat || deps.loading || pendingTurn || deps.pendingRoll || turnRequestInFlight.current) return;
     if (!choice.check) {
       const followClue = choice.clueRoute ? messages[currentSceneMessageIndex(messages)]?.socialFailure : undefined;
-      void handleChoice(choice.text, { noCheck: choice.check === null, followClue });
+      const midBossBypass = stateRef.current.arc?.phase === 3 && choice.text === t("combat.midBossBypassChoice") ? true : undefined;
+      void handleChoice(choice.text, { noCheck: choice.check === null, followClue, midBossBypass });
       return;
     }
     const { bonus, scoutKit } = scoutKitModifier(choice.check.skill, inventory, inCombat);
@@ -577,7 +758,7 @@ export function useNarrative(deps: GameDeps) {
 
   async function confirmGoldOffer(messageIndex: number) {
     const { messages, gold, inCombat } = stateRef.current;
-    if (deps.loading || deps.pendingRoll || deps.pendingInitiative || pendingCombatTurn || turnRequestInFlight.current || inCombat
+    if (deps.loading || deps.pendingRoll || deps.pendingInitiative || pendingTurn || turnRequestInFlight.current || inCombat
       || messageIndex !== currentSceneMessageIndex(messages)) return;
     const message = messages[messageIndex];
     const offer = message?.parsed?.goldOffer;
@@ -598,7 +779,7 @@ export function useNarrative(deps: GameDeps) {
 
   async function buyFromVendor(messageIndex: number, kind: VendorPurchase) {
     const { messages, gold, inCombat, inventory } = stateRef.current;
-    if (deps.loading || deps.pendingRoll || deps.pendingInitiative || pendingCombatTurn || turnRequestInFlight.current
+    if (deps.loading || deps.pendingRoll || deps.pendingInitiative || pendingTurn || turnRequestInFlight.current
       || inCombat || messageIndex !== currentSceneMessageIndex(messages) || !canSettleGold(gold, -vendorPrice)) return;
     const vendor = messages[messageIndex]?.parsed?.vendor;
     if (!vendor || (kind === "kit" ? inventory.some(isScoutKit) : messages.some(message => message.vendorTip === vendor.tip))) return;
@@ -613,5 +794,5 @@ export function useNarrative(deps: GameDeps) {
     });
   }
 
-  return { applyParsed, processAndSetMessages, handleChoice, retryCombatTurn, handleRollResult, handleInitiativeResult, confirmGoldOffer, declinePaidOffer, chooseStoryAction, buyFromVendor };
+  return { applyParsed, processAndSetMessages, handleChoice, chooseFinaleAction, retryTurn, handleRollResult, handleInitiativeResult, confirmGoldOffer, declinePaidOffer, chooseStoryAction, buyFromVendor };
 }

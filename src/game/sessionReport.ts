@@ -1,5 +1,5 @@
 import type { GameState } from "./state";
-import type { PendingCombatTurn } from "./combatTurn";
+import type { PendingTurn } from "./pendingTurn";
 import type { Parsed, PendingRoll } from "./types";
 
 type ReportContext = {
@@ -17,7 +17,7 @@ type ReportContext = {
   choiceSourceMessageIndex: number | null;
   displayedChoices: Parsed["choices"];
   alternativeClueLead?: string | null;
-  pendingCombatTurn?: PendingCombatTurn | null;
+  pendingTurn?: PendingTurn | null;
 };
 
 export function buildSessionReport(game: GameState, context: ReportContext, exportedAt = new Date()) {
@@ -32,11 +32,15 @@ export function buildSessionReport(game: GameState, context: ReportContext, expo
 
 export function downloadSessionReport(game: GameState, context: ReportContext) {
   const report = buildSessionReport(game, context);
-  const file = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
+  downloadJson(report, `solo-dnd-session-${report.exportedAt.replace(/[.:]/g, "-")}.json`);
+}
+
+export function downloadJson(data: unknown, filename: string) {
+  const file = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(file);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `solo-dnd-session-${report.exportedAt.replace(/[.:]/g, "-")}.json`;
+  link.download = filename;
   document.body.append(link);
   try {
     link.click();

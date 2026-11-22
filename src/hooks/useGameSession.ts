@@ -3,10 +3,12 @@
 // ─────────────────────────────────────────────────────────────────
 
 import i18n from "@/i18n";
+import { useState } from "react";
+import type { Arc } from "@/game/arcs";
 import { rollDice } from "@/game/dice";
 import { isPotion } from "@/game/inventory";
 import { parseDMResponse } from "@/game/parser";
-import { callDM } from "@/game/api";
+import { callDM, isDmUnavailable } from "@/game/api";
 import { pickRandomTemplate } from "@/game/arcs";
 import { varyArcWithLLM } from "@/game/arcVariation";
 import { trackEvent } from "@/lib/analytics";
@@ -18,13 +20,15 @@ export function useGameSession(deps: GameDeps) {
     t, language, stateRef, dispatch,
     setHp, setInventory, setMessages, setEnemies, setAllies, setInCombat,
     setSelectingTarget, setPendingAction, setShowSpellMini,
-    setLoading, setPendingRoll, setPendingInitiative, setPendingCombatTurn,
+    setLoading, setPendingRoll, setPendingInitiative, setPendingTurn,
     setScreen, setPreparingArc, setArcCompletedDismissed,
     setShowDefeated, setDefeatPending, setDefeatDismissed, setShowSpells,
     setFreeInput, setFreeText, setNegotiationDeclined,
     inCombat, loading, pendingRoll, pendingInitiative,
     pendingPotionInfoRef, combatCheckpointRef, needsCombatCheckpointRef,
   } = deps;
+
+  const [openingRetry, setOpeningRetry] = useState<{ char: Character; arc: Arc; prompt: string } | null>(null);
 
   function doSave(
     char: Character, currentHp: number, currentInv: string[],
@@ -47,7 +51,17 @@ export function useGameSession(deps: GameDeps) {
   }
 
   async function startGame(char: Character, customPrompt?: string) {
-    setPendingCombatTurn(null);
+    setOpeningRetry(null);
+    setShowDefeated(false);
+    setDefeatPending(false);
+    setDefeatDismissed(false);
+    setNegotiationDeclined(false);
+    setFreeInput(false);
+    setFreeText("");
+    setPendingAction(null);
+    setShowSpells(false);
+    pendingPotionInfoRef.current = null;
+    setPendingTurn(null);
     combatCheckpointRef.current = null;
     needsCombatCheckpointRef.current = false;
     const startInv = [...char.startItems];
@@ -63,14 +77,21 @@ export function useGameSession(deps: GameDeps) {
     setPendingInitiative(false);
     setShowSpellMini(false);
     setSelectingTarget(false);
-    setLoading(true);
     trackEvent("game_started", {
       characterId: char.id,
       messageNumber: 0,
       characterName: char.name,
       arcTemplateId: template.id,
     });
-    const prompt = customPrompt || t("dm.startPrompt");
+    await loadOpening(char, arc, customPrompt || t("dm.startPrompt"));
+  }
+
+  async function loadOpening(char: Character, arc: Arc, prompt: string) {
+    if (deps.turnRequestInFlight.current) return;
+    deps.turnRequestInFlight.current = true;
+    setLoading(true);
+    setOpeningRetry(null);
+    const startInv = [...char.startItems];
     try {
       const reply = await callDM({
         character: char,
@@ -87,12 +108,16 @@ export function useGameSession(deps: GameDeps) {
         artifactBonus: 0,
         silentFallback: t("dm.silent"),
       });
+      if (!reply.trim() || reply === t("dm.silent")) throw new Error("Empty opening scene");
       await deps.processAndSetMessagesRef.current(char, char.hp, startInv, [], [], reply, []);
-    } catch {
-      const errText = t("dm.connectionError");
-      setMessages([{ role: "assistant", content: errText, parsed: parseDMResponse(errText) }]);
+    } catch (error) {
+      const text = t(isDmUnavailable(error) ? "dm.masterUnavailableOpening" : "dm.connectionError");
+      setMessages([{ role: "assistant", source: "client", content: text, parsed: parseDMResponse(text) }]);
+      setOpeningRetry({ char, arc, prompt });
+    } finally {
+      deps.turnRequestInFlight.current = false;
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   async function handleStartNewArc() {
@@ -104,7 +129,8 @@ export function useGameSession(deps: GameDeps) {
 
   function exitToMenu() {
     if (deps.turnRequestInFlight.current) return;
-    setPendingCombatTurn(null);
+    setOpeningRetry(null);
+    setPendingTurn(null);
     combatCheckpointRef.current = null;
     needsCombatCheckpointRef.current = false;
     const { character: c, hp: h, inventory: inv, effects: eff, messages: msgs } = stateRef.current;
@@ -117,9 +143,9 @@ export function useGameSession(deps: GameDeps) {
 
   function handleShortRest() {
     const { character: c, hp: h } = stateRef.current;
-    if (!c || inCombat) return;
-    const heal = rollDice(6);
-    const newHp = Math.min(c.maxHp, h + heal);
+    if (!c || inCombat || deps.loading || deps.pendingTurn || deps.turnRequestInFlight.current) return;
+    const newHp = Math.min(c.maxHp, h + rollDice(6));
+    const heal = newHp - h;
     setHp(newHp);
     const text = t("combat.shortRestNarrative", { heal, hp: newHp, max: c.maxHp });
     setMessages(prev => [...prev, {
@@ -129,7 +155,7 @@ export function useGameSession(deps: GameDeps) {
 
   function handleLongRest() {
     const { character: c } = stateRef.current;
-    if (!c || inCombat) return;
+    if (!c || inCombat || deps.loading || deps.pendingTurn || deps.turnRequestInFlight.current) return;
     dispatch({
       type: "LONG_REST",
       hp: c.maxHp,
@@ -143,11 +169,11 @@ export function useGameSession(deps: GameDeps) {
 
   function handleUseItem(_item: string, idx: number) {
     const { hp: h, character: c } = stateRef.current;
-    if (!c) return;
+    if (!c || deps.pendingTurn || deps.turnRequestInFlight.current) return;
     if (inCombat && (loading || pendingRoll || pendingInitiative)) return;
     if (inCombat && pendingPotionInfoRef.current) return;
-    const heal = rollDice(6) + 2;
-    const newHp = Math.min(c.maxHp, h + heal);
+    const newHp = Math.min(c.maxHp, h + rollDice(6) + 2);
+    const heal = newHp - h;
     setHp(newHp);
     setInventory(prev => prev.filter((_, i) => i !== idx));
 
@@ -168,6 +194,7 @@ export function useGameSession(deps: GameDeps) {
   }
 
   async function handleContinueStory() {
+    if (!stateRef.current.character || stateRef.current.hp > 0 || deps.loading || deps.pendingTurn || deps.turnRequestInFlight.current) return;
     combatCheckpointRef.current = null;
     needsCombatCheckpointRef.current = false;
     setShowDefeated(false);
@@ -187,7 +214,7 @@ export function useGameSession(deps: GameDeps) {
   function handleDefeatedRetry() {
     const checkpoint = combatCheckpointRef.current;
     if (!checkpoint || !stateRef.current.inCombat || loading) return;
-    setPendingCombatTurn(null);
+    setPendingTurn(null);
 
     const content = t("defeated.restarted");
     dispatch({
@@ -229,6 +256,7 @@ export function useGameSession(deps: GameDeps) {
 
   return {
     doSave, startGame, handleStartNewArc, exitToMenu,
+    retryOpening: openingRetry ? () => loadOpening(openingRetry.char, openingRetry.arc, openingRetry.prompt) : null,
     handleShortRest, handleLongRest, handleUseItem,
     handleContinueStory, handleDefeatedRetry, handleDefeatedUsePotion,
   };

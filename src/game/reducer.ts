@@ -6,6 +6,7 @@
 // ─────────────────────────────────────────────────────────────────
 
 import type { GameState, GameAction } from "./state";
+import { collectFinds } from "./arcFinale.ts";
 import { initialGameState } from "./state.ts";
 import { claimCombatReward, combatLootItemName, createCombatLoot, midBossArtifactBonus } from "./combatLoot.ts";
 
@@ -17,6 +18,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         character: action.character,
         hp: action.character.hp,
         inventory: action.startInventory,
+        adventureFinds: action.restoredFinds ?? [],
         spellSlots: action.character.spellSlots
           ? { ...action.character.spellSlots }
           : null,
@@ -33,7 +35,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return { ...state, hp: action.hp };
 
     case "SET_INVENTORY":
-      return { ...state, inventory: action.inventory };
+    case "UPDATE_INVENTORY": {
+      const inventory = action.type === "SET_INVENTORY" ? action.inventory : action.updater(state.inventory);
+      return { ...state, inventory, adventureFinds: collectFinds(state.adventureFinds, state.inventory, inventory) };
+    }
 
     case "SET_EFFECTS":
       return { ...state, effects: action.effects };
@@ -52,9 +57,6 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
     case "SET_IN_COMBAT":
       return { ...state, inCombat: action.value };
-
-    case "UPDATE_INVENTORY":
-      return { ...state, inventory: action.updater(state.inventory) };
 
     case "UPDATE_EFFECTS":
       return { ...state, effects: action.updater(state.effects) };
@@ -104,6 +106,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case "RESTORE_COMBAT_CHECKPOINT":
       return {
         ...action.checkpoint.resources,
+        adventureFinds: action.checkpoint.resources.adventureFinds ?? state.adventureFinds,
         combatLoot: action.checkpoint.resources.combatLoot ?? state.combatLoot,
         artifactBonus: action.checkpoint.resources.combatLoot ? action.checkpoint.resources.artifactBonus : state.artifactBonus,
         inCombat: true,
@@ -122,6 +125,20 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     // ── Arc ──────────────────────────────────────────────────
     case "SET_ARC":
       return { ...state, arc: action.arc };
+
+    case "COMPLETE_FINALE": {
+      const ending = action.arc.ending;
+      if (!state.arc?.finale || state.arc.id !== action.arc.id || state.arc.completed
+        || state.arc.finale.stage !== "recognition" || !action.arc.completed || !ending?.artifact
+        || state.hp <= 0 || state.inCombat) return state;
+      return {
+        ...state, arc: action.arc, messages: action.messages,
+        gold: state.gold + (ending.rewardGold ?? 0),
+        combatLoot: { ...state.combatLoot, finalBossClaimed: true },
+        inventory: [...state.inventory, ending.artifact.name],
+        adventureFinds: [...state.adventureFinds, ending.artifact.name],
+      };
+    }
 
     case "SET_SURPRISE":
       return { ...state, surpriseAdvantage: action.value };
@@ -147,6 +164,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         combatLoot,
         gold: state.gold + gold,
         inventory: item ? [...state.inventory, combatLootItemName(item, action.language)] : state.inventory,
+        adventureFinds: item ? [...state.adventureFinds, combatLootItemName(item, action.language)] : state.adventureFinds,
         artifactBonus: kind === "midBoss" ? midBossArtifactBonus : state.artifactBonus,
       };
     }

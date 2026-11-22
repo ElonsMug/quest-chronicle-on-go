@@ -1,25 +1,7 @@
 import { combatReference, findCombatantIndex } from "./combatReferences.ts";
-import type { ChatMessage, Enemy, Parsed } from "./types";
+import type { Enemy, Parsed } from "./types";
 
 export type PlayerCombatAttack = { target: string; damage: number };
-
-export type PendingCombatTurn = {
-  messageIndex: number;
-  requestText: string;
-  attack: PlayerCombatAttack;
-};
-
-export function readPendingCombatTurn(value: unknown, messages: ChatMessage[], enemies: Enemy[]): PendingCombatTurn | null {
-  if (!value || typeof value !== "object") return null;
-  const turn = value as Partial<PendingCombatTurn>;
-  if (typeof turn.messageIndex !== "number" || !Number.isInteger(turn.messageIndex) || turn.messageIndex < 0
-    || messages[turn.messageIndex]?.role !== "user"
-    || messages.slice(turn.messageIndex + 1).some(message => message.source !== "client")
-    || typeof turn.requestText !== "string" || !turn.requestText.trim()
-    || typeof turn.attack?.target !== "string" || findCombatantIndex(enemies, "enemy", turn.attack.target) < 0
-    || !Number.isSafeInteger(turn.attack.damage) || turn.attack.damage < 0) return null;
-  return turn as PendingCombatTurn;
-}
 
 export function recordPlayerAttack(
   enemies: Enemy[], target: string | undefined, damage: number, artifactBonus: number,
@@ -35,11 +17,14 @@ export function recordPlayerAttack(
 export function applyPlayerAttackResult(parsed: Parsed, attack: PlayerCombatAttack, enemies: Enemy[]): Parsed {
   const target = findCombatantIndex(enemies, "enemy", attack.target);
   if (target < 0) return parsed;
-  const hasSurvivors = enemies.some((enemy, index) => enemy.hp > (index === target ? attack.damage : 0))
+  const remaining = enemies.map((enemy, index) => index === target ? { ...enemy, hp: Math.max(0, enemy.hp - attack.damage) } : enemy);
+  const withdrawing = withdrawingEnemies(parsed, remaining);
+  const hasSurvivors = remaining.some((enemy, index) => enemy.hp > 0 && !withdrawing.has(index))
     || parsed.newEnemies.some(enemy => enemy.hp > 0);
   return {
     ...parsed,
     enemyDamages: attack.damage > 0 ? [{ name: attack.target, damage: attack.damage }] : [],
+    enemyWithdrawals: [...withdrawing].map(index => combatReference("enemy", index)),
     combatEnd: !hasSurvivors,
     combatEndType: hasSurvivors ? null : "victory",
   };
@@ -51,8 +36,32 @@ export function selectEnemyAttackers(references: string[], enemies: Enemy[]): En
   return Array.from(livingIndexes, index => enemies[index]);
 }
 
-// The DM sometimes copies a client log immediately after its tag or on a new line.
-// Keep its tags and surrounding prose, and leave client-authored rolls intact.
+// Older narration can explicitly name a fleeing minion without the tag.
+export function withdrawingEnemies(parsed: Parsed, enemies: Enemy[]): Set<number> {
+  const tags = new Set((parsed.enemyWithdrawals ?? []).map(ref => findCombatantIndex(enemies, "enemy", ref)));
+  const sentences = parsed.narrative.split(/[.!?\n]+/);
+  return new Set(enemies.flatMap((enemy, index) => {
+    if (enemy.hp <= 0 || enemy.isBoss || enemy.isMidBoss) return [];
+    const namedRetreat = parsed.combatEnd && sentences.some(sentence =>
+      sentence.toLowerCase().includes(enemy.name.toLowerCase())
+      && /убега|убежа|скрыл[ас]|скрыва|броса.{0,35}бегство|flees|fled|runs away|retreats/i.test(sentence));
+    return tags.has(index) || namedRetreat ? [index] : [];
+  }));
+}
+
+export function resolveDisengagement(parsed: Parsed, ending: "surrender" | "retreat"): Parsed {
+  return {
+    ...parsed,
+    combatEnd: true, combatEndType: ending, newEnemies: [], newAllies: [], damage: null,
+    enemyDamages: [], enemyWithdrawals: [], enemyAttacks: [], allyDamages: [], behaviorShift: null,
+    initiativeTrigger: false, attackRequest: null, rollRequest: null, playerHpRestore: null,
+    newItem: null, newItems: [], upgrades: [], newEffects: [], goldOffer: null, goldChange: null,
+  };
+}
+
+// Client-authored rolls are displayed separately. Keep their tags in DM replies, strip copied rolls.
 export function stripEnemyAttackRolls(reply: string): string {
-  return reply.replace(/(?:^|(?<=\]))[ \t]*(?:[-*•][ \t]+)?[^\r\n[\].!?]{1,100}?[ \t]+(?:attacks?|атакует)[ \t]*[—–:-][ \t]*d20\s*\(\d+\)[^\r\n[\]]*/gimu, "");
+  return reply
+    .replace(/(?:^|(?<=\]))[ \t]*[^\r\n[\]]{0,145}?[—–:-][ \t]*d20\s*\(\d+\)[^\r\n[\]]*/gimu, "")
+    .replace(/(?:^|(?<=\]))[ \t]*(?:инициатива|initiative)\s*:[^\r\n[\]]*/gimu, "");
 }

@@ -6,9 +6,9 @@ import { OnboardingShell } from "@/components/onboarding/OnboardingShell";
 
 export const Route = createFileRoute("/")({
   component: Index,
-  validateSearch: (search: Record<string, unknown>): { playtest?: "lighthouse" | "full" } => {
+  validateSearch: (search: Record<string, unknown>): { playtest?: "lighthouse" | "full" | "mvp" } => {
     const { playtest } = search;
-    return import.meta.env.DEV && (playtest === "lighthouse" || playtest === "full")
+    return import.meta.env.DEV && (playtest === "lighthouse" || playtest === "full" || playtest === "mvp")
       ? { playtest }
       : {};
   },
@@ -31,7 +31,7 @@ function Index() {
 
   if (playtest && localPlaytest !== false) {
     return localPlaytest
-      ? <AuthProvider localPlaytest><SoloDnD lighthouseOnly={playtest === "lighthouse"} /></AuthProvider>
+      ? <AuthProvider localPlaytest><SoloDnD lighthouseOnly={playtest === "lighthouse"} oneShotOnly={playtest === "mvp"} /></AuthProvider>
       : <div className="min-h-screen bg-stone-950" />;
   }
 

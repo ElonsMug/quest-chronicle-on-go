@@ -239,6 +239,7 @@ export function InventoryTab({
   gold,
   inCombat,
   canUsePotion,
+  turnLocked,
   filter,
   onFilterChange,
   onUseItem,
@@ -250,6 +251,7 @@ export function InventoryTab({
   gold: number;
   inCombat: boolean;
   canUsePotion: boolean;
+  turnLocked?: boolean;
   filter: InvFilter;
   onFilterChange: (f: InvFilter) => void;
   onUseItem: (item: string, idx: number) => void;
@@ -317,7 +319,7 @@ export function InventoryTab({
           {items.map(({ it, idx, cat }) => {
             const cs = categoryStyle(cat, t);
             const usable = isPotion(it);
-            const disabled = inCombat && !canUsePotion;
+            const disabled = turnLocked || (inCombat && !canUsePotion);
             return (
               <div
                 key={idx}
@@ -380,7 +382,7 @@ export function InventoryTab({
         </div>
         <button
           onClick={onShortRest}
-          disabled={inCombat}
+          disabled={inCombat || turnLocked}
           className="w-full text-left px-4 py-3 rounded-xl text-amber-100 text-sm font-bold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
           style={{ background: "#1c1917", border: "1px solid #292524", fontFamily: "serif" }}
         >
@@ -391,7 +393,7 @@ export function InventoryTab({
         </button>
         <button
           onClick={onLongRest}
-          disabled={inCombat}
+          disabled={inCombat || turnLocked}
           className="w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
           style={{
             background: inCombat ? "#292524" : "linear-gradient(135deg,#d97706,#92400e)",

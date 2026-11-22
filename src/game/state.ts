@@ -21,6 +21,7 @@ export type GameState = {
   character: Character | null;
   hp: number;
   inventory: string[];
+  adventureFinds: string[];
   effects: string[];
   enemies: Enemy[];
   allies: Ally[];
@@ -48,6 +49,7 @@ export const initialGameState: GameState = {
   character: null,
   hp: 0,
   inventory: [],
+  adventureFinds: [],
   effects: [],
   enemies: [],
   allies: [],
@@ -81,6 +83,7 @@ export type GameAction =
       character: Character;
       startInventory: string[];
       arc: Arc | null;
+      restoredFinds?: string[];
     }
   | { type: "RESET_TO_MENU" }
 
@@ -118,6 +121,7 @@ export type GameAction =
   // the next-arc value is computed by computeNextArc() in arcs.ts and
   // passed in along with the victory flags.
   | { type: "SET_ARC"; arc: Arc }
+  | { type: "COMPLETE_FINALE"; arc: Arc; messages: ChatMessage[] }
   | { type: "SET_SURPRISE"; value: "player" | null }
   | { type: "SET_GOLD"; gold: number }
   | { type: "ADD_GOLD"; amount: number }

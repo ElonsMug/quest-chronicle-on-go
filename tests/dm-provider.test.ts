@@ -84,3 +84,14 @@ test("provider selection requires the matching server key", () => {
   assert.equal(getDmConfig({}), null);
   assert.equal(getDmConfig({ GEMINI_API_KEY: "test-key" })?.provider, "gemini");
 });
+
+test("an upstream Gemini error exposes the status code without the response message", async (t) => {
+  const config = getDmConfig({ GEMINI_API_KEY: "test-key" });
+  assert.ok(config);
+  t.mock.method(globalThis, "fetch", async () => Response.json({
+    error: { status: "UNAVAILABLE", message: "Potentially sensitive upstream details." },
+  }, { status: 503 }));
+  await assert.rejects(generateDmReply(config, request), error =>
+    error instanceof DmProviderError && error.status === 503 && error.providerCode === "UNAVAILABLE"
+    && !error.message.includes("upstream details"));
+});
