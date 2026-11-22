@@ -8,6 +8,7 @@ import type { TFunction } from "i18next";
 import type { Character } from "@/game/types";
 import type { Arc } from "@/game/arcs";
 import { isPotion } from "@/game/inventory";
+import { isScoutKit } from "@/game/vendor";
 
 export type TabKey = "story" | "character" | "inventory" | "journal";
 export type InvFilter = "all" | "weapons" | "armor" | "consumables" | "quest";
@@ -65,7 +66,7 @@ export function BottomNav({
 
 // ── Item categorization ────────────────────────────────────────────
 function categorize(item: string): InvFilter {
-  if (isPotion(item)) return "consumables";
+  if (isPotion(item) || isScoutKit(item)) return "consumables";
   if (/sword|dagger|staff|bow|axe|blade|меч|кинжал|посох|лук|топор/i.test(item)) return "weapons";
   if (/armor|shield|helm|cloak|mail|robes|кольчуга|броня|щит|шлем|плащ|мантия|доспех/i.test(item)) return "armor";
   return "quest";
@@ -238,6 +239,7 @@ export function InventoryTab({
   gold,
   inCombat,
   canUsePotion,
+  turnLocked,
   filter,
   onFilterChange,
   onUseItem,
@@ -249,6 +251,7 @@ export function InventoryTab({
   gold: number;
   inCombat: boolean;
   canUsePotion: boolean;
+  turnLocked?: boolean;
   filter: InvFilter;
   onFilterChange: (f: InvFilter) => void;
   onUseItem: (item: string, idx: number) => void;
@@ -315,8 +318,8 @@ export function InventoryTab({
         <div className="space-y-2">
           {items.map(({ it, idx, cat }) => {
             const cs = categoryStyle(cat, t);
-            const usable = cat === "consumables";
-            const disabled = inCombat && !canUsePotion;
+            const usable = isPotion(it);
+            const disabled = turnLocked || (inCombat && !canUsePotion);
             return (
               <div
                 key={idx}
@@ -334,7 +337,7 @@ export function InventoryTab({
                     {it}
                   </div>
                   <div className="text-stone-500" style={{ fontSize: 11, fontFamily: "sans-serif" }}>
-                    {cs.label}
+                    {isScoutKit(it) ? t("vendor.kitEffect") : cs.label}
                   </div>
                 </div>
                 {usable && (
@@ -379,7 +382,7 @@ export function InventoryTab({
         </div>
         <button
           onClick={onShortRest}
-          disabled={inCombat}
+          disabled={inCombat || turnLocked}
           className="w-full text-left px-4 py-3 rounded-xl text-amber-100 text-sm font-bold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
           style={{ background: "#1c1917", border: "1px solid #292524", fontFamily: "serif" }}
         >
@@ -390,7 +393,7 @@ export function InventoryTab({
         </button>
         <button
           onClick={onLongRest}
-          disabled={inCombat}
+          disabled={inCombat || turnLocked}
           className="w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
           style={{
             background: inCombat ? "#292524" : "linear-gradient(135deg,#d97706,#92400e)",

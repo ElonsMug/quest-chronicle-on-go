@@ -6,10 +6,12 @@
 // ─────────────────────────────────────────────────────────────────
 
 import { supabase } from "@/integrations/supabase/client";
+import type { DmUsage } from "../../supabase/functions/_shared/dm-provider";
 import type { DMRequest } from "../../supabase/functions/_shared/dm-security";
-import type { Character, ChatMessage } from "./types";
+import type { Ally, Character, ChatMessage, Enemy } from "./types";
 import type { Arc } from "./arcs";
 import { buildSystemPrompt } from "./prompt";
+import { stripEnemyAttackRolls } from "./combatTurn";
 
 export type DMRequestArgs = {
   character: Character;
@@ -27,6 +29,7 @@ export type DMRequestArgs = {
   gold: number;
   /** Player's current AC. */
   ac: number;
+  combatants?: { enemies: readonly Enemy[]; allies: readonly Ally[] };
   /** Bonus damage vs final boss from arc artifact. */
   artifactBonus: number;
   /** Fallback text when the API returns an empty body. */
@@ -36,7 +39,7 @@ export type DMRequestArgs = {
 export async function callDM(args: DMRequestArgs): Promise<string> {
   const {
     character, hp, inventory, effects, history, userMessage,
-    spellSlots, language, arc, gold, ac, artifactBonus, silentFallback,
+    spellSlots, language, arc, gold, ac, artifactBonus, combatants, silentFallback,
   } = args;
 
   const slotsForPrompt = character.id === "mage"
@@ -45,16 +48,33 @@ export async function callDM(args: DMRequestArgs): Promise<string> {
 
   const text = await requestDm({
     purpose: "turn",
-    system: buildSystemPrompt(character, hp, inventory, effects, slotsForPrompt, language, arc, gold, ac, artifactBonus),
+    system: buildSystemPrompt(character, hp, inventory, effects, slotsForPrompt, language, arc, gold, ac, artifactBonus, combatants),
     messages: [
-      ...history.map(({ role, content }) => ({ role, content })),
+      ...history.map(({ role, content, source }) => ({
+        role,
+        content: role === "assistant" && source !== "client"
+          ? stripEnemyAttackRolls(content).replace(/\[(?:VENDOR|CLUE_FALLBACK|EPILOGUE):[^\]]*\]/gi, "").trim()
+          : content,
+      })),
       { role: "user", content: userMessage },
     ],
   });
   return text || silentFallback;
 }
 
+type DmResponse = { text?: string; model?: string; usage?: DmUsage };
+
 export async function requestDm(request: DMRequest): Promise<string> {
+  return (await requestDmResult(request)).text ?? "";
+}
+
+export function isDmUnavailable(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return error.message === "API error 503"
+    || ("context" in error && error.context instanceof Response && error.context.status === 503);
+}
+
+export async function requestDmResult(request: DMRequest): Promise<DmResponse> {
   if (import.meta.env.DEV && ["localhost", "127.0.0.1"].includes(window.location.hostname)) {
     const response = await fetch("/api/dm", {
       method: "POST",
@@ -62,13 +82,12 @@ export async function requestDm(request: DMRequest): Promise<string> {
       body: JSON.stringify(request),
     });
     if (!response.ok) throw new Error(`API error ${response.status}`);
-    const data = (await response.json()) as { text?: string };
-    return data.text ?? "";
+    return await response.json() as DmResponse;
   }
 
-  const { data, error } = await supabase.functions.invoke<{ text?: string }>("dungeon-master", {
+  const { data, error } = await supabase.functions.invoke<DmResponse>("dungeon-master", {
     body: request,
   });
   if (error) throw error;
-  return data?.text ?? "";
+  return data ?? {};
 }

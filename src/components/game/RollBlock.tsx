@@ -5,7 +5,7 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { rollDice, parseDiceSides, PROFICIENCY_BONUS } from "@/game/dice";
+import { rollDice, rollAbilityCheck, parseDiceSides, PROFICIENCY_BONUS } from "@/game/dice";
 import type { RollRequest, RollResult } from "@/game/types";
 
 type Props = {
@@ -20,7 +20,7 @@ export function RollBlock({ type, request, onResult }: Props) {
   const [res, setRes] = useState<RollResult | null>(null);
 
   function execute() {
-    if (done) return;
+    if (done || res) return;
     const mod = request.mod || 0;
 
     if (type === "attack") {
@@ -45,14 +45,7 @@ export function RollBlock({ type, request, onResult }: Props) {
         ac, dc: ac, success: hit, crit, autoMiss, damage,
       });
     } else {
-      const dc = request.dc ?? 15;
-      const hitRoll = rollDice(20);
-      const total = hitRoll + mod;
-      const success = total >= dc;
-      setRes({
-        hitRoll, mod, prof: 0, total,
-        ac: dc, dc, success, crit: false, autoMiss: false, damage: 0,
-      });
+      setRes(rollAbilityCheck(request));
     }
   }
 
@@ -63,7 +56,9 @@ export function RollBlock({ type, request, onResult }: Props) {
     }
   }
 
-  const diceLabel = type === "attack" ? `${request.weapon} (${request.dice})` : `${request.stat} d20`;
+  const ability = t(`stats.${request.stat}`, { defaultValue: request.stat });
+  const checkLabel = request.skill ? `${t(`checks.skills.${request.skill}`)} (${ability})` : ability;
+  const diceLabel = type === "attack" ? `${request.weapon} (${request.dice})` : `${checkLabel} · d20`;
   const modLabel = (request.mod || 0) >= 0 ? `+${request.mod || 0}` : `${request.mod}`;
   const targetLabel = type === "attack" ? `AC${request.ac ?? 10}` : `DC${request.dc ?? 15}`;
 
@@ -94,6 +89,8 @@ export function RollBlock({ type, request, onResult }: Props) {
       <div className="text-amber-600 text-xs uppercase tracking-widest mb-2">
         {type === "attack" ? `⚔️ ${t("combat.attackLabel")}` : `🎲 ${t("combat.rollLabel")}`}: {diceLabel} {modLabel} vs {targetLabel}
       </div>
+      {type === "roll" && request.action && <p className="mb-2 text-sm text-amber-100">{request.action}</p>}
+      {request.scoutKit && <p className="mb-2 text-sm text-amber-200">{t("vendor.kitRoll")}</p>}
       {!res ? (
         <button
           onClick={execute}
@@ -113,7 +110,7 @@ export function RollBlock({ type, request, onResult }: Props) {
                   color: res.crit ? "#fbbf24" : res.autoMiss ? "#ef4444" : res.success ? "#4ade80" : "#f87171",
                 }}
               >
-                {res.hitRoll}
+                d20 ({res.hitRoll})
               </span>
               {!res.crit && !res.autoMiss && (
                 <>
@@ -153,7 +150,7 @@ export function RollBlock({ type, request, onResult }: Props) {
                 className="bg-stone-800 rounded-lg px-3 py-1 text-lg font-bold"
                 style={{ fontFamily: "serif", color: res.success ? "#4ade80" : "#f87171" }}
               >
-                {res.hitRoll}
+                d20 ({res.hitRoll})
               </span>
               {res.mod !== 0 && (
                 <>

@@ -17,7 +17,7 @@ export const LIMITS = {
 
 // ── Zod schema for /api/dm payload ───────────────────────────────
 export const dmRequestSchema = z.object({
-  purpose: z.enum(["turn", "arc-setup"]).default("turn"),
+  purpose: z.enum(["turn", "arc-setup", "lighthouse", "one-shot-setup", "one-shot-intent"]).default("turn"),
   system: z.string().max(LIMITS.systemMaxChars).default(""),
   messages: z
     .array(

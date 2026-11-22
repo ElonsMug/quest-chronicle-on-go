@@ -43,8 +43,11 @@ export function useAuth() {
   return v;
 }
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [loading, setLoading] = useState(true);
+export function AuthProvider({ children, localPlaytest = false }: {
+  children: ReactNode;
+  localPlaytest?: boolean;
+}) {
+  const [loading, setLoading] = useState(!localPlaytest);
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -66,6 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Auth listener FIRST, then session check (avoids race conditions).
   useEffect(() => {
+    if (localPlaytest) return;
     const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => {
       setSession(sess);
       setUser(sess?.user ?? null);
@@ -91,7 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return () => sub.subscription.unsubscribe();
-  }, [loadProfile, loadSave]);
+  }, [localPlaytest, loadProfile, loadSave]);
 
   const refreshProfile = useCallback(async () => {
     if (user) await loadProfile(user.id);

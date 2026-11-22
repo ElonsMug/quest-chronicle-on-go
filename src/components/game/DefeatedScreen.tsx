@@ -11,7 +11,7 @@ type Props = {
   hasPotion: boolean;
   onContinueStory: () => void;
   onUsePotion: () => void;
-  onRetry: () => void;
+  onRetry?: () => void;
   onMenu: () => void;
   onClose: () => void;
 };
@@ -56,13 +56,15 @@ export function DefeatedScreen({ hasPotion, onContinueStory, onUsePotion, onRetr
               🧪 {t("defeated.drinkPotion")}
             </button>
           )}
-          <button
-            onClick={onRetry}
-            className="w-full py-3 rounded-xl border border-stone-700 bg-stone-900 text-stone-300 text-sm font-bold"
-            style={{ fontFamily: "serif" }}
-          >
-            ⚔️ {t("defeated.retry")}
-          </button>
+          {onRetry && (
+            <button
+              onClick={onRetry}
+              className="w-full py-3 rounded-xl border border-stone-700 bg-stone-900 text-stone-300 text-sm font-bold"
+              style={{ fontFamily: "serif" }}
+            >
+              ⚔️ {t("defeated.retry")}
+            </button>
+          )}
           <button
             onClick={onMenu}
             className="w-full py-3 rounded-xl border border-stone-800 bg-stone-950 text-stone-500 text-sm"

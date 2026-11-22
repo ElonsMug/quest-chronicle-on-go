@@ -12,6 +12,70 @@
     "use": "Использовать",
     "act": "Действовать"
   },
+  "socialClue": {
+    "previousApproach": "предыдущая попытка переговоров",
+    "failedCheck": "[Правило сцены: социальная проверка провалилась. Действие игрока: {{action}}. Собеседник отказывает. Покажи конкретное последствие, например потерю времени или настороженность. Упомяни доступный альтернативный источник в рассказе и дай один обычный нумерованный вариант с тегами [NO_CHECK] [CLUE_ROUTE]. Подготовленный путь, если он есть: {{lead}}. Остальные варианты тоже должны продвигать сцену. Саму улику пока не раскрывай.]",
+    "followPrepared": "[Правило сцены: игрок пошёл к другому источнику после отказа. Прежний подход: {{action}}. Другой источник даёт улику: {{fact}}. Опиши, как герой её находит, сохрани последствия отказа и предложи действия, которые развивают сцену. Без новой проверки на получение этой улики.]",
+    "followUnprepared": "[Правило сцены: после провала переговоров игрок ищет другой источник. Прежний подход: {{action}}. Назови доступный и уместный для сцены источник, не связанный с отказавшим NPC, и сообщи одну конкретную улику, которая позволяет продвинуться к той же цели. Запиши эту улику на отдельной строке в формате CLUE_FOUND в квадратных скобках, например [CLUE_FOUND: Патруль меняется на закате]. Сохрани последствия отказа. Без нового броска, оплаты или разговора с тем же NPC за эту улику.]"
+  },
+  "checks": {
+    "difficulty": "Сл {{dc}}",
+    "choiceLabel": "{{skill}} · Сл {{dc}}",
+    "skills": {
+      "acrobatics": "Акробатика",
+      "animal handling": "Уход за животными",
+      "arcana": "Магия",
+      "athletics": "Атлетика",
+      "deception": "Обман",
+      "history": "История",
+      "insight": "Проницательность",
+      "intimidation": "Запугивание",
+      "investigation": "Расследование",
+      "medicine": "Медицина",
+      "nature": "Природа",
+      "perception": "Внимательность",
+      "performance": "Выступление",
+      "persuasion": "Убеждение",
+      "religion": "Религия",
+      "sleight of hand": "Ловкость рук",
+      "stealth": "Скрытность",
+      "survival": "Выживание"
+    }
+  },
+  "combatLoot": {
+    "gold": "{{amount}} зм",
+    "artifact": "+3 к урону по финальному боссу",
+    "received": "Добыча за победу: {{reward}}"
+  },
+  "vendor": {
+    "kitOnlyOffer": "Собеседник предлагает походный набор для разведки.",
+    "standardOffer": "Собеседник предлагает продать полезные сведения. Цена указана ниже.",
+    "roles": {
+      "innkeeper": "Трактирщик",
+      "merchant": "Торговец",
+      "informant": "Информатор"
+    },
+    "buyTip": "Купить сведения · {{price}} зм",
+    "buyKit": "Купить походный набор разведчика · {{price}} зм",
+    "kitEffect": "Одноразовый. +2 к следующей проверке Внимательности, Расследования или Выживания вне боя.",
+    "kitRoll": "Походный набор даёт +2 и расходуется на эту проверку.",
+    "confirmTip": "[Покупка подтверждена: {{amount}} зм за сведения. Сообщи только эту необязательную подсказку: {{tip}}. Продолжи сцену и предложи бесплатные варианты.]",
+    "confirmKit": "[Покупка подтверждена: {{amount}} зм за предмет «{{item}}». Движок выдаёт набор. Опиши покупку и предложи бесплатные варианты. Не раскрывай неоплаченные сведения.]",
+    "tipReceived": "Получены сведения: {{tip}}",
+    "leave": "Уйти и продолжить без покупки."
+  },
+  "goldOffer": {
+    "quote": "Цена за «{{reason}}» — {{amount}} золота. Предложение ждёт твоего решения.",
+    "decline": "Отказаться и продолжить без оплаты",
+    "declined": "Я отказываюсь от предложения. Продолжаю без оплаты и без того, что предложено за деньги.",
+    "connectionLost": "Связь прервалась. Предложение ещё действует, сумма в кошельке не изменилась.",
+    "receive": "Получить {{amount}} зм",
+    "pay": "Заплатить {{amount}} зм"
+  },
+  "sessionReport": {
+    "save": "Сохранить сессию",
+    "description": "Скачать историю и состояние игры для разбора ошибки"
+  },
   "language": {
     "label": "Язык",
     "english": "English",
@@ -19,7 +83,7 @@
     "switchTitle": "Сменить язык",
     "switchDuringGame": {
       "title": "Сменить язык?",
-      "body": "Меню, инвентарь и новые события будут на новом языке. Уже написанные сообщения мастера останутся на текущем языке.",
+      "body": "Подписи в меню и следующий ответ Мастера будут на новом языке. Текущая сцена, её варианты действий и названия полученных предметов сохранят прежний язык.",
       "confirm": "Сменить",
       "cancel": "Оставить текущий"
     }
@@ -72,6 +136,7 @@
     "hp": "HP"
   },
   "combat_log": {
+    "disadvantage": " · Помеха: d20({{first}}) и d20({{second}})",
     "enemyAttackHit": "{{name}} атакует — d20({{roll}})+{{atk}}={{total}} vs КД{{ac}} → ПОПАЛ → {{dmg}} урона",
     "enemyAttackMiss": "{{name}} атакует — d20({{roll}})+{{atk}}={{total}} vs КД{{ac}} → МИМО",
     "enemyAttackCrit": "{{name}} атакует — d20(20) КРИТ → {{dmg}} урона",
@@ -176,6 +241,19 @@
     "noSlots": "Нет слотов"
   },
   "combat": {
+    "noPotion": "У вас не осталось лечебных зелий.",
+    "midBossPassed": "Вы выбираете обходной путь и оставляете противника позади.",
+    "surrenderFallback": "Противник опускает оружие. Бой окончен.",
+    "retreatFallback": "Вы позволяете противнику отступить. Бой окончен.",
+    "disengageProceed": "Продолжить путь к цели",
+    "disengageLook": "Осмотреться перед тем, как идти дальше",
+    "reconciledHit": "Ваш удар достигает цели, но угроза ещё не миновала.",
+    "reconciledMiss": "Ваш удар не достигает цели. Бой продолжается.",
+    "dodgeAttempt": "Вы смещаетесь в сторону и готовитесь уклониться от атаки.",
+    "midBossApproach": "На пути впереди вы замечаете противника: {{name}}. У вас есть время решить, как поступить.",
+    "midBossBypassChoice": "Попробовать обойти противника и продолжить путь без боя",
+    "midBossTalkChoice": "Подойти и спросить, чего хочет противник",
+    "midBossFightChoice": "Атаковать: {{name}}",
     "surpriseRound": "Раунд засады",
     "attack": "Атака",
     "berserk": "Берсерк",
@@ -230,6 +308,7 @@
     "continueStory": "Продолжить историю",
     "drinkPotion": "Выпить зелье лечения",
     "retry": "Начать бой заново",
+    "restarted": "Бой начат заново. Состояние на начало боя восстановлено.",
     "returnToMenu": "Вернуться в меню",
     "closeAria": "Закрыть",
     "closeTitle": "Закрыть и перечитать журнал",
@@ -261,10 +340,67 @@
     }
   },
   "arcCompleted": {
+    "bossFallen": "Главный противник повержен.",
+    "bossSurrendered": "Главный противник сдался.",
+    "showEnding": "Посмотреть финал",
+    "reward": "Награда за завершение · {{gold}} зм",
+    "surrenderSubtitle": "Главный противник сдался. Цель достигнута.",
+    "surrenderFallback": "Противник складывает оружие. Угроза миновала, и вы доводите начатое до конца.",
+    "victoryFallback": "Последняя угроза устранена. Теперь ничто не мешает вам завершить начатое. Цель достигнута.",
+    "readStory": "Читать журнал",
+    "journal": "Эпилог — {{epilogue}}",
     "title": "Арка завершена!",
     "subtitle": "{{antagonist}} повержен. Серый Берег вздыхает свободнее.",
     "newArc": "Новое приключение",
-    "returnToMenu": "Вернуться в меню"
+    "returnToMenu": "В главное меню · за новыми приключениями",
+    "reportBack": "Вернуться и рассказать об успехе · {{recipient}}",
+    "continueToEnding": "Завершить приключение",
+    "objectivePending": "Путь свободен. Осталось выполнить последнее действие: {{objective}}.",
+    "artifactAward": "Получен уникальный артефакт · {{name}}",
+    "rewardHeading": "Награда за приключение",
+    "rewardAmount": "+{{gold}} зм",
+    "finds": "Предметы, собранные за приключение",
+    "noFinds": "Предметов за эту сессию не найдено.",
+    "futureInventory": "В будущих приключениях вы сможете сохранять собранные предметы между сессиями и менять ход истории с помощью их свойств.",
+    "supportLater": "Поддержать проект · позже",
+    "perks": {
+      "resolve": "Будущее свойство: один раз за приключение перебросить проваленную проверку.",
+      "insight": "Будущее свойство: +2 к первой проверке Расследования в приключении.",
+      "guard": "Будущее свойство: уменьшить урон от первого попадания по вам на 3.",
+      "fortune": "Будущее свойство: получить на 5 зм больше за первое завершённое столкновение."
+    },
+    "fallback": {
+      "objective": {
+        "altar": {
+          "action": "Уничтожить алтарь",
+          "result": "Вы разбиваете алтарь и разрываете договор. Скверна отступает от земли."
+        },
+        "ritual": {
+          "action": "Прервать ритуал",
+          "result": "Вы разрываете ритуальный круг. Призыв прекращается, и угроза минует."
+        },
+        "evidence": {
+          "action": "Собрать и предать огласке доказательства",
+          "result": "Вы собираете улики и передаёте их тем, кто может положить конец заговору."
+        }
+      },
+      "recognition": {
+        "merchants": {
+          "recipient": "купцы Серого Берега",
+          "response": "Купцы благодарят вас за освобождённый тракт. Первый караван уже готовится к дороге."
+        },
+        "villagers": {
+          "recipient": "жители деревни",
+          "response": "Жители выходят из домов навстречу. Они благодарят вас за то, что снова могут жить без страха перед скверной."
+        }
+      },
+      "artifacts": {
+        "resolve": "Перстень Стойкого Сердца",
+        "insight": "Линза Тайного Знака",
+        "guard": "Амулет Последнего Щита",
+        "fortune": "Монета Счастливого Пути"
+      }
+    }
   },
   "dev": {
     "title": "Dev Mode",
@@ -279,10 +415,14 @@
     }
   },
   "dm": {
+    "masterUnavailableOpening": "Мастер временно недоступен. Повторите запрос, чтобы открыть эту сессию.",
+    "masterUnavailableTurn": "Мастер временно недоступен. Ход сохранён, его можно отправить ещё раз.",
+    "retryOpening": "Повторить загрузку первой сцены",
     "thinking": "Мастер думает",
     "silent": "Мастер молчит...",
     "connectionError": "Ошибка соединения с Мастером.",
-    "connectionLost": "Связь прервалась.",
+    "turnConnectionLost": "Мастер не ответил. Ход сохранён, его можно отправить ещё раз.",
+    "retryTurn": "Повторить отправку хода",
     "genericError": "Ошибка.",
     "receivedItem": "Получен: {{item}}",
     "startPrompt": "Начни приключение. Вводная сцена в Сером Берегу. 3 варианта действий.",
@@ -297,8 +437,10 @@
     }
   },
   "system": {
+    "goldReceived": "[Игрок подтвердил получение {{amount}} зм. Причина: {{reason}}. Движок уже начислил монеты. Опиши последствия операции и продолжи сцену.]",
+    "goldPaid": "[Игрок подтвердил оплату {{amount}} зм. Причина: {{reason}}. Движок уже списал монеты. Опиши, что игрок получил за оплату, и продолжи сцену.]",
     "potionBonusAction": "[Bonus action before main attack: the player drinks a healing potion, +{{heal}} HP ({{hp}}/{{max}}). Describe the gulp of the potion in ONE sentence, then immediately describe the player's main action described below.]",
-    "combatTurnReminder": "[SYSTEM RULE: After describing the result of the player's action — the leader acts according to their behavior state. AGGRESSIVE/TACTICAL/DEFENSIVE → attack with [DAMAGE: X] on hit. RETREATING → narrate the disengage, no attack required. If leader is below 40% HP → trigger the motive-based behavior shift (surrender/flee/escalate). Minions add pressure in the narrative without their own turn. Do not offer choices 1-2-3 unless combat is ending.]",
+    "combatTurnReminder": "[SYSTEM RULE: After describing the result of the player's action — the leader acts according to their behavior state. AGGRESSIVE/TACTICAL/DEFENSIVE → use [ENEMY_ATTACK: reference] and let the client resolve the roll. RETREATING → narrate the disengage, no attack required. If leader is below 40% HP → trigger the motive-based behavior shift (surrender/flee/escalate). Minions add pressure in the narrative without their own turn. Do not offer choices 1-2-3 unless combat is ending.]",
     "surpriseRoundReminder": "[SYSTEM RULE: SURPRISE ROUND — the player just used their free ambush action. Enemies are STILL surprised this turn — DO NOT attack the player, DO NOT write [DAMAGE:]. Describe the result of the surprise action (kill, wound, missed swing). If enemies still live, NOW write [INITIATIVE] on its own line — normal combat starts on the next turn. Do not offer choices 1-2-3.]",
     "berserkActivated": "[Berserk activated: +2 damage and -2 AC for 2 turns]",
     "defendStance": "[Defensive stance: +2 AC until next turn]",
@@ -308,11 +450,12 @@
     "sleepCast": "[Sleep: pool of {{pool}} HP. Living enemies fall asleep starting from the lowest HP until the pool runs out (subtract sleeping enemy's HP from the pool). Undead, constructs and demons are immune. For each sleeping enemy write [EFFECT: <Enemy_name>_asleep, 2 rounds]. The sleepers are helpless but alive — ask the player what to do with each (finish, bind, interrogate, search) — this is no longer active combat with sleepers, give 3 choices.]",
     "controlSpellCast": "[Control spell cast: {{name}}. Spell Save DC 14.]",
     "spellCast": "[Cast: {{name}}]",
-    "retryCombat": "[Player restarts the fight — same encounter, original HP]",
     "initiativeWon": "[Initiative won: you {{player}} vs enemy {{enemy}} — you act first]",
     "initiativeLost": "[Initiative lost: you {{player}} vs enemy {{enemy}} — enemy attacks first]",
     "attackAutoMiss": "[Attack: {{weapon}}{{target}} — d20(1) AUTO-MISS vs AC{{ac}}]",
     "attackCrit": "[Attack: {{weapon}}{{target}} — d20(20) CRIT vs AC{{ac}} → Damage to enemy: {{damage}}. Describe the strike and write [ENEMY_DAMAGE: {{tagName}}, {{damage}}].]",
+    "combatAttackCrit": "[Attack: {{weapon}}{{target}} — d20(20) CRIT vs AC{{ac}} → Damage to enemy: {{damage}}]",
+    "combatAttackHit": "[Attack: {{weapon}}{{target}} — d20({{roll}})+mod({{mod}})+prof({{prof}})={{total}} vs AC{{ac}} HIT → Damage to enemy: {{damage}}]",
     "attackHit": "[Attack: {{weapon}}{{target}} — d20({{roll}})+mod({{mod}})+prof({{prof}})={{total}} vs AC{{ac}} HIT → Damage to enemy: {{damage}}. Describe the strike and write [ENEMY_DAMAGE: {{tagName}}, {{damage}}].]",
     "attackMiss": "[Attack: {{weapon}}{{target}} — d20({{roll}})+mod({{mod}})+prof({{prof}})={{total}} vs AC{{ac}} MISS]",
     "rollSuccess": "[Check: {{stat}} — SUCCESS ({{roll}}{{modPart}}={{total}} vs DC{{dc}})]",
@@ -354,5 +497,121 @@
     "returning_new": "Начать новый путь",
     "dev_reset": "Сбросить онбординг",
     "dev_preview_label": "DEV: предпросмотр онбординга"
+  },
+  "oneshot": {
+    "title": "Новое вселение",
+    "startAs": "Начать за {{name}}",
+    "exit": "К выбору героя",
+    "report": "Сохранить отчёт сессии",
+    "resources": "HP {{hp}}/{{max}} · {{gold}} зм · Зелья {{potions}}",
+    "preparing": "Gemini готовит твоё приключение…",
+    "listening": "Мастер разбирает твой ход…",
+    "error": "Мастер не смог ответить. Попробуй ещё раз.",
+    "retrySetup": "Повторить подготовку приключения",
+    "retryTurn": "Повторить отправку хода",
+    "edit": "Изменить ход",
+    "freeAction": "Свой вариант…",
+    "send": "Отправить",
+    "noMatch": "Сейчас это действие недоступно. Попробуй другой подход.",
+    "price": "{{gold}} зм",
+    "check": "{{skill}} · Сл {{dc}}",
+    "checkPass": "{{skill}} · d20 {{die}} ({{modifier}}) = {{total}} против Сл {{dc}} · Успех",
+    "checkFail": "{{skill}} · d20 {{die}} ({{modifier}}) = {{total}} против Сл {{dc}} · Провал",
+    "yourAttack": "Твоя атака · d20 {{die}}, итог {{total}} против КД {{ac}} · Урон {{damage}}",
+    "enemyAttack": "Атака противника · d20 {{die}}, итог {{total}} против КД {{ac}} · Урон {{damage}}",
+    "healed": "Зелье восстанавливает {{amount}} HP.",
+    "loot": "Получена добыча: {{name}} (+3 к урону в финальном бою).",
+    "forcedExit": "После трёх раундов ты выходишь из боя.",
+    "fight": "{{foe}} · {{hp}} HP · Раунд {{round}} из 3",
+    "clue": "Улика",
+    "journal": "Журнал",
+    "usage": "{{model}} · Запросы: {{requests}} · Токены: {{total}} ({{input}} вход, {{output}} выход)",
+    "unreported": "Запросов без полного подсчёта токенов: {{count}}",
+    "restart": "Создать новое приключение",
+    "action": {
+      "strike": "Атаковать",
+      "potion": "Выпить лечебное зелье",
+      "withdraw": "Выйти из боя",
+      "dodge": "Уклониться и выждать момент",
+      "tip": "Купить сведения · {{vendor}}",
+      "buyPotion": "Купить лечебное зелье · {{vendor}}"
+    },
+    "challenge": "Начать бой · {{opponent}}",
+    "spellSlots": "Ячейки заклинаний {{count}}",
+    "asleep": "Противник засыпает. Ты можешь двигаться дальше.",
+    "resistedSleep": "Заклинание не усыпило противника."
+  },
+  "lighthouse": {
+    "entry": "Сыграть короткое приключение",
+    "title": "Погасший маяк",
+    "restart": "Начать новое прохождение",
+    "premise": "Кто-то погасил маяк Серого Берега. Корабль идёт к рифам, и у тебя есть время предупредить его до того, как он войдёт в гавань.",
+    "start": "Начать приключение",
+    "retry": "Повторить запрос Мастеру",
+    "unavailable": "Мастер не ответил. Повтори запрос, чтобы продолжить с тем же результатом.",
+    "choices": "Что ты делаешь?",
+    "clues": "Улики",
+    "none": "Улик пока нет.",
+    "round": "Раунд {{round}} из 3",
+    "enemyHp": "{{enemy}} · {{hp}} HP",
+    "report": "Расход Gemini за прохождение",
+    "requests": "Запросов отправлено",
+    "input": "Входные токены",
+    "output": "Выходные токены",
+    "total": "Всего учтено токенов",
+    "partial": "Запросов без данных о расходе: {{count}}. В итог вошли ответы, для которых Gemini вернул число токенов.",
+    "model": "Модель",
+    "return": "К выбору персонажа",
+    "scene": {
+      "harbor": "В гавани выясни, что случилось и как добраться до маяка. Собрав две улики, ты отправишься к маяку.",
+      "gate": "Дозорный контрабандистов сторожит вход на маяк. Лестница ведёт в фонарную комнату.",
+      "guard": "Дозорный преградил путь. Идёт бой. Если дозорный продержится три раунда, он отступит в туман.",
+      "lantern": "Главарь контрабандистов загородил линзу маяка. У окна лежит сигнальная ракета, которой можно предупредить корабль.",
+      "captain": "Главарь сражается в фонарной комнате, пока корабль приближается к рифам. На бой есть три раунда. Сигнальная ракета под рукой.",
+      "ending": "Опиши зафиксированный исход и то, что после него происходит в гавани."
+    },
+    "enemy": {
+      "guard": "Дозорный",
+      "captain": "Главарь контрабандистов"
+    },
+    "action": {
+      "keeper": "Расспросить раненого смотрителя",
+      "orders": "Прочитать изъятый приказ в порту",
+      "passage": "Найти служебный проход на портовой карте",
+      "showOrders": "Показать дозорному приказ главаря",
+      "takePassage": "Войти через служебный проход",
+      "rushGuard": "Вызвать дозорного на бой",
+      "confrontCaptain": "Вступить в бой с главарём",
+      "negotiate": "Предъявить главарю приказ и показания смотрителя",
+      "repair": "Пробраться к линзе и убрать заслонку",
+      "strike": "Атаковать",
+      "flare": "Выпустить сигнальную ракету"
+    },
+    "event": {
+      "keeper": "Смотритель видел, как главарь намеренно загородил линзу. Главарь уверял сообщников, что никто не пострадает.",
+      "orders": "В подписанном приказе велено погасить маяк и разграбить севший на мель корабль. Дозорному приказано покинуть пост, если приказ раскроют.",
+      "passage": "Служебный проход позволяет обойти дозорного. На карте также указан короткий путь к линзе с тыльной стороны.",
+      "showOrders": "Дозорный увидел приказ и оставил пост. Ты поднялся в фонарную комнату.",
+      "takePassage": "Ты незаметно прошёл в фонарную комнату через служебный проход.",
+      "negotiate": "Увидев приказ и услышав показания смотрителя, главарь сдаётся.",
+      "enemyInitiative": "Противник ходит первым ({{opponent}} против {{player}}).",
+      "heroInitiative": "Ты ходишь первым ({{player}} против {{opponent}}).",
+      "checkPassed": "Проверка Ловкости {{total}} против сложности {{dc}}. Успех.",
+      "checkFailed": "Проверка Ловкости {{total}} против сложности {{dc}}. Главарь замечает тебя у линзы.",
+      "heroHit": "Ты попадаешь и наносишь {{damage}} урона ({{total}} на атаку).",
+      "heroMiss": "Ты промахиваешься ({{total}} на атаку).",
+      "enemyHit": "Противник попадает и наносит {{damage}} урона ({{total}} на атаку).",
+      "enemyMiss": "Противник промахивается ({{total}} на атаку).",
+      "guardDefeated": "Дозорный повержен. Ты поднимаешься к фонарю.",
+      "guardDisengages": "После трёх раундов дозорный отступает в туман. Ты поднимаешься к фонарю.",
+      "lit": "Маяк загорается, корабль проходит мимо рифов.",
+      "warned": "Ракета вовремя предупредила корабль. Маяк остался тёмным, а главарь на свободе.",
+      "lost": "Корабль достиг рифов прежде, чем его удалось предупредить. Портовая команда отправляется на помощь. Маяк остаётся тёмным."
+    },
+    "outcome": {
+      "lit": "Маяк снова горит",
+      "warned": "Корабль предупреждён",
+      "lost": "Корабль сел на мель"
+    }
   }
 }

@@ -6,6 +6,7 @@
 // ─────────────────────────────────────────────────────────────────
 
 import type { parseDMResponse } from "./parser";
+import type { Skill } from "./abilityChecks";
 
 export type Stat = "str" | "dex" | "con" | "int" | "wis" | "cha";
 export type SpellType = "attack" | "defense" | "control";
@@ -51,10 +52,18 @@ export type Character = {
 // implementation so the contract stays in sync automatically.
 export type Parsed = ReturnType<typeof parseDMResponse>;
 
+export type ClueFallback = { lead: string; fact: string };
+export type SocialFailure = { action?: string; clueFallback?: ClueFallback };
+
 export type ChatMessage = {
   role: "user" | "assistant";
   content: string;
+  rawContent?: string;
+  vendorTip?: string;
+  abilityRoll?: { action?: string; skill?: Skill; stat?: string; result: RollResult };
   parsed?: Parsed;
+  source?: "client";
+  socialFailure?: SocialFailure;
 };
 
 export type Enemy = {
@@ -87,14 +96,18 @@ export type Ally = { name: string; hp: number; maxHp: number };
 
 export type RollRequest = {
   stat?: string;
+  skill?: Skill;
+  action?: string;
+  scoutKit?: true;
   weapon?: string;
   dice?: string;
   mod: number;
   dc?: number;
+  social?: true;
   ac?: number;
 };
 
-export type PendingRoll = { type: "attack" | "roll"; request: RollRequest };
+export type PendingRoll = { type: "attack" | "roll"; request: RollRequest; choiceAction?: string; clueFallback?: ClueFallback };
 
 export type RollResult = {
   hitRoll: number;

@@ -6,28 +6,27 @@
 // when the narrative is written in another language.
 // ─────────────────────────────────────────────────────────────────
 
-import type { Stat } from "./types";
+import type { ClueFallback, Enemy } from "./types";
+import { limitStoryChoices, parseAbilityCheck, type StoryChoice } from "./abilityChecks.ts";
+import { isScoutKit, type Vendor } from "./vendor.ts";
+import { isCombatLootItem } from "./combatLoot.ts";
 
-function mapStatToKey(s: string): Stat {
-  const l = s.toLowerCase();
-  if (l.includes("str") || l.includes("сил") || l.includes("strength")) return "str";
-  if (l.includes("dex") || l.includes("лов") || l.includes("dexterity")) return "dex";
-  if (l.includes("con") || l.includes("вын") || l.includes("constitution")) return "con";
-  if (l.includes("wis") || l.includes("мдр") || l.includes("wisdom")) return "wis";
-  if (l.includes("cha") || l.includes("хар") || l.includes("charisma")) return "cha";
-  return "int";
+function parseClueFallback(text: string): ClueFallback | undefined {
+  const fallback = text.match(/\[CLUE_FALLBACK:[ \t]*([^|\[\]\r\n]+)\|([^|\[\]\r\n]+)\]/i);
+  const lead = fallback?.[1].trim();
+  const fact = fallback?.[2].trim();
+  return lead && fact ? { lead, fact } : undefined;
 }
 
 export function parseDMResponse(text: string) {
-  const choices: { num: string; text: string }[] = [];
+  const choices: StoryChoice[] = [];
   const narrativeLines: string[] = [];
   let attackRequest: { weapon: string; dice: string; mod: number; ac: number } | null = null;
-  let rollRequest: { stat: Stat; dc: number } | null = null;
   let damage: number | null = null;
   let newItem: string | null = null;
   const newItems: string[] = [];
   const upgrades: { from: string; to: string }[] = [];
-  const newEnemies: { name: string; maxHp: number; hp: number; ac: number; damage: string; attackBonus: number; wisBonus: number; isUndead?: boolean; isBoss?: boolean; isMidBoss?: boolean }[] = [];
+  const newEnemies: Enemy[] = [];
   const newAllies: { name: string; maxHp: number; hp: number }[] = [];
   const allyDamages: { name: string; damage: number }[] = [];
   const enemyDamages: { name: string; damage: number }[] = [];
@@ -46,13 +45,18 @@ export function parseDMResponse(text: string) {
   // The character class `[^\]]*` is intentionally permissive so a malformed
   // tag (extra space, trailing text inside brackets) still gets stripped from
   // the visible narrative even if its dedicated extractor regex doesn't fire.
-  const TAG = /\[(ATTACK|ROLL|DAMAGE|ITEM|UPGRADE|ENEMY|ENEMY_DAMAGE|ENEMY_ATTACK|ALLY|ALLY_DAMAGE|EFFECT|INITIATIVE|END_COMBAT|PLAYER_HP|BEHAVIOR_SHIFT|SURPRISE|GOLD|ARTIFACT)[^\]]*\]/gi;
+  const TAG = /\[(ATTACK|ROLL|CLUE_FALLBACK|CLUE_FOUND|DAMAGE|ITEM|UPGRADE|ENEMY|ENEMY_DAMAGE|ENEMY_ATTACK|ENEMY_WITHDRAWAL|MIDBOSS_BYPASSED|EPILOGUE|ALLY|ALLY_DAMAGE|EFFECT|INITIATIVE|END_COMBAT|PLAYER_HP|BEHAVIOR_SHIFT|SURPRISE|GOLD_OFFER|GOLD|ARTIFACT|VENDOR)[^\]]*\]/gi;
 
   const atk = text.match(/\[ATTACK:\s*([^,\]]+),\s*([^,\]]+),\s*([^,\]]+),\s*AC(\d+)\]/i);
   if (atk) attackRequest = { weapon: atk[1].trim(), dice: atk[2].trim(), mod: parseInt(atk[3]) || 0, ac: parseInt(atk[4]) };
 
-  const rol = text.match(/\[ROLL:\s*([^,\]]+)(?:,\s*DC[=:]?(\d+))?\]/i);
-  if (rol) rollRequest = { stat: mapStatToKey(rol[1].trim()), dc: parseInt(rol[2] || "15") };
+  const rol = text.match(/^\s*\[ROLL:\s*([^,\]\r\n]+)(?:,\s*DC[=:]?\s*(\d+))?(?:,\s*(SOCIAL|STRENGTH))?\s*\]\s*$/im);
+  const rollRequest = rol ? parseAbilityCheck(rol[1], Number(rol[2] ?? 15), rol[3]) : null;
+
+  const clueFallback = text.split(/\r?\n/).filter(line => !/^\s*\*{0,2}\d+\./.test(line))
+    .map(parseClueFallback).find(Boolean);
+
+  const discoveredClue = text.match(/^\s*\[CLUE_FOUND:[ \t]*([^\]\r\n]+)\]\s*$/im)?.[1].trim();
 
   // Sum every [DAMAGE: X] in the response
   const dmgRe = /\[DAMAGE:\s*(\d+)\]/gi;
@@ -67,11 +71,23 @@ export function parseDMResponse(text: string) {
   const goldMatch = text.match(/\[GOLD:\s*([+-]?\d+)\]/i);
   if (goldMatch) goldChange = parseInt(goldMatch[1]);
 
+  const offers = [...text.matchAll(/^\s*\[GOLD_OFFER:\s*([+-]\d+)\s*,\s*([^\]\r\n]+)\]\s*$/gim)];
+  const amount = Number(offers[0]?.[1]);
+  const reason = offers[0]?.[2].trim();
+  const goldOffer = offers.length === 1 && Number.isSafeInteger(amount) && amount !== 0 && reason
+    ? { amount, reason } : null;
+  const vendors = [...text.matchAll(/^\s*\[VENDOR:\s*(innkeeper|merchant|informant)[ \t]*\|[ \t]*([^\[\]\r\n]{1,300})\][ \t]*$/gim)];
+  const tip = vendors[0]?.[2].trim();
+  const vendor: Vendor | null = vendors.length === 1 && tip
+    ? { role: vendors[0][1].toLowerCase() as Vendor["role"], tip } : null;
+
   const itemRe = /\[ITEM:\s*([^\]]+)\]/gi;
   let im: RegExpExecArray | null;
   while ((im = itemRe.exec(text)) !== null) {
     const name = im[1].trim();
-    if (name) {
+    const looseGold = /^\d+\s*(?:gp|gold(?: (?:coins?|pieces?))?|зм|золот(?:ых(?: монет)?|ые монеты|ая монета|о))$/iu.test(name)
+      || /^(?:золото(?:\s+[^\d]+)?|(?:кошель|мешок|кошел[её]к|сумка) (?:с )?(?:золота|золотом|монет|монетами)|(?:bag|pouch|purse) of (?:gold|coins)|(?:stolen|merchant[’']s) gold)$/iu.test(name);
+    if (name && !looseGold && !isScoutKit(name) && !isCombatLootItem(name)) {
       newItems.push(name);
       if (newItem === null) newItem = name;
     }
@@ -80,34 +96,42 @@ export function parseDMResponse(text: string) {
   const upgradeRe = /\[UPGRADE:\s*([^\]]+?)\s*->\s*([^\]]+?)\]/gi;
   let um: RegExpExecArray | null;
   while ((um = upgradeRe.exec(text)) !== null) {
-    upgrades.push({ from: um[1].trim(), to: um[2].trim() });
+    const from = um[1].trim();
+    const to = um[2].trim();
+    if (!isScoutKit(from) && !isScoutKit(to) && !isCombatLootItem(from) && !isCombatLootItem(to)) {
+      upgrades.push({ from, to });
+    }
   }
 
-  // Extended [ENEMY: Name, HP:N, AC:N, ATK:+N, DMG:dX+Y, WIS:+N, UNDEAD, BOSS, MIDBOSS]
-  const enemyRe = /\[ENEMY:\s*([^,\]]+),\s*HP:(\d+)(?:,\s*AC:(\d+))?(?:,\s*ATK:([+-]?\d+))?(?:,\s*DMG:([^\],]+))?(?:,\s*WIS:([+-]?\d+))?((?:,\s*(?:UNDEAD|BOSS|MIDBOSS))*)\s*\]/gi;
-  let em: RegExpExecArray | null;
-  while ((em = enemyRe.exec(text)) !== null) {
-    const hp = parseInt(em[2]);
-    const flags = (em[7] || "").toUpperCase();
-    const isUndead = /\bUNDEAD\b/.test(flags);
-    const explicitBoss = /\bBOSS\b/.test(flags);
-    const isMidBoss = /\bMIDBOSS\b/.test(flags);
+  // Stat fields and flags may appear in any order. MOTIVE is narrative metadata.
+  const enemyRe = /\[ENEMY:\s*([^,\]]+),\s*([^\]]+)\]/gi;
+  for (const match of text.matchAll(enemyRe)) {
+    const name = match[1].trim();
+    const fields = match[2].split(",").map(field => field.trim());
+    const stats = new Map<string, string>();
+    const flags = new Set<string>();
+    for (const field of fields) {
+      const separator = field.indexOf(":");
+      if (separator < 0) flags.add(field.toUpperCase());
+      else stats.set(field.slice(0, separator).trim().toUpperCase(), field.slice(separator + 1).trim());
+    }
+    const number = (key: string, fallback: number) => {
+      const value = stats.get(key) ?? "";
+      return /^[+-]?\d+$/.test(value) && Number.isSafeInteger(Number(value)) ? Number(value) : fallback;
+    };
+    const hp = number("HP", 0);
+    if (!name || hp <= 0) continue;
     newEnemies.push({
-      name: em[1].trim(),
-      maxHp: hp,
-      hp,
-      ac: em[3] ? parseInt(em[3]) : 12,
-      attackBonus: em[4] ? parseInt(em[4]) : 3,
-      damage: em[5] ? em[5].trim() : "d6+1",
-      wisBonus: em[6] ? parseInt(em[6]) : 0,
-      isUndead,
-      isBoss: explicitBoss,
-      isMidBoss,
+      name, hp, maxHp: hp,
+      ac: number("AC", 12),
+      attackBonus: number("ATK", 3),
+      damage: stats.get("DMG") || "d6+1",
+      wisBonus: number("WIS", 0),
+      isUndead: flags.has("UNDEAD"),
+      isBoss: flags.has("BOSS"),
+      isMidBoss: flags.has("MIDBOSS"),
     });
   }
-  // Heuristic boss promotion: if exactly one enemy was declared in this
-  // response and its HP exceeds the leader cap (20), mark it as a boss so the
-  // anti-oneshot guard correctly steps aside.
 
   const allyRe = /\[ALLY:\s*([^,\]]+),\s*HP:(\d+)\]/gi;
   let am: RegExpExecArray | null;
@@ -181,7 +205,22 @@ export function parseDMResponse(text: string) {
   for (const rawLine of text.trim().split(/\r?\n/)) {
     const line = rawLine.replace(/\r/g, "");
     const choiceMatch = line.trim().match(/^\*{0,2}(\d+)\.\s+(.+?)\*{0,2}$/);
-    if (choiceMatch) { choices.push({ num: choiceMatch[1], text: choiceMatch[2].trim() }); continue; }
+    if (choiceMatch) {
+      const [, num, rawChoice] = choiceMatch;
+      const checkTag = rawChoice.match(/\[CHECK:\s*([^,\]]+),\s*DC[=:]?\s*(\d+)(?:,\s*(STRENGTH))?\s*\]/i);
+      const noCheck = /\[NO_CHECK\]/i.test(rawChoice);
+      const clueRoute = /\[CLUE_ROUTE\]/i.test(rawChoice);
+      const choiceText = rawChoice.replace(/\[(?:CHECK:|CLUE_FALLBACK:|NO_CHECK\b|CLUE_ROUTE\b)[^\]]*\]/gi, "").trim();
+      const check = checkTag ? parseAbilityCheck(checkTag[1], Number(checkTag[2]), checkTag[3]) : noCheck ? null : undefined;
+      const preparedClue = check?.social ? parseClueFallback(rawChoice) : undefined;
+      if (choiceText && (!checkTag || check)) choices.push({
+        num, text: choiceText,
+        ...(check !== undefined ? { check } : {}),
+        ...(preparedClue ? { clueFallback: preparedClue } : {}),
+        ...(clueRoute ? { clueRoute: true } : {}),
+      });
+      continue;
+    }
     const stripped = line.replace(TAG, "").trim();
     TAG.lastIndex = 0;
     if (stripped.length === 0) continue;
@@ -190,9 +229,11 @@ export function parseDMResponse(text: string) {
 
   return {
     narrative: narrativeLines.join("\n").trim(),
-    choices,
+    choices: limitStoryChoices(choices),
     attackRequest,
     rollRequest,
+    clueFallback,
+    discoveredClue,
     damage,
     newItem,
     newItems,
@@ -201,6 +242,9 @@ export function parseDMResponse(text: string) {
     newAllies,
     allyDamages,
     enemyDamages,
+    enemyWithdrawals: [...text.matchAll(/\[ENEMY_WITHDRAWAL:\s*([^\]\r\n]+)\]/gi)].map(match => match[1].trim()),
+    epilogue: text.match(/^\s*\[EPILOGUE:[ \t]*([^\]\r\n]{12,1200})\][ \t]*$/im)?.[1]?.trim(),
+    midBossBypassed: /\[MIDBOSS_BYPASSED\]/i.test(text),
     newEffects,
     initiativeTrigger,
     combatEnd,
@@ -209,6 +253,8 @@ export function parseDMResponse(text: string) {
     behaviorShift,
     surprise,
     goldChange,
+    goldOffer,
+    vendor,
     enemyAttacks,
     artifactBonus,
   };

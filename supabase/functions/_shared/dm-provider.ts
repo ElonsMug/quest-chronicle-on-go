@@ -7,8 +7,8 @@ const PROVIDERS = {
 
 type Provider = keyof typeof PROVIDERS;
 type Config = { provider: Provider; model: string; apiKey: string };
-type Usage = { input?: number; output?: number; cachedInput?: number; thinking?: number };
-type Reply = { text: string; finish?: string; usage: Usage };
+export type DmUsage = { input?: number; output?: number; cachedInput?: number; thinking?: number };
+type Reply = { text: string; finish?: string; usage: DmUsage };
 const outputLimit = 1200;
 
 export function getDmConfig(env: Record<string, string | undefined>): Config | null {
@@ -22,10 +22,12 @@ export function getDmConfig(env: Record<string, string | undefined>): Config | n
 
 export class DmProviderError extends Error {
   readonly status: number;
+  readonly providerCode?: string;
 
-  constructor(status: number) {
+  constructor(status: number, providerCode?: string) {
     super("DM provider request failed");
     this.status = status;
+    this.providerCode = providerCode;
   }
 }
 
@@ -36,7 +38,13 @@ async function postJson<T>(url: string, headers: Record<string, string>, body: o
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(30_000),
   });
-  if (!response.ok) throw new DmProviderError(response.status);
+  if (!response.ok) {
+    const body = await response.json().catch(() => null) as { error?: { status?: unknown } } | null;
+    const code = body?.error?.status;
+    const knownCode = typeof code === "string" && ["UNAVAILABLE", "RESOURCE_EXHAUSTED", "DEADLINE_EXCEEDED", "INTERNAL"].includes(code)
+      ? code : undefined;
+    throw new DmProviderError(response.status, knownCode);
+  }
   return (await response.json()) as T;
 }
 
@@ -68,6 +76,8 @@ async function callGemini(config: Config, request: DMRequest): Promise<Reply> {
     else contents.push({ role, parts: [part] });
   }
 
+  const isSetup = request.purpose === "one-shot-setup";
+  const wantsJson = isSetup || request.purpose === "one-shot-intent";
   const result = await postJson<GeminiResponse>(
     `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent`,
     { "x-goog-api-key": config.apiKey },
@@ -75,7 +85,8 @@ async function callGemini(config: Config, request: DMRequest): Promise<Reply> {
       contents,
       systemInstruction: request.system ? { parts: [{ text: request.system }] } : undefined,
       generationConfig: {
-        maxOutputTokens: outputLimit,
+        maxOutputTokens: isSetup ? 4200 : wantsJson ? 300 : outputLimit,
+        ...(wantsJson ? { responseMimeType: "application/json" } : {}),
         thinkingConfig: { thinkingLevel: "MINIMAL" },
       },
     },
@@ -136,7 +147,7 @@ async function callDeepSeek(config: Config, request: DMRequest): Promise<Reply> 
 
 const generate = { gemini: callGemini, deepseek: callDeepSeek };
 
-export async function generateDmReply(config: Config, request: DMRequest): Promise<string> {
+export async function generateDmResult(config: Config, request: DMRequest) {
   const started = Date.now();
   const reply = await generate[config.provider](config, request);
   console.info("[dm] generation", {
@@ -151,5 +162,9 @@ export async function generateDmReply(config: Config, request: DMRequest): Promi
   if (!reply.text.trim() || (reply.finish && reply.finish !== expectedFinish)) {
     throw new DmProviderError(502);
   }
-  return reply.text;
+  return { text: reply.text, model: config.model, usage: reply.usage };
+}
+
+export async function generateDmReply(config: Config, request: DMRequest): Promise<string> {
+  return (await generateDmResult(config, request)).text;
 }

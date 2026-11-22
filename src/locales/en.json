@@ -12,6 +12,70 @@
     "use": "Use",
     "act": "Act"
   },
+  "socialClue": {
+    "previousApproach": "the earlier attempt at negotiation",
+    "failedCheck": "[Scene rule: the social check failed. Player action: {{action}}. The NPC refuses. Show a concrete consequence such as lost time or suspicion. Introduce a specific alternate source in the narration and give it one ordinary numbered choice tagged [NO_CHECK] [CLUE_ROUTE]. Prepared lead, if any: {{lead}}. Keep the other choices useful. Save the clue for when the player follows its lead.]",
+    "followPrepared": "[Scene rule: the player followed an alternate lead after a refusal. Earlier approach: {{action}}. The alternate source provides this clue: {{fact}}. Describe how it is found, retain the cost of the refusal, and provide next actions that advance the scene. Do not require another check for this clue.]",
+    "followUnprepared": "[Scene rule: after a failed social check, the player is looking for another source. Earlier approach: {{action}}. Use an accessible source that fits the scene and does not rely on the NPC who refused. Give one concrete clue that advances the same objective, and mark it on its own line as [CLUE_FOUND: concrete fact]. Preserve the consequence of the refusal. Give the clue without another roll, payment, or conversation with that NPC.]"
+  },
+  "checks": {
+    "difficulty": "DC {{dc}}",
+    "choiceLabel": "{{skill}} check · DC {{dc}}",
+    "skills": {
+      "acrobatics": "Acrobatics",
+      "animal handling": "Animal Handling",
+      "arcana": "Arcana",
+      "athletics": "Athletics",
+      "deception": "Deception",
+      "history": "History",
+      "insight": "Insight",
+      "intimidation": "Intimidation",
+      "investigation": "Investigation",
+      "medicine": "Medicine",
+      "nature": "Nature",
+      "perception": "Perception",
+      "performance": "Performance",
+      "persuasion": "Persuasion",
+      "religion": "Religion",
+      "sleight of hand": "Sleight of Hand",
+      "stealth": "Stealth",
+      "survival": "Survival"
+    }
+  },
+  "combatLoot": {
+    "gold": "{{amount}} gp",
+    "artifact": "+3 damage against the final boss",
+    "received": "Combat loot received: {{reward}}"
+  },
+  "vendor": {
+    "kitOnlyOffer": "The contact offers a field kit to help with exploration.",
+    "standardOffer": "The contact offers to sell useful information. The price is listed below.",
+    "roles": {
+      "innkeeper": "Innkeeper",
+      "merchant": "Merchant",
+      "informant": "Informant"
+    },
+    "buyTip": "Buy a tip · {{price}} gp",
+    "buyKit": "Buy a Scout’s Field Kit · {{price}} gp",
+    "kitEffect": "Single use. +2 to the next Perception, Investigation, or Survival check outside combat.",
+    "kitRoll": "Scout’s Field Kit: +2 included. The kit is used on this check.",
+    "confirmTip": "[Trade confirmed: {{amount}} gp for one tip. Deliver only this optional information: {{tip}}. Continue the scene with free options.]",
+    "confirmKit": "[Trade confirmed: {{amount}} gp for {{item}}. The engine grants the kit. Describe the purchase and continue with free options; do not reveal the unpaid tip.]",
+    "tipReceived": "Tip received: {{tip}}",
+    "leave": "Leave and continue without buying anything."
+  },
+  "goldOffer": {
+    "quote": "Price for {{reason}} — {{amount}} gold. The offer is awaiting your decision.",
+    "decline": "Decline and continue without paying",
+    "declined": "I decline the offer. I continue without paying or obtaining the paid benefit.",
+    "connectionLost": "Connection lost. The offer is still open and your wallet is unchanged.",
+    "receive": "Receive {{amount}} gp",
+    "pay": "Pay {{amount}} gp"
+  },
+  "sessionReport": {
+    "save": "Save session",
+    "description": "Download the story and game state for debugging"
+  },
   "language": {
     "label": "Language",
     "english": "English",
@@ -19,7 +83,7 @@
     "switchTitle": "Change language",
     "switchDuringGame": {
       "title": "Switch language?",
-      "body": "Menus, inventory and new events will appear in the new language. Messages already written by the Dungeon Master will stay in the current language.",
+      "body": "Menu labels and the Master’s next reply will use the new language. Existing scenes, choices, and item names keep the language they were written in.",
       "confirm": "Switch",
       "cancel": "Keep current"
     }
@@ -72,6 +136,7 @@
     "hp": "HP"
   },
   "combat_log": {
+    "disadvantage": " · Disadvantage: d20({{first}}) and d20({{second}})",
     "enemyAttackHit": "{{name}} attacks — d20({{roll}})+{{atk}}={{total}} vs AC{{ac}} → HIT → {{dmg}} damage",
     "enemyAttackMiss": "{{name}} attacks — d20({{roll}})+{{atk}}={{total}} vs AC{{ac}} → MISS",
     "enemyAttackCrit": "{{name}} attacks — d20(20) CRIT → {{dmg}} damage",
@@ -176,6 +241,19 @@
     "noSlots": "No slots"
   },
   "combat": {
+    "noPotion": "You have no healing potion left.",
+    "midBossPassed": "You take the side route and leave the opponent behind.",
+    "surrenderFallback": "Your opponent lowers their weapon. The fight is over.",
+    "retreatFallback": "You let your opponent withdraw. The fight is over.",
+    "disengageProceed": "Continue toward the objective",
+    "disengageLook": "Look around before moving on",
+    "reconciledHit": "Your strike lands, but the threat is still present.",
+    "reconciledMiss": "Your strike misses. The fight continues.",
+    "dodgeAttempt": "You shift aside and brace for the next attack.",
+    "midBossApproach": "The way ahead brings you within sight of {{name}}. You still have room to decide how to proceed.",
+    "midBossBypassChoice": "Look for a way around {{name}} and continue without a fight",
+    "midBossTalkChoice": "Approach {{name}} and ask what they want",
+    "midBossFightChoice": "Attack {{name}}",
     "surpriseRound": "Surprise round",
     "attack": "Attack",
     "berserk": "Berserk",
@@ -230,6 +308,7 @@
     "continueStory": "Continue the story",
     "drinkPotion": "Drink healing potion",
     "retry": "Restart the fight",
+    "restarted": "The fight restarts with the state restored from its opening.",
     "returnToMenu": "Return to menu",
     "closeAria": "Close",
     "closeTitle": "Close and re-read the journal",
@@ -261,10 +340,67 @@
     }
   },
   "arcCompleted": {
+    "bossFallen": "The final opponent has fallen.",
+    "bossSurrendered": "The final opponent has surrendered.",
+    "showEnding": "View ending",
+    "reward": "Adventure reward · {{gold}} gp",
+    "surrenderSubtitle": "The final opponent surrendered. You achieved your goal.",
+    "surrenderFallback": "Your opponent yields. With the threat contained, you see your task through.",
+    "victoryFallback": "The final threat falls. The way is clear to finish what you came to do, and your task is complete.",
+    "readStory": "Read the journal",
+    "journal": "Epilogue — {{epilogue}}",
     "title": "Arc complete!",
     "subtitle": "{{antagonist}} has fallen. Grey Shore breathes easier.",
     "newArc": "New adventure",
-    "returnToMenu": "Return to menu"
+    "returnToMenu": "Main menu · new adventures",
+    "reportBack": "Return and report your success · {{recipient}}",
+    "continueToEnding": "Finish the adventure",
+    "objectivePending": "The way is clear. One action remains: {{objective}}.",
+    "artifactAward": "Unique artifact acquired · {{name}}",
+    "rewardHeading": "Adventure reward",
+    "rewardAmount": "+{{gold}} gold",
+    "finds": "Items found in this adventure",
+    "noFinds": "You collected no items.",
+    "futureInventory": "In future adventures, you’ll be able to carry collected items forward and use their abilities to change how your stories unfold.",
+    "supportLater": "Support the project · coming later",
+    "perks": {
+      "resolve": "Planned ability: reroll one failed ability check per adventure.",
+      "insight": "Planned ability: gain +2 on your first Investigation check in an adventure.",
+      "guard": "Planned ability: reduce the first hit you take in an adventure by 3 damage.",
+      "fortune": "Planned ability: gain 5 extra gold from your first completed encounter."
+    },
+    "fallback": {
+      "objective": {
+        "altar": {
+          "action": "Destroy the altar",
+          "result": "You destroy the altar and break the pact. The corruption begins to recede."
+        },
+        "ritual": {
+          "action": "Disrupt the ritual",
+          "result": "You break the ritual circle. The summoning stops and the danger passes."
+        },
+        "evidence": {
+          "action": "Gather and expose the evidence",
+          "result": "You collect the evidence and hand it to those who can put an end to the conspiracy."
+        }
+      },
+      "recognition": {
+        "merchants": {
+          "recipient": "the merchants of Grey Shore",
+          "response": "The merchants thank you for freeing the trade road. The first caravan is already preparing to leave."
+        },
+        "villagers": {
+          "recipient": "the villagers",
+          "response": "The villagers come out to meet you. They thank you for giving them a chance to live free of the corruption."
+        }
+      },
+      "artifacts": {
+        "resolve": "Ring of Steadfast Resolve",
+        "insight": "Lens of Hidden Signs",
+        "guard": "Amulet of the Last Shield",
+        "fortune": "Coin of the Fortunate Road"
+      }
+    }
   },
   "dev": {
     "title": "Dev Mode",
@@ -279,10 +415,14 @@
     }
   },
   "dm": {
+    "masterUnavailableOpening": "The Master is temporarily unavailable. Retry to open this adventure.",
+    "masterUnavailableTurn": "The Master is temporarily unavailable. Your move is saved for retry.",
+    "retryOpening": "Retry opening scene",
     "thinking": "The Master is thinking",
     "silent": "The Master is silent...",
     "connectionError": "Connection to the Master failed.",
-    "connectionLost": "Connection lost.",
+    "turnConnectionLost": "The Dungeon Master did not respond. Your turn is saved and can be sent again.",
+    "retryTurn": "Retry sending this turn",
     "genericError": "Error.",
     "receivedItem": "Received: {{item}}",
     "startPrompt": "Begin the adventure. An opening scene in Grey Shore. 3 action choices.",
@@ -297,8 +437,10 @@
     }
   },
   "system": {
+    "goldReceived": "[The player confirmed receipt of {{amount}} gp. Reason: {{reason}}. The engine already credited the coins. Describe the result and continue the scene.]",
+    "goldPaid": "[The player confirmed payment of {{amount}} gp. Reason: {{reason}}. The engine already debited the coins. Describe what the player received and continue the scene.]",
     "potionBonusAction": "[Bonus action before main attack: the player drinks a healing potion, +{{heal}} HP ({{hp}}/{{max}}). Describe the gulp of the potion in ONE sentence, then immediately describe the player's main action described below.]",
-    "combatTurnReminder": "[SYSTEM RULE: After describing the result of the player's action — the leader acts according to their behavior state. AGGRESSIVE/TACTICAL/DEFENSIVE → attack with [DAMAGE: X] on hit. RETREATING → narrate the disengage, no attack required. If leader is below 40% HP → trigger the motive-based behavior shift (surrender/flee/escalate). Minions add pressure in the narrative without their own turn. Do not offer choices 1-2-3 unless combat is ending.]",
+    "combatTurnReminder": "[SYSTEM RULE: After describing the result of the player's action — the leader acts according to their behavior state. AGGRESSIVE/TACTICAL/DEFENSIVE → use [ENEMY_ATTACK: reference] and let the client resolve the roll. RETREATING → narrate the disengage, no attack required. If leader is below 40% HP → trigger the motive-based behavior shift (surrender/flee/escalate). Minions add pressure in the narrative without their own turn. Do not offer choices 1-2-3 unless combat is ending.]",
     "surpriseRoundReminder": "[SYSTEM RULE: SURPRISE ROUND — the player just used their free ambush action. Enemies are STILL surprised this turn — DO NOT attack the player, DO NOT write [DAMAGE:]. Describe the result of the surprise action (kill, wound, missed swing). If enemies still live, NOW write [INITIATIVE] on its own line — normal combat starts on the next turn. Do not offer choices 1-2-3.]",
     "berserkActivated": "[Berserk activated: +2 damage and -2 AC for 2 turns]",
     "defendStance": "[Defensive stance: +2 AC until next turn]",
@@ -308,11 +450,12 @@
     "sleepCast": "[Sleep: pool of {{pool}} HP. Living enemies fall asleep starting from the lowest HP until the pool runs out (subtract sleeping enemy's HP from the pool). Undead, constructs and demons are immune. For each sleeping enemy write [EFFECT: <Enemy_name>_asleep, 2 rounds]. The sleepers are helpless but alive — ask the player what to do with each (finish, bind, interrogate, search) — this is no longer active combat with sleepers, give 3 choices.]",
     "controlSpellCast": "[Control spell cast: {{name}}. Spell Save DC 14.]",
     "spellCast": "[Cast: {{name}}]",
-    "retryCombat": "[Player restarts the fight — same encounter, original HP]",
     "initiativeWon": "[Initiative won: you {{player}} vs enemy {{enemy}} — you act first]",
     "initiativeLost": "[Initiative lost: you {{player}} vs enemy {{enemy}} — enemy attacks first]",
     "attackAutoMiss": "[Attack: {{weapon}}{{target}} — d20(1) AUTO-MISS vs AC{{ac}}]",
     "attackCrit": "[Attack: {{weapon}}{{target}} — d20(20) CRIT vs AC{{ac}} → Damage to enemy: {{damage}}. Describe the strike and write [ENEMY_DAMAGE: {{tagName}}, {{damage}}].]",
+    "combatAttackCrit": "[Attack: {{weapon}}{{target}} — d20(20) CRIT vs AC{{ac}} → Damage to enemy: {{damage}}]",
+    "combatAttackHit": "[Attack: {{weapon}}{{target}} — d20({{roll}})+mod({{mod}})+prof({{prof}})={{total}} vs AC{{ac}} HIT → Damage to enemy: {{damage}}]",
     "attackHit": "[Attack: {{weapon}}{{target}} — d20({{roll}})+mod({{mod}})+prof({{prof}})={{total}} vs AC{{ac}} HIT → Damage to enemy: {{damage}}. Describe the strike and write [ENEMY_DAMAGE: {{tagName}}, {{damage}}].]",
     "attackMiss": "[Attack: {{weapon}}{{target}} — d20({{roll}})+mod({{mod}})+prof({{prof}})={{total}} vs AC{{ac}} MISS]",
     "rollSuccess": "[Check: {{stat}} — SUCCESS ({{roll}}{{modPart}}={{total}} vs DC{{dc}})]",
@@ -354,5 +497,121 @@
     "returning_new": "Start a new journey",
     "dev_reset": "Reset onboarding",
     "dev_preview_label": "DEV: onboarding preview"
+  },
+  "oneshot": {
+    "title": "A new incarnation",
+    "startAs": "Begin as {{name}}",
+    "exit": "Back to heroes",
+    "report": "Save session report",
+    "resources": "HP {{hp}}/{{max}} · {{gold}} gp · Potions {{potions}}",
+    "preparing": "Gemini is preparing your adventure…",
+    "listening": "The Master is considering your move…",
+    "error": "The Master couldn’t answer. Try again.",
+    "retrySetup": "Retry adventure setup",
+    "retryTurn": "Resend the same move",
+    "edit": "Edit move",
+    "freeAction": "Your own action…",
+    "send": "Send",
+    "noMatch": "That action isn’t available in this scene. Try a different approach.",
+    "price": "{{gold}} gp",
+    "check": "{{skill}} · DC {{dc}}",
+    "checkPass": "{{skill}} · d20 {{die}} ({{modifier}}) = {{total}} vs DC {{dc}} · Success",
+    "checkFail": "{{skill}} · d20 {{die}} ({{modifier}}) = {{total}} vs DC {{dc}} · Failure",
+    "yourAttack": "Your attack · d20 {{die}}, total {{total}} vs AC {{ac}} · {{damage}} damage",
+    "enemyAttack": "Enemy attack · d20 {{die}}, total {{total}} vs AC {{ac}} · {{damage}} damage",
+    "healed": "Potion restores {{amount}} HP.",
+    "loot": "Loot received: {{name}} (+3 damage in the final fight).",
+    "forcedExit": "After three rounds, you break off the fight.",
+    "fight": "{{foe}} · {{hp}} HP · Round {{round}} of 3",
+    "clue": "Clue",
+    "journal": "Journal",
+    "usage": "{{model}} · Requests: {{requests}} · Tokens: {{total}} ({{input}} in, {{output}} out)",
+    "unreported": "Requests without a complete token count: {{count}}",
+    "restart": "Generate another adventure",
+    "action": {
+      "strike": "Attack",
+      "potion": "Drink a healing potion",
+      "withdraw": "Break off the fight",
+      "dodge": "Dodge and look for an opening",
+      "tip": "Buy tactical information from {{vendor}}",
+      "buyPotion": "Buy a healing potion from {{vendor}}"
+    },
+    "challenge": "Attack {{opponent}}",
+    "spellSlots": "Spell slots {{count}}",
+    "asleep": "The opponent falls asleep. You can move on.",
+    "resistedSleep": "The spell fails to put the opponent to sleep."
+  },
+  "lighthouse": {
+    "entry": "Play the short adventure",
+    "title": "The Darkened Lighthouse",
+    "restart": "Start another run",
+    "premise": "Someone put out Grey Shore’s lighthouse. A ship is approaching the reef, and you have until it reaches the harbor to warn it.",
+    "start": "Begin adventure",
+    "retry": "Retry the Master’s reply",
+    "unavailable": "The Master didn’t answer. Retry to continue from the same result.",
+    "choices": "What do you do?",
+    "clues": "Clues",
+    "none": "No clues yet.",
+    "round": "Round {{round}} of 3",
+    "enemyHp": "{{enemy}} · {{hp}} HP",
+    "report": "Gemini usage for this run",
+    "requests": "Requests sent",
+    "input": "Input tokens",
+    "output": "Output tokens",
+    "total": "Total reported tokens",
+    "partial": "Usage unavailable for {{count}} request(s). These totals cover replies with token counts.",
+    "model": "Model",
+    "return": "Return to character selection",
+    "scene": {
+      "harbor": "At the harbor, learn what happened and how to reach the lighthouse. After two clues, you head uphill.",
+      "gate": "A smuggler lookout guards the lighthouse gate. The stairs lead up to the lantern room.",
+      "guard": "The lookout blocks the stairs. Resolve the duel. If the lookout survives three rounds, they withdraw into the fog.",
+      "lantern": "The captain has blocked the lighthouse lens. A signal flare lies by the window as an emergency way to warn the ship.",
+      "captain": "The smuggler captain fights by the lantern as the ship nears the reef. There are up to three rounds. The signal flare is still within reach.",
+      "ending": "Describe the recorded outcome and what happens at the harbor afterward."
+    },
+    "enemy": {
+      "guard": "Lookout",
+      "captain": "Smuggler captain"
+    },
+    "action": {
+      "keeper": "Question the wounded lighthouse keeper",
+      "orders": "Read the confiscated dock orders",
+      "passage": "Trace the maintenance passage on the harbor map",
+      "showOrders": "Show the lookout the captain’s orders",
+      "takePassage": "Enter through the maintenance passage",
+      "rushGuard": "Challenge the lookout",
+      "confrontCaptain": "Fight the captain",
+      "negotiate": "Confront the captain with the orders and the keeper’s testimony",
+      "repair": "Slip to the lens and clear the obstruction",
+      "strike": "Attack",
+      "flare": "Fire the emergency flare"
+    },
+    "event": {
+      "keeper": "The keeper saw the captain deliberately block the lens. The captain told the crew that nobody would get hurt.",
+      "orders": "The signed orders direct the crew to extinguish the lamp and loot the grounded ship. They also order the lookout to leave if the orders are exposed.",
+      "passage": "The maintenance passage goes around the lookout. The map also shows a shortcut to the back of the lighthouse lens.",
+      "showOrders": "The lookout sees the orders and abandons the gate. You reach the lantern.",
+      "takePassage": "You take the maintenance passage and reach the lantern unseen.",
+      "negotiate": "The captain stands down when faced with the orders and the keeper’s testimony.",
+      "enemyInitiative": "The enemy goes first ({{opponent}} vs {{player}}).",
+      "heroInitiative": "You go first ({{player}} vs {{opponent}}).",
+      "checkPassed": "Dexterity check {{total}} vs {{dc}}. Success.",
+      "checkFailed": "Dexterity check {{total}} vs {{dc}}. The captain catches you at the lens.",
+      "heroHit": "Your attack hits for {{damage}} damage ({{total}} to hit).",
+      "heroMiss": "Your attack misses ({{total}} to hit).",
+      "enemyHit": "The enemy hits for {{damage}} damage ({{total}} to hit).",
+      "enemyMiss": "The enemy misses ({{total}} to hit).",
+      "guardDefeated": "The lookout is defeated. You climb to the lantern.",
+      "guardDisengages": "After three rounds, the lookout withdraws into the fog. You climb to the lantern.",
+      "lit": "The lighthouse shines and the ship clears the reef.",
+      "warned": "The flare warns the ship in time. The lighthouse remains dark and the captain is still at large.",
+      "lost": "The ship reaches the reef before it can be warned. The harbor crew launches a rescue. The lighthouse stays dark."
+    },
+    "outcome": {
+      "lit": "The light is restored",
+      "warned": "The ship is warned",
+      "lost": "The ship runs aground"
+    }
   }
 }

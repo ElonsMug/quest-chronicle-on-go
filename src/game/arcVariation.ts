@@ -14,69 +14,37 @@
 
 import type { Character } from "./types";
 import type { Arc, ArcTemplate } from "./arcs";
-import { createArcFromTemplate } from "./arcs";
+import { createArcFromTemplate, parseArcVariation } from "./arcs";
 
+import { fallbackFinalePlan, requiresObjectiveAction } from "./arcFinale";
+import i18n from "@/i18n";
 import { requestDm } from "./api";
-
-function tryParseArcJson(raw: string): Partial<{
-  goal: string;
-  antagonist: string;
-  setting: string;
-  midBossName: string;
-}> | null {
-  // The model often wraps JSON in ```json fences or surrounding prose.
-  // Pull out the first {...} block instead of trusting the whole string.
-  const match = raw.match(/\{[\s\S]*\}/);
-  if (!match) return null;
-  try {
-    const obj = JSON.parse(match[0]) as Record<string, unknown>;
-    const pick = (k: string) =>
-      typeof obj[k] === "string" && (obj[k] as string).trim().length > 0
-        ? (obj[k] as string).trim()
-        : undefined;
-    return {
-      goal: pick("goal"),
-      antagonist: pick("antagonist"),
-      setting: pick("setting"),
-      midBossName: pick("midBossName"),
-    };
-  } catch {
-    return null;
-  }
-}
 
 export async function varyArcWithLLM(
   template: ArcTemplate,
   character: Character,
   language: "en" | "ru",
 ): Promise<Arc> {
-  const fallback = createArcFromTemplate(template);
+  const base = createArcFromTemplate(template, language);
+  const defaultPlan = fallbackFinalePlan(base, i18n.getFixedT(language));
+  const fallback = { ...base, finalePlan: defaultPlan };
+  const { toneHint } = template.text[language];
 
-  const system = language === "ru"
-    ? `Ты помогаешь Мастеру (DM) подготовить новое приключение. Твоя задача — взять скелет арки и переписать его в свежем варианте, сохранив структуру (мини-босс, финальный босс, та же тема), но с новыми именами, местом и подачей. Пиши строго на русском кириллицей. Верни ТОЛЬКО валидный JSON без markdown, без комментариев. Поля: goal (короткая цель героя, 1 предложение), antagonist (имя и краткое описание главного злодея), setting (где разворачивается арка), midBossName (имя мини-босса).`
-    : `You help the Dungeon Master prepare a new adventure. Your task: take an arc skeleton and rewrite it as a fresh variant — keep the structure (mid-boss, final boss, same theme) but invent new names, place and flavor. Write in English. Return ONLY valid JSON, no markdown, no commentary. Fields: goal (1-sentence hero goal), antagonist (name + short description of main villain), setting (where the arc takes place), midBossName (mid-boss name).`;
-
-  const userMsg = language === "ru"
-    ? `Класс героя: ${character.name}.
-Тон арки: ${template.toneHint}.
-
-Скелет (перепиши с новыми именами/местом, СОХРАНИ суть):
-- Цель: ${template.goal}
-- Антагонист: ${template.antagonist}
-- Сеттинг: ${template.setting}
-- Мини-босс: ${template.midBossName}
-
-Верни JSON: {"goal":"...","antagonist":"...","setting":"...","midBossName":"..."}`
-    : `Hero class: ${character.name}.
-Arc tone: ${template.toneHint}.
-
-Skeleton (rewrite with new names/place, KEEP the essence):
-- Goal: ${template.goal}
-- Antagonist: ${template.antagonist}
-- Setting: ${template.setting}
-- Mid-boss: ${template.midBossName}
-
-Return JSON: {"goal":"...","antagonist":"...","setting":"...","midBossName":"..."}`;
+  const system = [
+    "Prepare a fresh version of an adventure for a solo D&D hero. Keep the same structure, with new names, setting, and details.",
+    language === "ru" ? "Write all values in Russian Cyrillic." : "Write all values in English.",
+    "Return JSON only with goal, antagonist, setting, midBossName, successEpilogue and finalePlan.",
+    'finalePlan uses {"objective":null or {"action":"player action","result":"result of the action"},"recognition":null or {"recipient":"an interested NPC or group","response":"their personal thanks after the hero reports back"},"artifact":{"name":"unique short name suited to this adventure","perk":"resolve|insight|guard|fortune"}}.',
+    "If the objective needs a deliberate act after the opponent is subdued, describe that act. For an altar include its actual destruction as the player action. If neutralizing the boss fulfills the whole goal, use null. Choose an optional beneficiary with a clear reason to thank the hero; establish them during this adventure.",
+    "Use only one of resolve, insight, guard, fortune for the artifact perk. Never promise a sum of gold or invent the effect of the artifact in any prose.",
+    "The goal is one sentence. Give the main enemy a name and brief description.",
+    "Prepare the successful epilogue in 2–3 sentences. Describe the impact after all required player actions have taken place; do not make a choice for the player or describe an optional return.",
+    "The ending must fit victory by force or accepted surrender. Do not assume specific loot, secondary choices, or whether the opponent lives.",
+  ].join(" ");
+  const userMsg = JSON.stringify({
+    heroClass: character.name, heroBackstory: character.backstory, tone: toneHint,
+    goal: fallback.goal, antagonist: fallback.antagonist, setting: fallback.setting, midBossName: fallback.midBossName,
+  });
 
   try {
     const raw = await requestDm({
@@ -84,14 +52,21 @@ Return JSON: {"goal":"...","antagonist":"...","setting":"...","midBossName":"...
       system,
       messages: [{ role: "user", content: userMsg }],
     });
-    const parsed = tryParseArcJson(raw);
+    const parsed = parseArcVariation(raw, language);
     if (!parsed) return fallback;
+    const plan = parsed.goal ? parsed.finalePlan : undefined;
+    const finalePlan = plan ? { ...plan,
+      objective: requiresObjectiveAction(template.id) ? plan.objective ?? defaultPlan.objective : plan.objective,
+      recognition: plan.recognition ?? defaultPlan.recognition,
+    } : defaultPlan;
     return {
       ...fallback,
       goal: parsed.goal ?? fallback.goal,
       antagonist: parsed.antagonist ?? fallback.antagonist,
       setting: parsed.setting ?? fallback.setting,
       midBossName: parsed.midBossName ?? fallback.midBossName,
+      successEpilogue: parsed.goal ? parsed.successEpilogue : undefined,
+      finalePlan,
     };
   } catch {
     return fallback;
